@@ -36,6 +36,17 @@ pub enum DataKey {
     LastReset(Scope, Period), // u64
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TimeRecord {
+    pub player: Address,
+    pub puzzle_id: u32,
+    pub time_ms: u64,
+    pub submitted_at: u64,
+    pub replay_hash: BytesN<32>,
+    pub record_id: u64,
+}
+
 #[contract]
 pub struct TimeAttack;
 
