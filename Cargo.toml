@@ -4,7 +4,8 @@ resolver = "2"
 members = [
     "contracts/achievement_nft",
     "contracts/reward_token",
-    "contracts/puzzle_verification",
+    "contracts/puzzle_verification", 
+    "contracts/guild",
 ]
 
 [workspace.dependencies]
