@@ -28,8 +28,9 @@ pub enum TimePeriod {
 #[contracttype]
 pub enum DataKey {
     // Admin / config
-    Admin, // Address
-    TopN,  // u32
+    Admin,        // Address
+    TopN,         // u32
+    RewardAmount, // i128 (STUB: future world-record reward amount)
 
     // Timing (only used if start_run/submit_run)
     RunStart(Address, u32), // u64
@@ -56,6 +57,7 @@ pub enum Error {
     DuplicateReplay = 5,
     ContractNotInitialized = 6,
     InvalidPuzzleId = 7,
+    InvalidRewardAmount = 8, // STUB: used by set_reward_amount
 }
 
 /// A single player completion record for a puzzle run submission.
@@ -81,6 +83,16 @@ pub struct Leaderboard {
     pub last_reset: u64,
 }
 
+/// Pure logic classification for future "time bracket competitions".
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TimeBracket {
+    Beginner,
+    Intermediate,
+    Advanced,
+    Expert,
+}
+
 #[contract]
 pub struct TimeAttack;
 
@@ -98,6 +110,9 @@ impl TimeAttack {
 
         // Store the admin address in contract storage
         storage.set(&DataKey::Admin, &admin);
+
+        // STUB: reward plumbing only (no payout logic yet)
+        storage.set(&DataKey::RewardAmount, &0_i128);
 
         Ok(())
     }
@@ -388,32 +403,66 @@ impl TimeAttack {
             .unwrap_or(Vec::new(&env))
     }
 
-    /// Set maximum leaderboard size (admin only)
-    ///
-    /// # Arguments
-    /// * `env` - Contract environment
-    /// * `admin` - Admin address
-    /// * `max_size` - Maximum number of entries per leaderboard
-    pub fn set_max_leaderboard_size(
+    /// STUB: configure a future world-record reward amount (admin only).
+    pub fn set_reward_amount(
         env: Env,
         admin: Address,
-        max_size: u32,
+        world_record_reward: i128,
     ) -> Result<(), Error> {
         admin.require_auth();
 
-        // Verify admin
         let stored_admin: Address = env
             .storage()
             .instance()
             .get(&DataKey::Admin)
             .ok_or(Error::ContractNotInitialized)?;
 
-        if admin != stored_admin {
-            return Err(Error::NotAuthorized);
+
+            
+        if world_record_reward < 0 {
+            return Err(Error::InvalidRewardAmount);
         }
 
-        env.storage().instance().set(&DataKey::TopN, &max_size);
+        env.storage()
+            .instance()
+            .set(&DataKey::RewardAmount, &world_record_reward);
+
         Ok(())
+    }
+
+    /// STUB: read configured reward amount. Defaults to 0 if unset.
+    pub fn get_reward_amount(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DataKey::RewardAmount)
+            .unwrap_or(0)
+    }
+
+    /// Pure mapping: completion time (ms) -> bracket (no storage).
+    pub fn get_time_bracket(_env: Env, completion_time_ms: u64) -> TimeBracket {
+        Self::time_to_bracket(completion_time_ms)
+    }
+
+    fn time_to_bracket(completion_time_ms: u64) -> TimeBracket {
+        match completion_time_ms {
+            0..=300_000 => TimeBracket::Beginner,
+            300_001..=600_000 => TimeBracket::Intermediate,
+            600_001..=900_000 => TimeBracket::Advanced,
+            _ => TimeBracket::Expert,
+        }
+    }
+
+    /// Get the admin address
+    pub fn get_admin(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin address not set")
+    }
+
+    /// Get the current timestamp (for testing)
+    pub fn get_timestamp(env: Env) -> u64 {
+        env.ledger().timestamp()
     }
 }
 
@@ -588,5 +637,24 @@ mod test {
         assert_eq!(leaderboard.get(0).unwrap().completion_time_ms, 100_000); // player2
         assert_eq!(leaderboard.get(1).unwrap().completion_time_ms, 125_000); // player3
         assert_eq!(leaderboard.get(2).unwrap().completion_time_ms, 150_000); // player1
+    }
+
+    #[test]
+    fn test_reward_amount_stub_defaults_and_setter() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let contract_id = env.register_contract(None, TimeAttack);
+        let client = TimeAttackClient::new(&env, &contract_id);
+
+        let admin = Address::generate(&env);
+        client.initialize(&admin);
+
+        // defaults to 0 (stub)
+        assert_eq!(client.get_reward_amount(), 0);
+
+        // admin can set
+        client.set_reward_amount(&admin, &123_i128);
+        assert_eq!(client.get_reward_amount(), 123);
     }
 }
