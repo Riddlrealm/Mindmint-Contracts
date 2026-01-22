@@ -13,6 +13,18 @@ Manages custom token rewards and puzzle unlocks.
 ### Puzzle Verification Contract
 Verifies puzzle solutions and triggers rewards.
 
+### Guild Contract
+Manages guild membership, treasury, voting, and inter-guild competitions.
+
+### Referral Contract
+Tracks referral relationships and distributes rewards to both referrers and referees. Features include:
+- Unique referral code generation
+- Dual reward distribution (referrer + referee)
+- Referral limits per user
+- Anti-gaming mechanisms (prevents self-referrals, duplicate registrations)
+- Comprehensive statistics tracking
+- Event emissions for all referral activities
+
 ## 🛠️ Tech Stack
 
 * **Language**: Rust
@@ -66,7 +78,9 @@ quest-service-contracts/
 ├── contracts/
 │   ├── achievement_nft/     # NFT achievement contract
 │   ├── reward_token/        # Token reward contract
-│   └── puzzle_verification/ # Puzzle verification contract
+│   ├── puzzle_verification/ # Puzzle verification contract
+│   ├── guild/               # Guild management contract
+│   └── referral/            # Referral tracking and rewards contract
 ├── tests/                   # Integration tests
 ├── scripts/                 # Deployment scripts
 ├── Cargo.toml              # Workspace configuration

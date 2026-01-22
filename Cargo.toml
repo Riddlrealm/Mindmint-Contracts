@@ -7,6 +7,7 @@ members = [
     "contracts/reward_token",
     "contracts/puzzle_verification",
     "contracts/guild",
+    "contracts/referral",
     "contracts/tournament",
     "contracts/staking",
     "contracts/time_attack",
