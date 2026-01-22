@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "contracts/achievement_nft",
+    "contracts/achievement_collection",
     "contracts/reward_token",
     "contracts/puzzle_verification", 
     "contracts/guild",
