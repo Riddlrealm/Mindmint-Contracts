@@ -220,8 +220,7 @@ impl TimeAttack {
         const MAX_REASONABLE_TIME_MS: u64 = 60 * 60 * 1000; // 1h
         const MIN_SUBMIT_INTERVAL_S: u64 = 5;
 
-        if completion_time_ms < MIN_REASONABLE_TIME_MS || completion_time_ms > MAX_REASONABLE_TIME_MS
-        {
+        if !(MIN_REASONABLE_TIME_MS..=MAX_REASONABLE_TIME_MS).contains(&completion_time_ms) {
             return Err(Error::InvalidTime);
         }
 
@@ -417,8 +416,10 @@ impl TimeAttack {
             .get(&DataKey::Admin)
             .ok_or(Error::ContractNotInitialized)?;
 
+        if admin != stored_admin {
+            return Err(Error::NotAuthorized);
+        }
 
-            
         if world_record_reward < 0 {
             return Err(Error::InvalidRewardAmount);
         }
@@ -469,7 +470,10 @@ impl TimeAttack {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::{Address as _, Ledger}, Env};
+    use soroban_sdk::{
+        testutils::{Address as _, Ledger},
+        Env,
+    };
 
     #[test]
     fn test_initialize() {
@@ -555,8 +559,7 @@ mod test {
 
         // First submission should succeed
         let replay1 = BytesN::from_array(&env, &[1u8; 32]);
-        client
-            .submit_time(&player, &1u32, &completion_time, &replay1);
+        client.submit_time(&player, &1u32, &completion_time, &replay1);
 
         // Second submission immediately should fail (rate limiting)
         let replay2 = BytesN::from_array(&env, &[2u8; 32]);
@@ -581,8 +584,7 @@ mod test {
         let completion_time = 120_000u64;
 
         // First player submits
-        client
-            .submit_time(&player1, &1u32, &completion_time, &replay_hash);
+        client.submit_time(&player1, &1u32, &completion_time, &replay_hash);
 
         // Second player tries to use same replay (should fail)
         let result = client.try_submit_time(&player2, &1u32, &completion_time, &replay_hash);
