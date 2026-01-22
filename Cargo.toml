@@ -10,6 +10,7 @@ members = [
     "contracts/staking",
     "contracts/time_attack",
     "contracts/leaderboard",
+    "contracts/energy",
 ]
 
 [workspace.dependencies]
