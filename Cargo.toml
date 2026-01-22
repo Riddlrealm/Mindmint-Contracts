@@ -5,6 +5,7 @@ members = [
     "contracts/achievement_nft",
     "contracts/reward_token",
     "contracts/puzzle_verification",
+    "contracts/time_attack",  
 ]
 
 [workspace.dependencies]
