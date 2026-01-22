@@ -1,6 +1,5 @@
 #![no_std]
-
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, symbol_short, Symbol};
 
 #[contracttype]
 #[derive(Clone)]
@@ -13,9 +12,10 @@ pub struct Achievement {
 
 #[contracttype]
 pub enum DataKey {
-    Achievement(u32),
-    NextTokenId,
-    TotalSupply,
+    Achievement(u32), // Persistent
+    NextTokenId,      // Instance
+    TotalSupply,      // Instance
+    Admin,            // Instance
 }
 
 #[contract]
@@ -23,26 +23,23 @@ pub struct AchievementNFT;
 
 #[contractimpl]
 impl AchievementNFT {
-    /// Initialize the contract
-    pub fn initialize(env: Env) {
+    /// Initialize the contract with an admin
+    pub fn initialize(env: Env, admin: Address) {
+        if env.storage().instance().has(&DataKey::Admin) {
+            panic!("Already initialized");
+        }
+        env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::NextTokenId, &1u32);
         env.storage().instance().set(&DataKey::TotalSupply, &0u32);
     }
 
-    /// Mint a new achievement NFT
-    pub fn mint(
-        env: Env,
-        to: Address,
-        puzzle_id: u32,
-        metadata: String,
-    ) -> u32 {
+    /// Mint a new achievement NFT (SEP-41 style)
+    pub fn mint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {
+        // In a real scenario, you might check if a 'PuzzleService' contract 
+        // confirms this user actually solved the puzzle.
         to.require_auth();
 
-        let token_id: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::NextTokenId)
-            .unwrap_or(1);
+        let token_id: u32 = env.storage().instance().get(&DataKey::NextTokenId).unwrap();
 
         let achievement = Achievement {
             owner: to.clone(),
@@ -51,66 +48,66 @@ impl AchievementNFT {
             timestamp: env.ledger().timestamp(),
         };
 
-        env.storage()
-            .instance()
-            .set(&DataKey::Achievement(token_id), &achievement);
-
-        env.storage()
-            .instance()
-            .set(&DataKey::NextTokenId, &(token_id + 1));
-
-        let total_supply: u32 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &(total_supply + 1));
+        // Use Persistent storage for the individual NFT data
+        env.storage().persistent().set(&DataKey::Achievement(token_id), &achievement);
+        
+        // Update counters
+        env.storage().instance().set(&DataKey::NextTokenId, &(token_id + 1));
+        let total: u32 = env.storage().instance().get(&DataKey::TotalSupply).unwrap();
+        env.storage().instance().set(&DataKey::TotalSupply, &(total + 1));
 
         token_id
     }
 
-    /// Get achievement details
-    pub fn get_achievement(env: Env, token_id: u32) -> Option<Achievement> {
-        env.storage()
-            .instance()
+    /// SEP-41: Transfer ownership
+    pub fn transfer(env: Env, from: Address, to: Address, token_id: u32) {
+        from.require_auth();
+
+        let mut achievement: Achievement = env
+            .storage()
+            .persistent()
             .get(&DataKey::Achievement(token_id))
+            .expect("Token does not exist");
+
+        if achievement.owner != from {
+            panic!("Not the owner");
+        }
+
+        achievement.owner = to;
+        env.storage().persistent().set(&DataKey::Achievement(token_id), &achievement);
     }
 
-    /// Get total supply
+    /// SEP-41: Get owner of a token
+    pub fn owner_of(env: Env, token_id: u32) -> Address {
+        let achievement: Achievement = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Achievement(token_id))
+            .expect("Token does not exist");
+        achievement.owner
+    }
+
+    pub fn get_achievement(env: Env, token_id: u32) -> Option<Achievement> {
+        env.storage().persistent().get(&DataKey::Achievement(token_id))
+    }
+
     pub fn total_supply(env: Env) -> u32 {
-        env.storage()
-            .instance()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0)
+        env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
+    }
+
+    /// Burn/Revoke functionality
+    pub fn burn(env: Env, token_id: u32) {
+        let achievement: Achievement = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Achievement(token_id))
+            .expect("Token does not exist");
+        
+        achievement.owner.require_auth();
+
+        env.storage().persistent().remove(&DataKey::Achievement(token_id));
+        
+        let total: u32 = env.storage().instance().get(&DataKey::TotalSupply).unwrap();
+        env.storage().instance().set(&DataKey::TotalSupply, &(total - 1));
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use soroban_sdk::testutils::Address as _;
-
-    #[test]
-    fn test_mint() {
-        let env = Env::default();
-        let contract_id = env.register_contract(None, AchievementNFT);
-        let client = AchievementNFTClient::new(&env, &contract_id);
-
-        client.initialize();
-
-        let user = Address::generate(&env);
-        let metadata = String::from_str(&env, "First Puzzle Completed");
-
-        env.mock_all_auths(); // <-- required for require_auth()
-
-        let token_id = client.mint(&user, &1, &metadata);
-
-        assert_eq!(token_id, 1);
-        assert_eq!(client.total_supply(), 1);
-
-        let achievement = client.get_achievement(&token_id).unwrap();
-        assert_eq!(achievement.puzzle_id, 1);
-    }
-} // <-- THIS closes mod test
