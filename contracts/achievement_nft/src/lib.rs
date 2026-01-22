@@ -111,3 +111,5 @@ impl AchievementNFT {
         env.storage().instance().set(&DataKey::TotalSupply, &(total - 1));
     }
 }
+
+mod test;
