@@ -1,11 +1,10 @@
 [package]
-name = "guild"
+name = "energy"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["lib", "cdylib"]
-doctest = false
+crate-type = ["cdylib"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
@@ -13,3 +12,5 @@ soroban-sdk = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 
+[features]
+testutils = ["soroban-sdk/testutils"]
