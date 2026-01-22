@@ -5,8 +5,12 @@ members = [
     "contracts/achievement_nft",
     "contracts/achievement_collection",
     "contracts/reward_token",
-    "contracts/puzzle_verification", 
+    "contracts/puzzle_verification",
     "contracts/guild",
+    "contracts/tournament",
+    "contracts/staking",
+    "contracts/time_attack",
+    "contracts/leaderboard",
 ]
 
 [workspace.dependencies]
