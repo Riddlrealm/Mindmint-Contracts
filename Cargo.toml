@@ -16,6 +16,7 @@ members = [
   "contracts/staking",
   "contracts/time_attack",
   "contracts/tournament",
+  "contracts/bounty",
 ]
 
 [workspace.dependencies]
