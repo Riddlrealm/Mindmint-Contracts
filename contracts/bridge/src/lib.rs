@@ -916,11 +916,14 @@ mod test {
         let fee_collector = Address::generate(&env);
         let user = Address::generate(&env);
         let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+        let token_admin_client = token::StellarAssetClient::new(&env, &token_contract.address());
 
         client.initialize(&admin, &1u32, &0u32, &fee_collector);
 
         // For testing, we'll use a mock token - actual minting would be done externally
         // In a real scenario, the user would already have tokens
+
+        token_admin_client.mint(&user, &1000);
 
         // Bridge tokens
         let recipient = Bytes::from_array(&env, &[1u8; 32]);

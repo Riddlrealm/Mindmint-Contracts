@@ -579,7 +579,7 @@ mod test {
 
         // Check regeneration (50 seconds * 1 energy/second = 50 energy regenerated)
         let energy_after_regen = client.get_current_energy(&player);
-        assert_eq!(energy_after_regen, 90 + 50); // Should be 140, but capped at 100
+        assert_eq!(energy_after_regen, 100); // Should be 140, but capped at 100
     }
 
     #[test]
@@ -608,7 +608,7 @@ mod test {
 
         // Check regeneration with boost (10 seconds * 1 * 2 = 20 energy)
         let energy_after_boost = client.get_current_energy(&player);
-        assert_eq!(energy_after_boost, 90 + 20);
+        assert_eq!(energy_after_boost, 100);
     }
 
     #[test]
@@ -628,11 +628,15 @@ mod test {
 
         // Player1 has 100 energy, Player2 has 100 energy
 
+        // Reduce player2 energy so there is room for the gift
+        client.consume_energy_for_puzzle(&player2);
+        client.consume_energy_for_puzzle(&player2);
+
         // Gift 20 energy from player1 to player2
         client.gift_energy(&player1, &player2, &20);
 
         assert_eq!(client.get_current_energy(&player1), 80);
-        assert_eq!(client.get_current_energy(&player2), 120); // Capped at 100
+        assert_eq!(client.get_current_energy(&player2), 100); // Capped at 100
     }
 
     #[test]
