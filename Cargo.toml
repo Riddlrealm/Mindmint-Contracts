@@ -14,7 +14,8 @@ members = [
     "contracts/leaderboard",
     "contracts/energy",
     "contracts/bridge",
-     "contracts/daily_rewards", 
+     "contracts/daily_rewards",
+     "contracts/subscription", 
 ]
 
 [workspace.dependencies]
