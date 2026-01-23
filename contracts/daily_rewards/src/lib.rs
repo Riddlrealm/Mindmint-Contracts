@@ -1,7 +1,6 @@
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Env, Symbol,
-    testutils::{Address as _, Ledger},
-};
+#![no_std]
+
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 
 #[cfg(not(test))]
 const DAY_IN_LEDGERS: u32 = 17280;          // ≈ 24 hours (5s per ledger)
