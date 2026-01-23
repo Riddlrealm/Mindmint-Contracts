@@ -1,20 +1,20 @@
 [workspace]
 resolver = "2"
-
 members = [
-    "contracts/achievement_nft",
-    "contracts/achievement_collection",
-    "contracts/reward_token",
-    "contracts/puzzle_verification",
-    "contracts/guild",
-    "contracts/referral",
-    "contracts/tournament",
-    "contracts/staking",
-    "contracts/time_attack",
-    "contracts/leaderboard",
-    "contracts/energy",
-    "contracts/bridge",
-     "contracts/daily_rewards", 
+  "contracts/achievement_collection",
+  "contracts/achievement_nft",
+  "contracts/bridge",
+  "contracts/daily_rewards",
+  "contracts/energy",
+  "contracts/guild",
+  "contracts/leaderboard",
+  "contracts/oracle",
+  "contracts/puzzle_verification",
+  "contracts/referral",
+  "contracts/reward_token",
+  "contracts/staking",
+  "contracts/time_attack",
+  "contracts/tournament",
 ]
 
 [workspace.dependencies]
@@ -22,13 +22,13 @@ soroban-sdk = "21.0.0"
 
 [profile.release]
 opt-level = "z"
-overflow-checks = true
 debug = 0
 strip = "symbols"
 debug-assertions = false
+overflow-checks = true
+lto = true
 panic = "abort"
 codegen-units = 1
-lto = true
 
 [profile.release-with-logs]
 inherits = "release"
