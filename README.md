@@ -25,6 +25,17 @@ Tracks referral relationships and distributes rewards to both referrers and refe
 - Comprehensive statistics tracking
 - Event emissions for all referral activities
 
+### Insurance Contract
+Protects player assets (NFTs, tokens) against loss through premium-based insurance. Features include:
+- Multiple coverage types (NFT, Token, Combined)
+- Dynamic premium calculation
+- Policy purchase, renewal, and cancellation
+- Claim submission and review system
+- Admin-reviewed payout processing
+- Fraud detection with cooldowns and frequency limits
+- Premium pool management
+- Prorated refunds on cancellation
+
 ## 🛠️ Tech Stack
 
 * **Language**: Rust
@@ -66,6 +77,7 @@ cargo test
 
 # Run specific contract tests
 cargo test --package achievement-nft
+cargo test --package insurance
 
 # Run with output
 cargo test -- --nocapture
@@ -80,7 +92,8 @@ quest-service-contracts/
 │   ├── reward_token/        # Token reward contract
 │   ├── puzzle_verification/ # Puzzle verification contract
 │   ├── guild/               # Guild management contract
-│   └── referral/            # Referral tracking and rewards contract
+│   ├── referral/            # Referral tracking and rewards contract
+│   └── insurance/           # Asset insurance and protection contract
 ├── tests/                   # Integration tests
 ├── scripts/                 # Deployment scripts
 ├── Cargo.toml              # Workspace configuration
