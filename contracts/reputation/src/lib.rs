@@ -1,9 +1,22 @@
 #![no_std]
 
 mod types;
+#[cfg(test)]
+mod test;
 
-use soroban_sdk::{contract, contractimpl, Address, Env};
-use types::{Config, ContractError, DataKey, Feedback, Milestone, ReputationScore};
+use soroban_sdk::{contract, contractimpl, contracterror, vec, Address, Env};
+use types::{Config, DataKey, Feedback, Milestone, ReputationScore};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ContractError {
+    NotInitialized = 1,
+    AlreadyInitialized = 2,
+    SelfFeedback = 3,
+    RateLimitExceeded = 4,
+    Unauthorized = 5,
+}
 
 #[contract]
 pub struct ReputationContract;
@@ -103,6 +116,7 @@ impl ReputationContract {
     ) -> Result<(), ContractError> {
         let mut reputation = Self::get_or_create_reputation(&env, &player);
         reputation.quests_completed = reputation.quests_completed.saturating_add(points);
+        reputation.total_score = reputation.total_score.saturating_add(points);
         reputation.last_activity = env.ledger().timestamp();
         
         env.storage()
@@ -120,6 +134,7 @@ impl ReputationContract {
     ) -> Result<(), ContractError> {
         let mut reputation = Self::get_or_create_reputation(&env, &player);
         reputation.contributions = reputation.contributions.saturating_add(points);
+        reputation.total_score = reputation.total_score.saturating_add(points);
         reputation.last_activity = env.ledger().timestamp();
         
         env.storage()
