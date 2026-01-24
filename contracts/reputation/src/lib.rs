@@ -90,6 +90,41 @@ impl ReputationContract {
 
         Ok(())
     }
+
+    /// Get player's reputation score with decay applied
+    pub fn get_reputation(env: Env, player: Address) -> ReputationScore {
+        let mut reputation = Self::get_or_create_reputation(&env, &player);
+        
+        // Apply decay before returning
+        Self::apply_decay(&env, &mut reputation);
+        
+        // Save updated reputation after decay
+        env.storage()
+            .persistent()
+            .set(&DataKey::Reputation(player), &reputation);
+        
+        reputation
+    }
+
+    /// Calculate weighted reputation score
+    pub fn calculate_score(env: Env, player: Address) -> u32 {
+        let reputation = Self::get_reputation(env.clone(), player);
+        
+        // Calculate activity score
+        let activity_score = Self::calculate_activity_score(&env, &reputation);
+        
+        // Weighted score calculation:
+        // - Positive feedback: 40%
+        // - Quests completed: 30%
+        // - Contributions: 20%
+        // - Activity: 10%
+        let score = (reputation.positive_feedback * 40 / 100)
+            + (reputation.quests_completed * 30 / 100)
+            + (reputation.contributions * 20 / 100)
+            + (activity_score * 10 / 100);
+        
+        score
+    }
 }
 
 // Helper functions
@@ -219,5 +254,48 @@ impl ReputationContract {
                 last_activity: env.ledger().timestamp(),
                 created_at: env.ledger().timestamp(),
             })
+    }
+
+    /// Apply time-based decay to reputation score
+    fn apply_decay(env: &Env, reputation: &mut ReputationScore) {
+        let config = match Self::get_config(env) {
+            Ok(c) => c,
+            Err(_) => return, // Skip decay if not initialized
+        };
+
+        let current_time = env.ledger().timestamp();
+        let time_elapsed = current_time.saturating_sub(reputation.last_activity);
+        
+        // Calculate number of decay periods that have passed
+        if config.decay_period > 0 && time_elapsed >= config.decay_period {
+            let periods_elapsed = time_elapsed / config.decay_period;
+            
+            // Apply decay: reduce score by decay_rate (in basis points) per period
+            // decay_rate is in basis points (e.g., 200 = 2%)
+            for _ in 0..periods_elapsed {
+                let decay_amount = (reputation.total_score * config.decay_rate) / 10000;
+                reputation.total_score = reputation.total_score.saturating_sub(decay_amount);
+            }
+            
+            // Update last activity to current time
+            reputation.last_activity = current_time;
+        }
+    }
+
+    /// Calculate activity score based on last activity
+    fn calculate_activity_score(env: &Env, reputation: &ReputationScore) -> u32 {
+        let current_time = env.ledger().timestamp();
+        let time_since_activity = current_time.saturating_sub(reputation.last_activity);
+        
+        // Simple activity scoring:
+        // - Active (within 7 days): 100 points
+        // - Inactive: 50 points
+        const SEVEN_DAYS: u64 = 7 * 24 * 60 * 60;
+        
+        if time_since_activity < SEVEN_DAYS {
+            100
+        } else {
+            50
+        }
     }
 }
