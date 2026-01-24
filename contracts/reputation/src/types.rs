@@ -57,3 +57,14 @@ pub enum DataKey {
     Milestone(u32),
     PlayerMilestones(Address),
 }
+
+/// Contract error codes
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ContractError {
+    NotInitialized,
+    AlreadyInitialized,
+    SelfFeedback,
+    RateLimitExceeded,
+    Unauthorized,
+}
