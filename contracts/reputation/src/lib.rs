@@ -125,6 +125,55 @@ impl ReputationContract {
         
         score
     }
+
+    /// Record quest completion for a player
+    pub fn record_quest_completion(
+        env: Env,
+        player: Address,
+        points: u32,
+    ) -> Result<(), ContractError> {
+        // Get or create player reputation
+        let mut reputation = Self::get_or_create_reputation(&env, &player);
+        
+        // Add points to quests_completed
+        reputation.quests_completed = reputation.quests_completed.saturating_add(points);
+        
+        // Update last activity timestamp
+        reputation.last_activity = env.ledger().timestamp();
+        
+        // Save to storage
+        env.storage()
+            .persistent()
+            .set(&DataKey::Reputation(player.clone()), &reputation);
+        
+        // Check if any milestones were reached
+        Self::check_milestones(&env, &player, &reputation);
+        
+        Ok(())
+    }
+
+    /// Record contribution for a player
+    pub fn record_contribution(
+        env: Env,
+        player: Address,
+        points: u32,
+    ) -> Result<(), ContractError> {
+        // Get or create player reputation
+        let mut reputation = Self::get_or_create_reputation(&env, &player);
+        
+        // Add points to contributions
+        reputation.contributions = reputation.contributions.saturating_add(points);
+        
+        // Update last activity timestamp
+        reputation.last_activity = env.ledger().timestamp();
+        
+        // Save to storage
+        env.storage()
+            .persistent()
+            .set(&DataKey::Reputation(player), &reputation);
+        
+        Ok(())
+    }
 }
 
 // Helper functions
@@ -297,5 +346,36 @@ impl ReputationContract {
         } else {
             50
         }
+    }
+
+    /// Check and update player milestones based on current score
+    fn check_milestones(env: &Env, player: &Address, reputation: &ReputationScore) {
+        let total_score = reputation.total_score;
+        
+        // Get current player milestones (if any)
+        let mut current_milestones: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PlayerMilestones(player.clone()))
+            .unwrap_or(0);
+        
+        // Check each milestone level
+        for level in 1..=4 {
+            if let Some(milestone) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, Milestone>(&DataKey::Milestone(level))
+            {
+                // Check if score requirement is met and milestone not already achieved
+                if total_score >= milestone.score_required && current_milestones < level {
+                    current_milestones = level;
+                }
+            }
+        }
+        
+        // Save updated milestones
+        env.storage()
+            .persistent()
+            .set(&DataKey::PlayerMilestones(player.clone()), &current_milestones);
     }
 }
