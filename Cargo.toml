@@ -4,7 +4,9 @@ members = [
   "contracts/subscription", 
   "contracts/achievement_collection",
   "contracts/achievement_nft",
+  "contracts/auction",
   "contracts/bridge",
+  "contracts/crafting",
   "contracts/daily_rewards",
   "contracts/energy",
   "contracts/guild",
@@ -17,6 +19,8 @@ members = [
   "contracts/time_attack",
   "contracts/tournament",
   "contracts/bounty", "contracts/vesting",
+  "contracts/bounty",
+  "contracts/insurance",
 ]
 
 [workspace.dependencies]
