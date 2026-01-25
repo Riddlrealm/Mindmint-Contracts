@@ -12,6 +12,7 @@ members = [
   "contracts/oracle",
   "contracts/puzzle_verification",
   "contracts/referral",
+  "contracts/reputation",
   "contracts/reward_token",
   "contracts/staking",
   "contracts/time_attack",
