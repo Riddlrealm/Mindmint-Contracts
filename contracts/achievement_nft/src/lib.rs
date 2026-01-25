@@ -1,6 +1,6 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
 };
 
 #[contracttype]
@@ -46,19 +46,11 @@ impl AchievementNFT {
             .set(&DataKey::PuzzleCompleted(user, puzzle_id), &true);
     }
 
-    /// Mint a new NFT only if the puzzle is completed.
-    pub fn mint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {
-        to.require_auth();
-
-        // Check puzzle completion
-        let completed: bool = env
-            .storage()
-            .persistent()
-            .get(&DataKey::PuzzleCompleted(to.clone(), puzzle_id))
-            .unwrap_or(false);
-        if !completed {
-            panic!("Puzzle not completed");
-        }
+    /// Mint a new NFT for crafting purposes (testnet: no auth required).
+    pub fn craftmint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {
+        // For testnet deployment, remove admin auth requirement
+        // let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        // admin.require_auth();
 
         let token_id: u32 = env.storage().instance().get(&DataKey::NextTokenId).unwrap();
 
@@ -87,12 +79,7 @@ impl AchievementNFT {
         env.storage().instance().set(&DataKey::TotalSupply, &(total + 1));
 
         // Emit Event
-        env.events().publish((symbol_short!("mint"), to.clone()), token_id);
-
-        // Remove puzzle completion flag to prevent double minting
-        env.storage()
-            .persistent()
-            .remove(&DataKey::PuzzleCompleted(to, puzzle_id));
+        env.events().publish((symbol_short!("minted"), to.clone()), token_id);
 
         token_id
     }
@@ -159,7 +146,7 @@ impl AchievementNFT {
         env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0)
     }
 
-    /// Destroys a token
+    /// Destroys a token (testnet: no auth required for crafting).
     pub fn burn(env: Env, token_id: u32) {
         let achievement: Achievement = env
             .storage()
@@ -167,7 +154,8 @@ impl AchievementNFT {
             .get(&DataKey::Achievement(token_id))
             .expect("Token does not exist");
 
-        achievement.owner.require_auth();
+        // For testnet deployment, remove owner auth requirement
+        // achievement.owner.require_auth();
 
         let mut collection = Self::get_collection(env.clone(), achievement.owner.clone());
         if let Some(index) = collection.first_index_of(token_id) {
