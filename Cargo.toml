@@ -11,6 +11,7 @@ members = [
   "contracts/energy",
   "contracts/guild",
   "contracts/leaderboard",
+  "contracts/lending",
   "contracts/oracle",
   "contracts/puzzle_verification",
   "contracts/referral",
