@@ -22,7 +22,8 @@ members = [
   "contracts/tournament",
   "contracts/bounty", "contracts/vesting",
   "contracts/bounty",
-  "contracts/insurance",
+  "contracts/insurance", "contracts/lottery",
+  "contracts/lottery",
 ]
 
 [workspace.dependencies]
