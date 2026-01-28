@@ -6,6 +6,7 @@ members = [
     "contracts/achievement_collection",
     "contracts/reward_token",
     "contracts/puzzle_verification",
+    "contracts/puzzle_factory",
     "contracts/guild",
     "contracts/referral",
     "contracts/tournament",
