@@ -1,15 +1,17 @@
 [package]
-name = "reward-token"
+name = "oracle"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]
+ed25519-dalek = "2.2.0"
+rand = "0.8.5"
 soroban-sdk = { workspace = true, features = ["testutils"] }
 
 [features]
