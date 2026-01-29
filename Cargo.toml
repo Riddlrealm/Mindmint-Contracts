@@ -21,7 +21,15 @@ members = [
   "contracts/time_attack",
   "contracts/tournament",
   "contracts/bounty",
+
+  "contracts/vesting",
   "contracts/insurance",
+  "contracts/whitelist",
+  "contracts/skill_rating",
+  "contracts/governance",
+  "contracts/lottery",
+
+>>>>>>> 4c5946c4a488f871e014d779ebb0f4924fe5423e
 ]
 
 [workspace.dependencies]
