@@ -27,6 +27,13 @@ pub enum ReleaseCondition {
     AllPartiesApprove,
     MajorityApprove,
     ArbitratorApprove,
+pub enum EscrowStatus {
+    Created = 1,
+    Active = 2,
+    Disputed = 3,
+    Resolved = 4,
+    Refunded = 5,
+    Released = 6,
 }
 
 #[contracttype]
@@ -34,6 +41,11 @@ pub enum ReleaseCondition {
 pub enum DisputeResolution {
     Release,
     Refund,
+pub struct ReleaseCondition {
+    pub condition_id: u64,
+    pub description: String,
+    pub fulfilled: bool,
+    pub evidence: Option<String>,
 }
 
 #[contracttype]
@@ -80,12 +92,46 @@ const DISPUTE_RESOLVED: Symbol = symbol_short!("resolved");
 const AUTO_RELEASE: Symbol = symbol_short!("auto");
 const TIMEOUT_REFUND: Symbol = symbol_short!("timeout");
 
+pub struct EscrowAgreement {
+    pub escrow_id: u64,
+    pub creator: Address,
+    pub parties: Vec<Party>,
+    pub arbitrator: Address,
+    pub status: EscrowStatus,
+    pub total_deposit: i128,
+    pub release_conditions: Vec<ReleaseCondition>,
+    pub dispute_reason: Option<String>,
+    pub resolution: Option<String>,
+    pub created_at: u64,
+    pub timeout_at: u64,
+    pub last_activity_at: u64,
+}
+
+#[contracttype]
+pub enum DataKey {
+    Escrow(u64),
+    EscrowCount,
+    NextConditionId,
+}
+
+// 2. CONTRACT LOGIC
 #[contract]
 pub struct EscrowContract;
 
 #[contractimpl]
 impl EscrowContract {
     #[allow(clippy::too_many_arguments)]
+    /// Initialize the contract
+    pub fn init(env: Env, _admin: Address) {
+        if !env.storage().instance().has(&DataKey::EscrowCount) {
+            env.storage().instance().set(&DataKey::EscrowCount, &0u64);
+        }
+        if !env.storage().instance().has(&DataKey::NextConditionId) {
+            env.storage().instance().set(&DataKey::NextConditionId, &1u64);
+        }
+    }
+
+    /// Create a new escrow agreement
     pub fn create_escrow(
         env: Env,
         creator: Address,
