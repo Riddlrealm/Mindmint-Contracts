@@ -1,11 +1,14 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Env, Map};
+use soroban_sdk::{Env, Map};
+use soroban_sdk::testutils::Address as _; // 👈 IMPORTANT
 
 #[test]
 fn test_distribution_and_withdraw() {
     let env = Env::default();
+    env.mock_all_auths(); // 👈 THIS FIXES EVERYTHING
+
     let admin = Address::generate(&env);
     let alice = Address::generate(&env);
     let bob = Address::generate(&env);
@@ -18,12 +21,7 @@ fn test_distribution_and_withdraw() {
 
     RoyaltySplitter::distribute(env.clone(), 1000);
 
-    // withdraw Alice
-    alice.mock_auth(&env);
     RoyaltySplitter::withdraw(env.clone(), alice.clone());
-
-    // withdraw Bob
-    bob.mock_auth(&env);
     RoyaltySplitter::withdraw(env.clone(), bob.clone());
 }
 
@@ -31,11 +29,13 @@ fn test_distribution_and_withdraw() {
 #[should_panic]
 fn test_invalid_split() {
     let env = Env::default();
+    env.mock_all_auths();
+
     let admin = Address::generate(&env);
     let alice = Address::generate(&env);
 
     let mut splits = Map::new(&env);
-    splits.set(alice, 5000);
+    splits.set(alice, 5000); //  not 100%
 
     RoyaltySplitter::init(env, admin, splits, 10);
 }
