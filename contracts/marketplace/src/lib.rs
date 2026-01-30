@@ -864,7 +864,13 @@ impl MarketplaceContract {
 
         // Keep only last 100 prices
         if history.len() > 100 {
-            history.pop_front();
+            // Create a new Vec with only the last 100 elements
+            let mut new_history = Vec::new(env);
+            let start_index = history.len() - 100;
+            for i in start_index..history.len() {
+                new_history.push_back(*history.get(i).unwrap());
+            }
+            history = new_history;
         }
 
         env.storage()
