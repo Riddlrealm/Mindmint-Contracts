@@ -1,251 +1,223 @@
-#![no_std]
+#![cfg(test)]
+use super::*;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol, Val,
+    testutils::{Address as _, Ledger},
+    Address, Env, String, Vec,
 };
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use soroban_sdk::test_utils::{Contract, TestEnvBuilder};
+#[test]
+fn test_escrow_creation() {
+    let env = Env::default();
+    env.mock_all_auths();
 
-    #[test]
-    fn test_escrow_lifecycle() {
-        let mut env = TestEnvBuilder::new().build();
-        let escrow_contract = Contract::new(&mut env, "escrow");
+    let contract_id = env.register_contract(None, EscrowContract);
+    let client = EscrowContractClient::new(&env, &contract_id);
 
-        // Create test accounts
-        let creator = env.new_tester();
-        let party1 = env.new_tester();
-        let party2 = env.new_tester();
-        let arbitrator = env.new_tester();
+    let creator = Address::generate(&env);
+    let party1 = Address::generate(&env);
+    let party2 = Address::generate(&env);
+    let token = Address::generate(&env);
 
-        // Create escrow
-        let escrow_id = escrow_contract
-            .call(&mut env, "create_escrow", (
-                creator.address(),
-                vec![party1.address(), party2.address()],
-                arbitrator.address(),
-                300, // 5 minute timeout
-                vec![
-                    "Condition 1: Deliver product".to_string(),
-                    "Condition 2: Verify quality".to_string(),
-                ],
-            ))
+    let parties = Vec::from_array(&env, [party1.clone(), party2.clone()]);
+    let amounts = Vec::from_array(&env, [1000i128, 2000i128]);
+    let conditions = Vec::from_array(&env, [ReleaseCondition::AllPartiesApprove]);
+
+    let escrow_id = client.create_escrow(
+        &creator,
+        &parties,
+        &token,
+        &amounts,
+        &conditions,
+        &None,
+        &3600u64,
+    );
+
+    assert_eq!(escrow_id, 1);
+
+    let escrow = client.get_escrow(&escrow_id).unwrap();
+    assert_eq!(escrow.state, EscrowState::Created);
+    assert_eq!(escrow.parties, parties);
+    assert_eq!(escrow.amounts, amounts);
+}
+
+#[test]
+fn test_escrow_state_transitions() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, EscrowContract);
+    let client = EscrowContractClient::new(&env, &contract_id);
+
+    let creator = Address::generate(&env);
+    let party1 = Address::generate(&env);
+    let party2 = Address::generate(&env);
+    let arbitrator = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    let parties = Vec::from_array(&env, [party1.clone(), party2.clone()]);
+    let amounts = Vec::from_array(&env, [1000i128, 2000i128]);
+    let conditions = Vec::from_array(&env, [ReleaseCondition::AllPartiesApprove]);
+
+    let escrow_id = client.create_escrow(
+        &creator,
+        &parties,
+        &token,
+        &amounts,
+        &conditions,
+        &Some(arbitrator.clone()),
+        &3600u64,
+    );
+
+    // Manually set escrow to active state using contract context
+    env.as_contract(&contract_id, || {
+        let mut escrow: EscrowData = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
             .unwrap();
+        escrow.state = EscrowState::Active;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
+    });
 
-        // Verify escrow creation
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
+    client.dispute(&party1, &escrow_id, &String::from_str(&env, "Test dispute"));
+
+    let escrow = client.get_escrow(&escrow_id).unwrap();
+    assert_eq!(escrow.state, EscrowState::Disputed);
+
+    client.resolve_dispute(&arbitrator, &escrow_id, &DisputeResolution::Refund);
+
+    let escrow = client.get_escrow(&escrow_id).unwrap();
+    assert_eq!(escrow.state, EscrowState::Refunded);
+}
+
+#[test]
+fn test_timeout_functionality() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, EscrowContract);
+    let client = EscrowContractClient::new(&env, &contract_id);
+
+    let creator = Address::generate(&env);
+    let party1 = Address::generate(&env);
+    let party2 = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    let parties = Vec::from_array(&env, [party1.clone(), party2.clone()]);
+    let amounts = Vec::from_array(&env, [1000i128, 2000i128]);
+    let conditions = Vec::from_array(&env, [ReleaseCondition::AllPartiesApprove]);
+
+    let escrow_id = client.create_escrow(
+        &creator,
+        &parties,
+        &token,
+        &amounts,
+        &conditions,
+        &None,
+        &100u64,
+    );
+
+    // Set escrow to active state using contract context
+    env.as_contract(&contract_id, || {
+        let mut escrow: EscrowData = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
             .unwrap();
-        assert_eq!(escrow.status, EscrowStatus::Created);
-        assert_eq!(escrow.parties.len(), 2);
-        assert_eq!(escrow.release_conditions.len(), 2);
+        escrow.state = EscrowState::Active;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
+    });
 
-        // Approve escrow
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party2.address());
+    // Advance time past timeout
+    env.ledger().with_mut(|li| li.timestamp = 200);
 
-        // Verify approval
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
+    client.refund_timeout(&escrow_id);
+
+    let escrow = client.get_escrow(&escrow_id).unwrap();
+    assert_eq!(escrow.state, EscrowState::Refunded);
+}
+
+#[test]
+fn test_approval_logic() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, EscrowContract);
+    let client = EscrowContractClient::new(&env, &contract_id);
+
+    let creator = Address::generate(&env);
+    let party1 = Address::generate(&env);
+    let party2 = Address::generate(&env);
+    let party3 = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    let parties = Vec::from_array(&env, [party1.clone(), party2.clone(), party3.clone()]);
+    let amounts = Vec::from_array(&env, [1000i128, 2000i128, 1500i128]);
+    let conditions = Vec::from_array(&env, [ReleaseCondition::MajorityApprove]);
+
+    let escrow_id = client.create_escrow(
+        &creator,
+        &parties,
+        &token,
+        &amounts,
+        &conditions,
+        &None,
+        &3600u64,
+    );
+
+    // Set escrow to active state using contract context
+    env.as_contract(&contract_id, || {
+        let mut escrow: EscrowData = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
             .unwrap();
-        assert!(escrow.parties.iter().all(|p| p.approved));
-        assert_eq!(escrow.status, EscrowStatus::Active);
+        escrow.state = EscrowState::Active;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
+    });
 
-        // Make deposits
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 100))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 100))
-            .with_caller(party2.address());
+    // Test majority approval
+    client.approve(&party1, &escrow_id);
+    client.approve(&party2, &escrow_id);
 
-        // Verify deposits
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
-            .unwrap();
-        assert_eq!(escrow.total_deposit, 200);
-        assert!(escrow.parties.iter().all(|p| p.deposit > 0));
+    let escrow = client.get_escrow(&escrow_id).unwrap();
+    assert_eq!(escrow.state, EscrowState::Released);
+}
 
-        // Fulfill conditions
-        escrow_contract
-            .call(&mut env, "fulfill_condition", (escrow_id, 1, "Product delivered".to_string()));
-        escrow_contract
-            .call(&mut env, "fulfill_condition", (escrow_id, 2, "Quality verified".to_string()));
+#[test]
+fn test_error_conditions() {
+    let env = Env::default();
+    env.mock_all_auths();
 
-        // Verify conditions and release
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
-            .unwrap();
-        assert!(escrow.release_conditions.iter().all(|c| c.fulfilled));
-        assert_eq!(escrow.status, EscrowStatus::Released);
+    let contract_id = env.register_contract(None, EscrowContract);
+    let client = EscrowContractClient::new(&env, &contract_id);
 
-        // Check balances
-        let party1_balance = env.get_balance(party1.address());
-        let party2_balance = env.get_balance(party2.address());
-        assert!(party1_balance > 0);
-        assert!(party2_balance > 0);
-    }
+    // Test escrow not found
+    let result = client.get_escrow(&999);
+    assert_eq!(result, None);
 
-    #[test]
-    fn test_dispute_resolution() {
-        let mut env = TestEnvBuilder::new().build();
-        let escrow_contract = Contract::new(&mut env, "escrow");
+    // Test invalid parties
+    let creator = Address::generate(&env);
+    let token = Address::generate(&env);
+    let empty_parties = vec![&env];
+    let empty_amounts = vec![&env];
+    let conditions = Vec::from_array(&env, [ReleaseCondition::AllPartiesApprove]);
 
-        let creator = env.new_tester();
-        let party1 = env.new_tester();
-        let party2 = env.new_tester();
-        let arbitrator = env.new_tester();
+    let result = client.try_create_escrow(
+        &creator,
+        &empty_parties,
+        &token,
+        &empty_amounts,
+        &conditions,
+        &None,
+        &3600u64,
+    );
 
-        let escrow_id = escrow_contract
-            .call(&mut env, "create_escrow", (
-                creator.address(),
-                vec![party1.address(), party2.address()],
-                arbitrator.address(),
-                300,
-                vec!["Deliver product".to_string()],
-            ))
-            .unwrap();
-
-        // Approve and deposit
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party2.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 100))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 100))
-            .with_caller(party2.address());
-
-        // Initiate dispute
-        escrow_contract
-            .call(&mut env, "initiate_dispute", (escrow_id, "Product not as described".to_string()))
-            .with_caller(party1.address());
-
-        // Verify dispute
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
-            .unwrap();
-        assert_eq!(escrow.status, EscrowStatus::Disputed);
-        assert_eq!(escrow.dispute_reason, Some("Product not as described".to_string()));
-
-        // Arbitrator resolves
-        escrow_contract
-            .call(&mut env, "resolve_dispute", (escrow_id, "Full refund issued".to_string()))
-            .with_caller(arbitrator.address());
-
-        // Verify resolution
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
-            .unwrap();
-        assert_eq!(escrow.status, EscrowStatus::Resolved);
-        assert_eq!(escrow.resolution, Some("Full refund issued".to_string()));
-    }
-
-    #[test]
-    fn test_timeout_refund() {
-        let mut env = TestEnvBuilder::new().build();
-        let escrow_contract = Contract::new(&mut env, "escrow");
-
-        let creator = env.new_tester();
-        let party1 = env.new_tester();
-        let party2 = env.new_tester();
-        let arbitrator = env.new_tester();
-
-        let escrow_id = escrow_contract
-            .call(&mut env, "create_escrow", (
-                creator.address(),
-                vec![party1.address(), party2.address()],
-                arbitrator.address(),
-                1, // 1 second timeout for test
-                vec!["Deliver product".to_string()],
-            ))
-            .unwrap();
-
-        // Approve and deposit
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party2.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 100))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 100))
-            .with_caller(party2.address());
-
-        // Fast forward time
-        env.set_timestamp(env.current_timestamp() + 2);
-
-        // Check timeout
-        escrow_contract.call(&mut env, "check_timeout", (escrow_id,));
-
-        // Verify refund
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
-            .unwrap();
-        assert_eq!(escrow.status, EscrowStatus::Refunded);
-        assert!(escrow.parties.iter().all(|p| p.deposit == 0));
-    }
-
-    #[test]
-    fn test_partial_release() {
-        let mut env = TestEnvBuilder::new().build();
-        let escrow_contract = Contract::new(&mut env, "escrow");
-
-        let creator = env.new_tester();
-        let party1 = env.new_tester();
-        let party2 = env.new_tester();
-        let arbitrator = env.new_tester();
-
-        let escrow_id = escrow_contract
-            .call(&mut env, "create_escrow", (
-                creator.address(),
-                vec![party1.address(), party2.address()],
-                arbitrator.address(),
-                300,
-                vec![
-                    "Condition 1: Partial delivery".to_string(),
-                    "Condition 2: Full delivery".to_string(),
-                ],
-            ))
-            .unwrap();
-
-        // Approve and deposit
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "approve_escrow", (escrow_id,))
-            .with_caller(party2.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 200))
-            .with_caller(party1.address());
-        escrow_contract
-            .call(&mut env, "deposit", (escrow_id, 200))
-            .with_caller(party2.address());
-
-        // Fulfill first condition only
-        escrow_contract
-            .call(&mut env, "fulfill_condition", (escrow_id, 1, "Partial delivery complete".to_string()));
-
-        // Partial release
-        escrow_contract.call(&mut env, "partial_release", (escrow_id,));
-
-        // Verify partial release
-        let escrow: EscrowAgreement = escrow_contract
-            .call(&mut env, "get_escrow", (escrow_id,))
-            .unwrap();
-        assert!(escrow.parties.iter().any(|p| p.deposit < 200));
-    }
+    assert_eq!(result, Err(Ok(EscrowError::InvalidParties)));
 }
