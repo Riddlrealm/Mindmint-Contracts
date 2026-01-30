@@ -195,6 +195,11 @@ mod test {
         let admin = Address::generate(&env);
         let player = Address::generate(&env);
 
+<<<<<<< Updated upstream
+=======
+        client.set_puzzle(&1, &solution);
+
+>>>>>>> Stashed changes
         env.mock_all_auths();
         client.initialize(&admin);
 

@@ -1,7 +1,12 @@
 #![no_std]
+<<<<<<< Updated upstream
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
 };
+=======
+
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
+>>>>>>> Stashed changes
 
 #[contracttype]
 #[derive(Clone)]
@@ -37,6 +42,7 @@ impl AchievementNFT {
         env.storage().instance().set(&DataKey::TotalSupply, &0u32);
     }
 
+<<<<<<< Updated upstream
     /// Admin function to mark a puzzle as completed for a user.
     pub fn mark_puzzle_completed(env: Env, user: Address, puzzle_id: u32) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
@@ -45,6 +51,11 @@ impl AchievementNFT {
             .persistent()
             .set(&DataKey::PuzzleCompleted(user, puzzle_id), &true);
     }
+=======
+    /// Mint a new achievement NFT
+    pub fn mint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {
+        to.require_auth();
+>>>>>>> Stashed changes
 
     /// Mint a new NFT for crafting purposes (testnet: no auth required).
     pub fn craftmint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {

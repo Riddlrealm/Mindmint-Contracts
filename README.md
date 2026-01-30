@@ -11,6 +11,7 @@ Mints and manages NFT achievements for puzzle completion milestones.
 Manages custom token rewards and puzzle unlocks.
 
 ### Puzzle Verification Contract
+
 Verifies puzzle solutions and triggers rewards.
 
 ### Guild Contract
