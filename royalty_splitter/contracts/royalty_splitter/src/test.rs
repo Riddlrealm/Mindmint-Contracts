@@ -9,7 +9,7 @@ fn test_distribution_and_withdraw() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, RoyaltySplitter);
+    let contract_id = env.register(RoyaltySplitter);
 
     let admin = Address::generate(&env);
     let alice = Address::generate(&env);
@@ -33,13 +33,13 @@ fn test_invalid_split() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let contract_id = env.register_contract(None, RoyaltySplitter);
+    let contract_id = env.register(RoyaltySplitter);
 
     let admin = Address::generate(&env);
     let alice = Address::generate(&env);
 
     let mut splits = Map::new(&env);
-    splits.set(alice, 5000);
+    splits.set(alice, 5000); // invalid
 
     env.as_contract(&contract_id, || {
         RoyaltySplitter::init(env.clone(), admin, splits, 10);
