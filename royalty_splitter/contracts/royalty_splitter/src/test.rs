@@ -1,13 +1,15 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{Env, Map};
-use soroban_sdk::testutils::Address as _; // 👈 IMPORTANT
+use soroban_sdk::{Env, Map, Address};
+use soroban_sdk::testutils::Address as _;
 
 #[test]
 fn test_distribution_and_withdraw() {
     let env = Env::default();
-    env.mock_all_auths(); // 👈 THIS FIXES EVERYTHING
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, RoyaltySplitter);
 
     let admin = Address::generate(&env);
     let alice = Address::generate(&env);
@@ -17,12 +19,12 @@ fn test_distribution_and_withdraw() {
     splits.set(alice.clone(), 6000);
     splits.set(bob.clone(), 4000);
 
-    RoyaltySplitter::init(env.clone(), admin.clone(), splits, 10);
-
-    RoyaltySplitter::distribute(env.clone(), 1000);
-
-    RoyaltySplitter::withdraw(env.clone(), alice.clone());
-    RoyaltySplitter::withdraw(env.clone(), bob.clone());
+    env.as_contract(&contract_id, || {
+        RoyaltySplitter::init(env.clone(), admin.clone(), splits, 10);
+        RoyaltySplitter::distribute(env.clone(), 1000);
+        RoyaltySplitter::withdraw(env.clone(), alice.clone());
+        RoyaltySplitter::withdraw(env.clone(), bob.clone());
+    });
 }
 
 #[test]
@@ -31,11 +33,15 @@ fn test_invalid_split() {
     let env = Env::default();
     env.mock_all_auths();
 
+    let contract_id = env.register_contract(None, RoyaltySplitter);
+
     let admin = Address::generate(&env);
     let alice = Address::generate(&env);
 
     let mut splits = Map::new(&env);
-    splits.set(alice, 5000); //  not 100%
+    splits.set(alice, 5000);
 
-    RoyaltySplitter::init(env, admin, splits, 10);
+    env.as_contract(&contract_id, || {
+        RoyaltySplitter::init(env.clone(), admin, splits, 10);
+    });
 }
