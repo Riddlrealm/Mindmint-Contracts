@@ -165,3 +165,5 @@ impl RoyaltySplitter {
         admin.require_auth();
     }
 }
+
+mod test;
