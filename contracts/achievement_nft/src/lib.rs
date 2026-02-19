@@ -1,12 +1,8 @@
 #![no_std]
-<<<<<<< Updated upstream
+
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
 };
-=======
-
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
->>>>>>> Stashed changes
 
 #[contracttype]
 #[derive(Clone)]
@@ -42,20 +38,34 @@ impl AchievementNFT {
         env.storage().instance().set(&DataKey::TotalSupply, &0u32);
     }
 
-<<<<<<< Updated upstream
-    /// Admin function to mark a puzzle as completed for a user.
+    /// Mark a puzzle as completed by a user.
     pub fn mark_puzzle_completed(env: Env, user: Address, puzzle_id: u32) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
+        let key = DataKey::PuzzleCompleted(user.clone(), puzzle_id);
         env.storage()
             .persistent()
-            .set(&DataKey::PuzzleCompleted(user, puzzle_id), &true);
+            .set(&key, &true);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
     }
-=======
+
     /// Mint a new achievement NFT
     pub fn mint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {
         to.require_auth();
->>>>>>> Stashed changes
+
+        let completed: bool = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PuzzleCompleted(to.clone(), puzzle_id))
+            .unwrap_or(false);
+        if !completed {
+            panic!("Puzzle not completed");
+        }
+
+        Self::craftmint(env, to, puzzle_id, metadata)
+    }
 
     /// Mint a new NFT for crafting purposes (testnet: no auth required).
     pub fn craftmint(env: Env, to: Address, puzzle_id: u32, metadata: String) -> u32 {
