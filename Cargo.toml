@@ -6,6 +6,7 @@ members = [
   "contracts/achievement_nft",
   "contracts/achievement_sets",
   "contracts/auction",
+  "contracts/battle_pass",
   "contracts/bridge",
   "contracts/crafting",
   "contracts/daily_rewards",
