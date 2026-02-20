@@ -21,7 +21,7 @@ members = [
   "contracts/time_attack",
   "contracts/tournament",
   "contracts/bounty",
-
+  "contracts/charity",
   "contracts/vesting",
   "contracts/insurance",
   "contracts/whitelist",
