@@ -501,7 +501,10 @@ impl MultisigTreasury {
         set_pending_transactions(&env, &new_pending);
 
         // Add to history
-        let signers: Vec<Address> = tx.signatures.iter().map(|s| s.signer.clone()).collect();
+        let mut signers = Vec::new(&env);
+        for sig in tx.signatures.iter() {
+            signers.push_back(sig.signer.clone());
+        }
         let record = TransactionRecord {
             id: tx_id,
             transaction_type: tx.transaction_type.clone(),
@@ -616,12 +619,16 @@ impl MultisigTreasury {
 
         // Count total owners
         let members = get_members(&env);
-        let owners: Vec<Address> = members.iter().filter(|m| {
-            get_member(&env, m).map(|mem| mem.role == Role::Owner && mem.active).unwrap_or(false)
-        }).collect();
+        let mut owner_count: u32 = 0;
+        for m in members.iter() {
+            if let Some(mem) = get_member(&env, &m) {
+                if mem.role == Role::Owner && mem.active {
+                    owner_count += 1;
+                }
+            }
+        }
 
-        let total_owners = owners.len() as u32;
-        let required_approvals = (total_owners * 2 / 3).max(1);
+        let required_approvals = (owner_count * 2 / 3).max(1);
 
         // For simplicity in this contract, we'll require the original activator plus one more owner
         // In production, you'd track individual approvals
