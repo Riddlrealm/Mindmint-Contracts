@@ -28,11 +28,13 @@ members = [
   "contracts/skill_rating",
   "contracts/governance",
   "contracts/lottery",
+  "contracts/prize_pool",
   "contracts/seasonal_event",
 ]
 
 [workspace.dependencies]
-soroban-sdk = "21.0.0"
+# Enable test utilities for test builds across workspace
+soroban-sdk = { version = "21.0.0", features = ["testutils"] }
 
 [profile.release]
 opt-level = "z"
