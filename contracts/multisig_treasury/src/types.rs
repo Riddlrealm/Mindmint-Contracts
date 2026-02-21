@@ -115,7 +115,7 @@ pub struct Transaction {
 
 /// Record of a completed transaction for history
 #[contracttype]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransactionRecord {
     pub id: u64,
     pub transaction_type: TransactionType,
@@ -123,7 +123,6 @@ pub struct TransactionRecord {
     pub proposer: Address,
     pub signers: Vec<Address>,
     pub executed_at: u64,
-    pub result: Option<Val>,
 }
 
 /// Emergency recovery state

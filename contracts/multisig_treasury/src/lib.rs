@@ -512,7 +512,6 @@ impl MultisigTreasury {
             proposer: tx.proposer.clone(),
             signers,
             executed_at: env.ledger().timestamp(),
-            result: result.clone(),
         };
         set_transaction_history(&env, tx_id, &record);
         increment_transaction_count(&env);
