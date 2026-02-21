@@ -18,7 +18,7 @@ fn test_initialization() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let config = client.get_config_info();
     assert_eq!(config.owner, owner);
@@ -46,8 +46,8 @@ fn test_double_initialization() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
+    client.initialize(&owner, &2, &86400, &10, &0);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn test_initialize_with_zero_threshold() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &0, &86400, &10);
+    client.initialize(&owner, &0, &86400, &10, &0);
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn test_add_member() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer1 = Address::generate(&env);
     let signer2 = Address::generate(&env);
@@ -96,7 +96,7 @@ fn test_add_duplicate_member() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer = Address::generate(&env);
     client.add_member(&owner, &signer, &Role::Signer);
@@ -112,7 +112,7 @@ fn test_signer_cannot_add_member() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer = Address::generate(&env);
     client.add_member(&owner, &signer, &Role::Signer);
@@ -130,7 +130,7 @@ fn test_admin_cannot_add_admin() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let admin = Address::generate(&env);
     client.add_member(&owner, &admin, &Role::Admin);
@@ -147,7 +147,7 @@ fn test_remove_member() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer1 = Address::generate(&env);
     let signer2 = Address::generate(&env);
@@ -171,7 +171,7 @@ fn test_cannot_remove_last_owner() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     client.remove_member(&owner, &owner);
 }
 
@@ -183,7 +183,7 @@ fn test_admin_can_remove_signer() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let admin = Address::generate(&env);
     let signer = Address::generate(&env);
@@ -204,7 +204,7 @@ fn test_admin_cannot_remove_admin() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let admin1 = Address::generate(&env);
     let admin2 = Address::generate(&env);
@@ -223,7 +223,7 @@ fn test_update_member_role() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer = Address::generate(&env);
     client.add_member(&owner, &signer, &Role::Signer);
@@ -240,7 +240,7 @@ fn test_propose_and_sign_transfer() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer1 = Address::generate(&env);
     let signer2 = Address::generate(&env);
@@ -278,7 +278,7 @@ fn test_cannot_sign_twice() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let token = Address::generate(&env);
     let destination = Address::generate(&env);
@@ -297,7 +297,7 @@ fn test_non_member_cannot_sign() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let token = Address::generate(&env);
     let destination = Address::generate(&env);
@@ -315,7 +315,7 @@ fn test_propose_contract_call() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let target = Address::generate(&env);
     let args = Vec::from_array(&env, [100i32.into_val(&env)]);
@@ -333,7 +333,7 @@ fn test_reject_transaction() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let token = Address::generate(&env);
     let destination = Address::generate(&env);
@@ -355,7 +355,7 @@ fn test_non_proposer_cannot_reject() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer = Address::generate(&env);
     client.add_member(&owner, &signer, &Role::Signer);
@@ -375,7 +375,7 @@ fn test_update_config() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer1 = Address::generate(&env);
     let signer2 = Address::generate(&env);
@@ -399,7 +399,7 @@ fn test_non_owner_cannot_update_config() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let signer = Address::generate(&env);
     client.add_member(&owner, &signer, &Role::Signer);
@@ -415,7 +415,7 @@ fn test_emergency_recovery_activation() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let owner2 = Address::generate(&env);
     client.add_member(&owner, &owner2, &Role::Owner);
@@ -435,7 +435,7 @@ fn test_non_owner_cannot_activate_emergency() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let admin = Address::generate(&env);
     client.add_member(&owner, &admin, &Role::Admin);
@@ -451,7 +451,7 @@ fn test_emergency_recovery_execution() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let owner2 = Address::generate(&env);
     client.add_member(&owner, &owner2, &Role::Owner);
@@ -474,7 +474,7 @@ fn test_cancel_emergency_recovery() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let owner2 = Address::generate(&env);
     client.add_member(&owner, &owner2, &Role::Owner);
@@ -494,7 +494,7 @@ fn test_emergency_requires_second_owner() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let owner2 = Address::generate(&env);
     client.add_member(&owner, &owner2, &Role::Owner);
@@ -513,7 +513,7 @@ fn test_transaction_counter() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let token = Address::generate(&env);
     let destination = Address::generate(&env);
@@ -536,7 +536,7 @@ fn test_role_levels() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &2, &86400, &10);
+    client.initialize(&owner, &2, &86400, &10, &0);
     
     let admin = Address::generate(&env);
     let signer = Address::generate(&env);
@@ -558,7 +558,7 @@ fn test_pending_transaction_limit() {
     let contract_id = env.register_contract(None, MultisigTreasury);
     let client = MultisigTreasuryClient::new(&env, &contract_id);
     
-    client.initialize(&owner, &1, &86400, &3);
+    client.initialize(&owner, &1, &86400, &3, &0);
     
     let token = Address::generate(&env);
     let destination = Address::generate(&env);

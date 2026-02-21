@@ -35,6 +35,7 @@ impl MultisigTreasury {
         threshold: u32,
         proposal_timeout: u64,
         max_pending_proposals: u32,
+        emergency_cooldown: u64,
     ) {
         // Prevent re-initialization
         if get_config(&env).is_some() {
@@ -55,7 +56,7 @@ impl MultisigTreasury {
             proposal_timeout,
             max_pending_proposals,
             emergency_recovery_enabled: true,
-            emergency_cooldown: 86400, // 24 hours
+            emergency_cooldown,
         };
 
         set_config(&env, &config);
