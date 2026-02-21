@@ -1,7 +1,4 @@
 //! Puzzle Rental Contract
-//!
-//! Allows NFT owners to rent out exclusive puzzle access to other players
-//! for a time period in exchange for tokens.
 
 #![no_std]
 
