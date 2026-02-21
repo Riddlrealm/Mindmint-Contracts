@@ -3,26 +3,26 @@
 use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
-    token::{Client as TokenClient, StellarAssetClient},
+    token::StellarAssetClient,
     Address, Env, String,
 };
 
-fn create_token_contract<'a>(e: &'a Env, admin: &Address) -> (Address, TokenClient<'a>) {
+fn create_token_contract(e: &Env, admin: &Address) -> Address {
     let sac = e.register_stellar_asset_contract_v2(admin.clone());
     let address = sac.address();
-    (address.clone(), TokenClient::new(e, &address))
+    address.clone()
 }
 
 fn create_tipping_contract(e: &Env) -> Address {
     e.register_contract(None, SocialTippingContract)
 }
 
-fn setup_contract(e: &Env) -> (Address, Address, Address, TokenClient) {
+fn setup_contract(e: &Env) -> (Address, Address, Address) {
     e.mock_all_auths();
     
     let admin = Address::generate(e);
-    let token_admin = Address::generate(e);
-    let (token_address, token_client) = create_token_contract(e, &token_admin);
+    let token_admin_addr = Address::generate(e);
+    let token_address = create_token_contract(e, &token_admin_addr);
     let tipping_contract = create_tipping_contract(e);
     
     let token_admin_client = StellarAssetClient::new(e, &token_address);
@@ -40,7 +40,7 @@ fn setup_contract(e: &Env) -> (Address, Address, Address, TokenClient) {
     // Mint tokens to users
     token_admin_client.mint(&admin, &100_000_000);
 
-    (tipping_contract, token_address, admin, token_client)
+    (tipping_contract, token_address, admin)
 }
 
 #[test]
@@ -49,8 +49,8 @@ fn test_initialize() {
     e.mock_all_auths();
     
     let admin = Address::generate(&e);
-    let token_admin = Address::generate(&e);
-    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let _token_admin = Address::generate(&e);
+    let token_address = create_token_contract(&e, &_token_admin);
     let tipping_contract = create_tipping_contract(&e);
 
     let client = SocialTippingContractClient::new(&e, &tipping_contract);
@@ -80,8 +80,8 @@ fn test_initialize_twice_should_fail() {
     e.mock_all_auths();
     
     let admin = Address::generate(&e);
-    let token_admin = Address::generate(&e);
-    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let _token_admin = Address::generate(&e);
+    let token_address = create_token_contract(&e, &_token_admin);
     let tipping_contract = create_tipping_contract(&e);
 
     let client = SocialTippingContractClient::new(&e, &tipping_contract);
@@ -92,13 +92,13 @@ fn test_initialize_twice_should_fail() {
 #[test]
 fn test_direct_tip() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -122,13 +122,13 @@ fn test_direct_tip() {
 #[should_panic(expected = "Error(Contract, #3)")]
 fn test_tip_with_invalid_amount() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -142,12 +142,12 @@ fn test_tip_with_invalid_amount() {
 #[should_panic(expected = "Error(Contract, #4)")]
 fn test_tip_to_self_should_fail() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -160,13 +160,13 @@ fn test_tip_to_self_should_fail() {
 #[test]
 fn test_tip_with_message() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -191,7 +191,7 @@ fn test_tip_with_message() {
 #[test]
 fn test_batch_tipping() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient1 = Address::generate(&e);
@@ -199,7 +199,7 @@ fn test_batch_tipping() {
     let recipient3 = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -244,7 +244,7 @@ fn test_batch_tipping() {
 #[should_panic(expected = "Error(Contract, #9)")]
 fn test_batch_tipping_size_mismatch() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient1 = Address::generate(&e);
@@ -269,14 +269,14 @@ fn test_batch_tipping_size_mismatch() {
 #[test]
 fn test_tip_history_tracking() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper1 = Address::generate(&e);
     let tipper2 = Address::generate(&e);
     let recipient = Address::generate(&e);
     
     // Mint tokens to tippers
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper1, &10_000_000);
     token_admin_client.mint(&tipper2, &10_000_000);
@@ -309,7 +309,7 @@ fn test_tip_history_tracking() {
 #[test]
 fn test_top_tippers_leaderboard() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper1 = Address::generate(&e);
     let tipper2 = Address::generate(&e);
@@ -317,7 +317,7 @@ fn test_top_tippers_leaderboard() {
     let recipient = Address::generate(&e);
     
     // Mint tokens to tippers
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper1, &10_000_000);
     token_admin_client.mint(&tipper2, &10_000_000);
@@ -343,7 +343,7 @@ fn test_top_tippers_leaderboard() {
 #[test]
 fn test_top_recipients_leaderboard() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient1 = Address::generate(&e);
@@ -351,7 +351,7 @@ fn test_top_recipients_leaderboard() {
     let recipient3 = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -376,7 +376,7 @@ fn test_top_recipients_leaderboard() {
 #[should_panic(expected = "Error(Contract, #6)")]
 fn test_daily_tip_limit() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     
@@ -409,8 +409,8 @@ fn test_cooldown_mechanism() {
     e.ledger().set_timestamp(1000); // Start with a non-zero timestamp
     
     let admin = Address::generate(&e);
-    let token_admin = Address::generate(&e);
-    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let _token_admin = Address::generate(&e);
+    let token_address = create_token_contract(&e, &_token_admin);
     let tipping_contract = create_tipping_contract(&e);
     
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
@@ -455,13 +455,13 @@ fn test_cooldown_mechanism() {
 #[test]
 fn test_tipper_stats_accumulation() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper = Address::generate(&e);
     let recipient = Address::generate(&e);
     
     // Mint tokens to tipper
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper, &10_000_000);
 
@@ -487,14 +487,14 @@ fn test_tipper_stats_accumulation() {
 #[test]
 fn test_recipient_stats_accumulation() {
     let e = Env::default();
-    let (tipping_contract, token_address, _, _) = setup_contract(&e);
+    let (tipping_contract, token_address, _) = setup_contract(&e);
     
     let tipper1 = Address::generate(&e);
     let tipper2 = Address::generate(&e);
     let recipient = Address::generate(&e);
     
     // Mint tokens to tippers
-    let token_admin = Address::generate(&e);
+    let _token_admin = Address::generate(&e);
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     token_admin_client.mint(&tipper1, &10_000_000);
     token_admin_client.mint(&tipper2, &10_000_000);
@@ -521,8 +521,8 @@ fn test_get_config() {
     e.mock_all_auths();
     
     let admin = Address::generate(&e);
-    let token_admin = Address::generate(&e);
-    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let _token_admin = Address::generate(&e);
+    let token_address = create_token_contract(&e, &_token_admin);
     let tipping_contract = create_tipping_contract(&e);
 
     let client = SocialTippingContractClient::new(&e, &tipping_contract);
