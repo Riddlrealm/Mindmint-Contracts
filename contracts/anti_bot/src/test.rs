@@ -213,7 +213,7 @@ fn test_expired_challenge_fails() {
     };
 
     let result = client.verify_captcha_proof(&player, &proof);
-    assert!(!result.allowed);
+    assert!(!result);
 }
 
 // ============================================================================
