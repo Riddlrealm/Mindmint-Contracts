@@ -115,7 +115,7 @@ pub struct Transaction {
 
 /// Record of a completed transaction for history
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TransactionRecord {
     pub id: u64,
     pub transaction_type: TransactionType,

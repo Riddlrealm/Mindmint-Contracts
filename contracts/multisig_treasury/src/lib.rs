@@ -440,7 +440,7 @@ impl MultisigTreasury {
         // Check threshold for pending transactions
         if tx.status == TransactionStatus::Pending {
             let config = get_config(&env).expect("Not initialized");
-            if tx.signatures.len() as u32 < config.threshold {
+            if (tx.signatures.len() as u32) < config.threshold {
                 panic!("Threshold not reached");
             }
             tx.status = TransactionStatus::Approved;
