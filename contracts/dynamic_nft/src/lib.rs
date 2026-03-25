@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, contractevent, Address, Env, String, Vec, Map};
+use soroban_sdk::{contract, contractimpl, contracttype, contractevent, Address, Env, String, Map};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -212,7 +212,6 @@ impl DynamicNftContract {
             .get(&DataKey::EvolutionRules)
             .unwrap_or_else(|| Map::new(env));
         
-        let mut evolved = false;
         let old_level = nft.level;
         
         // Find the highest evolution rule that can be applied
@@ -230,7 +229,6 @@ impl DynamicNftContract {
             nft.level = rule.new_level;
             nft.evolution_stage += 1;
             nft.metadata_uri = rule.new_metadata_uri.clone();
-            evolved = true;
             
             env.storage().persistent().set(&DataKey::DynamicNft(token_id), &nft);
             
