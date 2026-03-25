@@ -1,225 +1,261 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, contractevent, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, contractevent, Address, Env, String, Map};
 
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DynamicNft {
+    pub token_id: u32,
     pub owner: Address,
     pub level: u32,
-    pub rarity: u32,
-    pub traits: String,
-    pub metadata: String,
-    pub history: Vec<String>,
-    pub minted_at: u64,
+    pub evolution_stage: u32,
+    pub metadata_uri: String,
+    pub xp: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvolutionRule {
+    pub min_xp: u64,
+    pub new_level: u32,
+    pub new_metadata_uri: String,
 }
 
 #[contracttype]
 pub enum DataKey {
     Admin(Address),
-    Verifier(Address),
+    Oracle(Address),
     DynamicNft(u32),
-    NextNftId,
+    NextTokenId,
+    EvolutionRules,
+}
+
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct NFTEvolved {
+    pub token_id: u32,
+    pub old_level: u32,
+    pub new_level: u32,
+    pub new_metadata_uri: String,
+}
+
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct NFTMinted {
+    pub token_id: u32,
+    pub owner: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct XPAdded {
+    pub token_id: u32,
+    pub amount: u64,
+    pub total_xp: u64,
 }
 
 #[contract]
 pub struct DynamicNftContract;
 
-#[contractevent]
-#[derive(Clone)]
-pub struct MintEvent {
-    pub owner: Address,
-    pub token_id: u32,
-}
-
-#[contractevent]
-#[derive(Clone)]
-pub struct EvolveMilestoneEvent {
-    pub token_id: u32,
-}
-
-#[contractevent]
-#[derive(Clone)]
-pub struct EvolveTimeEvent {
-    pub token_id: u32,
-}
-
-#[contractevent]
-#[derive(Clone)]
-pub struct DowngradeEvent {
-    pub token_id: u32,
-}
-
-#[contractevent]
-#[derive(Clone)]
-pub struct FuseEvent {
-    pub owner: Address,
-    pub token_id: u32,
-}
-
 #[contractimpl]
 impl DynamicNftContract {
-    pub fn initialize(env: Env, admin: Address) {
+    pub fn initialize(env: Env, admin: Address, oracle: Address) {
         admin.require_auth();
+        
         if env.storage().persistent().has(&DataKey::Admin(admin.clone())) {
             panic!("Already initialized");
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Admin(admin.clone()), &true);
-        env.storage().persistent().set(&DataKey::NextNftId, &1u32);
+        
+        env.storage().persistent().set(&DataKey::Admin(admin.clone()), &true);
+        env.storage().persistent().set(&DataKey::Oracle(oracle), &true);
+        env.storage().persistent().set(&DataKey::NextTokenId, &1u32);
+        env.storage().persistent().set(&DataKey::EvolutionRules, &Map::<u64, EvolutionRule>::new(&env));
     }
 
-    pub fn add_verifier(env: Env, admin: Address, verifier: Address) {
-        admin.require_auth();
-        Self::assert_admin(&env, &admin);
-        env.storage().persistent().set(&DataKey::Verifier(verifier), &true);
-    }
-
-    pub fn remove_verifier(env: Env, admin: Address, verifier: Address) {
-        admin.require_auth();
-        Self::assert_admin(&env, &admin);
-        env.storage().persistent().remove(&DataKey::Verifier(verifier));
-    }
-
-    pub fn mint(env: Env, minter: Address, owner: Address, metadata: String, traits: String) -> u32 {
-        minter.require_auth();
-
-        let next: u32 = env.storage().persistent().get(&DataKey::NextNftId).unwrap();
+    pub fn mint(env: Env, owner: Address) -> u32 {
+        owner.require_auth();
+        
+        let next_id: u32 = env.storage().persistent().get(&DataKey::NextTokenId).unwrap();
+        
         let nft = DynamicNft {
+            token_id: next_id,
             owner: owner.clone(),
             level: 1,
-            rarity: 1,
-            traits: traits.clone(),
-            metadata: metadata.clone(),
-            history: Vec::new(&env),
-            minted_at: env.ledger().timestamp(),
+            evolution_stage: 1,
+            metadata_uri: String::from_str(&env, "ipfs://base-metadata"),
+            xp: 0,
         };
-        env.storage().persistent().set(&DataKey::DynamicNft(next), &nft);
-        env.storage().persistent().set(&DataKey::NextNftId, &(next + 1));
-        env.events().publish_event(&MintEvent { owner: owner.clone(), token_id: next });
-        next
+        
+        env.storage().persistent().set(&DataKey::DynamicNft(next_id), &nft);
+        env.storage().persistent().set(&DataKey::NextTokenId, &(next_id + 1));
+        
+        env.events().publish_event(&NFTMinted { token_id: next_id, owner });
+        
+        next_id
     }
 
-    // evolve by milestone (admin or verifier in governance)
-    pub fn evolve_milestone(env: Env, submitter: Address, token_id: u32, level_inc: u32, rarity_inc: u32, new_traits: Option<String>) {
-        submitter.require_auth();
-        Self::assert_admin_or_verifier(&env, &submitter);
-        let mut nft: DynamicNft = env.storage().persistent().get(&DataKey::DynamicNft(token_id)).unwrap();
-        nft.level = nft.level.saturating_add(level_inc);
-        nft.rarity = nft.rarity.saturating_add(rarity_inc);
-        if let Some(t) = new_traits {
-            nft.traits = t;
-        }
-        // record evolution event in history
-        let mut hist = nft.history.clone();
-        hist.push_back(String::from_str(&env, "evolved_milestone"));
-        nft.history = hist;
+    pub fn add_xp(env: Env, oracle: Address, token_id: u32, amount: u64) {
+        oracle.require_auth();
+        Self::assert_oracle(&env, &oracle);
+        
+        let mut nft: DynamicNft = env.storage().persistent()
+            .get(&DataKey::DynamicNft(token_id))
+            .unwrap_or_else(|| panic!("NFT not found"));
+        
+        nft.xp = nft.xp.saturating_add(amount);
+        let total_xp = nft.xp;
+        
         env.storage().persistent().set(&DataKey::DynamicNft(token_id), &nft);
-        env.events().publish_event(&EvolveMilestoneEvent { token_id });
+        
+        env.events().publish_event(&XPAdded { token_id, amount, total_xp });
+        
+        // Check for evolution
+        Self::check_and_evolve(&env, token_id);
     }
 
-    // time-based evolution callable by anyone; checks elapsed time
-    pub fn evolve_time(env: Env, caller: Address, token_id: u32, required_secs: u64) {
+    pub fn evolve(env: Env, caller: Address, token_id: u32) {
         caller.require_auth();
-        let mut nft: DynamicNft = env.storage().persistent().get(&DataKey::DynamicNft(token_id)).unwrap();
-        let now = env.ledger().timestamp();
-        if now < nft.minted_at + required_secs {
-            panic!("Not ready for time evolution");
+        
+        let nft: DynamicNft = env.storage().persistent()
+            .get(&DataKey::DynamicNft(token_id))
+            .unwrap_or_else(|| panic!("NFT not found"));
+        
+        if nft.owner != caller {
+            panic!("Only owner can trigger evolution");
         }
-        nft.level = nft.level.saturating_add(1);
-        // record time evolution in history
-        let mut hist = nft.history.clone();
-        hist.push_back(String::from_str(&env, "time_evolved"));
-        nft.history = hist;
-        nft.minted_at = now; // reset timer for further evolutions
-        env.storage().persistent().set(&DataKey::DynamicNft(token_id), &nft);
-        env.events().publish_event(&EvolveTimeEvent { token_id });
-    }
-
-    pub fn downgrade(env: Env, submitter: Address, token_id: u32, level_dec: u32) {
-        submitter.require_auth();
-        Self::assert_admin_or_verifier(&env, &submitter);
-        let mut nft: DynamicNft = env.storage().persistent().get(&DataKey::DynamicNft(token_id)).unwrap();
-        nft.level = nft.level.saturating_sub(level_dec);
-        let mut hist = nft.history.clone();
-        hist.push_back(String::from_str(&env, "downgraded"));
-        nft.history = hist;
-        env.storage().persistent().set(&DataKey::DynamicNft(token_id), &nft);
-        env.events().publish_event(&DowngradeEvent { token_id });
-    }
-
-    // fuse two NFTs into a new one; owner must be same for both
-    pub fn fuse(env: Env, submitter: Address, token_a: u32, token_b: u32) -> u32 {
-        submitter.require_auth();
-        let nft_a: DynamicNft = env.storage().persistent().get(&DataKey::DynamicNft(token_a)).unwrap();
-        let nft_b: DynamicNft = env.storage().persistent().get(&DataKey::DynamicNft(token_b)).unwrap();
-        if nft_a.owner != nft_b.owner {
-            panic!("Owners must match to fuse");
-        }
-        // only owner can fuse
-        if submitter != nft_a.owner {
-            panic!("Only owner can fuse tokens");
-        }
-        // create fused NFT: summed level, higher rarity, combined traits
-        let owner = nft_a.owner.clone();
-        let fused_level = nft_a.level.saturating_add(nft_b.level);
-        let fused_rarity = if nft_a.rarity > nft_b.rarity { nft_a.rarity } else { nft_b.rarity } + 1u32;
-        let combined_traits = nft_a.traits.clone();
-        let combined_metadata = nft_a.metadata.clone();
-
-        // simple burn: remove old entries
-        env.storage().persistent().remove(&DataKey::DynamicNft(token_a));
-        env.storage().persistent().remove(&DataKey::DynamicNft(token_b));
-
-        let next: u32 = env.storage().persistent().get(&DataKey::NextNftId).unwrap();
-        let mut new_hist = Vec::new(&env);
-        new_hist.push_back(String::from_str(&env, "fused"));
-
-        let nft = DynamicNft {
-            owner: owner.clone(),
-            level: fused_level,
-            rarity: fused_rarity,
-            traits: combined_traits,
-            metadata: combined_metadata,
-            history: new_hist,
-            minted_at: env.ledger().timestamp(),
-        };
-        env.storage().persistent().set(&DataKey::DynamicNft(next), &nft);
-        env.storage().persistent().set(&DataKey::NextNftId, &(next + 1));
-        env.events().publish_event(&FuseEvent { owner: owner.clone(), token_id: next });
-        next
+        
+        Self::check_and_evolve(&env, token_id);
     }
 
     pub fn get_nft(env: Env, token_id: u32) -> Option<DynamicNft> {
         env.storage().persistent().get(&DataKey::DynamicNft(token_id))
     }
 
-    pub fn get_history(env: Env, token_id: u32) -> Option<Vec<String>> {
-        let nft: Option<DynamicNft> = env.storage().persistent().get(&DataKey::DynamicNft(token_id));
-        match nft {
-            Some(n) => Some(n.history),
-            None => None,
+    pub fn transfer(env: Env, from: Address, to: Address, token_id: u32) {
+        from.require_auth();
+        
+        let mut nft: DynamicNft = env.storage().persistent()
+            .get(&DataKey::DynamicNft(token_id))
+            .unwrap_or_else(|| panic!("NFT not found"));
+        
+        if nft.owner != from {
+            panic!("Not the owner");
+        }
+        
+        // Soulbound restriction: non-transferable until level 3
+        if nft.level < 3 {
+            panic!("NFT is soulbound until level 3");
+        }
+        
+        nft.owner = to.clone();
+        env.storage().persistent().set(&DataKey::DynamicNft(token_id), &nft);
+    }
+
+    pub fn add_evolution_rule(env: Env, admin: Address, min_xp: u64, new_level: u32, new_metadata_uri: String) {
+        admin.require_auth();
+        Self::assert_admin(&env, &admin);
+        
+        let mut rules: Map<u64, EvolutionRule> = env.storage().persistent()
+            .get(&DataKey::EvolutionRules)
+            .unwrap_or_else(|| Map::new(&env));
+        
+        let rule = EvolutionRule {
+            min_xp,
+            new_level,
+            new_metadata_uri: new_metadata_uri.clone(),
+        };
+        
+        rules.set(min_xp, rule);
+        env.storage().persistent().set(&DataKey::EvolutionRules, &rules);
+    }
+
+    pub fn remove_evolution_rule(env: Env, admin: Address, min_xp: u64) {
+        admin.require_auth();
+        Self::assert_admin(&env, &admin);
+        
+        let mut rules: Map<u64, EvolutionRule> = env.storage().persistent()
+            .get(&DataKey::EvolutionRules)
+            .unwrap_or_else(|| Map::new(&env));
+        
+        rules.remove(min_xp);
+        env.storage().persistent().set(&DataKey::EvolutionRules, &rules);
+    }
+
+    pub fn get_evolution_rules(env: Env) -> Map<u64, EvolutionRule> {
+        env.storage().persistent()
+            .get(&DataKey::EvolutionRules)
+            .unwrap_or_else(|| Map::new(&env))
+    }
+
+    pub fn update_oracle(env: Env, admin: Address, new_oracle: Address) {
+        admin.require_auth();
+        Self::assert_admin(&env, &admin);
+        
+        // Remove old oracle
+        let old_oracle: Option<Address> = env.storage().persistent()
+            .get(&DataKey::Oracle(new_oracle.clone()));
+        
+        if let Some(old) = old_oracle {
+            env.storage().persistent().remove(&DataKey::Oracle(old));
+        }
+        
+        // Set new oracle
+        env.storage().persistent().set(&DataKey::Oracle(new_oracle.clone()), &true);
+    }
+
+    fn check_and_evolve(env: &Env, token_id: u32) {
+        let mut nft: DynamicNft = env.storage().persistent()
+            .get(&DataKey::DynamicNft(token_id))
+            .unwrap_or_else(|| panic!("NFT not found"));
+        
+        let rules: Map<u64, EvolutionRule> = env.storage().persistent()
+            .get(&DataKey::EvolutionRules)
+            .unwrap_or_else(|| Map::new(env));
+        
+        let old_level = nft.level;
+        
+        // Find the highest evolution rule that can be applied
+        let mut applicable_rule: Option<EvolutionRule> = None;
+        let mut highest_min_xp = 0u64;
+        
+        for (min_xp, rule) in rules.iter() {
+            if nft.xp >= min_xp && min_xp > highest_min_xp && rule.new_level > nft.level {
+                highest_min_xp = min_xp;
+                applicable_rule = Some(rule);
+            }
+        }
+        
+        if let Some(rule) = applicable_rule {
+            nft.level = rule.new_level;
+            nft.evolution_stage += 1;
+            nft.metadata_uri = rule.new_metadata_uri.clone();
+            
+            env.storage().persistent().set(&DataKey::DynamicNft(token_id), &nft);
+            
+            env.events().publish_event(&NFTEvolved {
+                token_id,
+                old_level,
+                new_level: rule.new_level,
+                new_metadata_uri: rule.new_metadata_uri,
+            });
         }
     }
 
-    // helpers
     fn assert_admin(env: &Env, admin: &Address) {
-        let is_admin: bool = env.storage().persistent().get(&DataKey::Admin(admin.clone())).unwrap_or(false);
+        let is_admin: bool = env.storage().persistent()
+            .get(&DataKey::Admin(admin.clone()))
+            .unwrap_or(false);
         if !is_admin {
-            panic!("Unauthorized");
+            panic!("Not admin");
         }
     }
 
-    fn assert_admin_or_verifier(env: &Env, submitter: &Address) {
-        // check admin
-        let is_admin: bool = env.storage().persistent().get(&DataKey::Admin(submitter.clone())).unwrap_or(false);
-        if is_admin {
-            return;
-        }
-        let is_verifier: bool = env.storage().persistent().get(&DataKey::Verifier(submitter.clone())).unwrap_or(false);
-        if !is_verifier {
-            panic!("Unauthorized");
+    fn assert_oracle(env: &Env, oracle: &Address) {
+        let is_oracle: bool = env.storage().persistent()
+            .get(&DataKey::Oracle(oracle.clone()))
+            .unwrap_or(false);
+        if !is_oracle {
+            panic!("Not oracle");
         }
     }
 }
