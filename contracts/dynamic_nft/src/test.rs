@@ -51,16 +51,12 @@ impl<'a> DynamicNftContractClient<'a> {
     }
 
     pub fn get_nft(&self, token_id: &u32) -> Option<DynamicNft> {
-        let result = self.env.try_invoke_contract::<DynamicNft, soroban_sdk::xdr::ScError>(
+        let result = self.env.invoke_contract::<Option<DynamicNft>>(
             &self.contract_id,
             &Symbol::new(self.env, "get_nft"),
             soroban_sdk::vec![self.env, token_id.to_val()],
         );
-        
-        match result {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        result
     }
 
     pub fn transfer(&self, from: &Address, to: &Address, token_id: &u32) {
@@ -111,9 +107,9 @@ fn setup() -> (Env, Address, Address, Address, DynamicNftContractClient<'static>
     let contract_id = env.register_contract(None, DynamicNftContract);
     let client = DynamicNftContractClient::new(&env, &contract_id);
 
-    let admin = Address::generate(&env);
-    let oracle = Address::generate(&env);
-    let user = Address::generate(&env);
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    let user = Address::random(&env);
 
     client.initialize(&admin, &oracle);
 
@@ -164,7 +160,7 @@ fn test_add_xp() {
 #[should_panic(expected = "Not oracle")]
 fn test_add_xp_unauthorized() {
     let (env, _admin, _oracle, user, client) = setup();
-    let unauthorized = Address::generate(&env);
+    let unauthorized = Address::random(&env);
     let token_id = client.mint(&user);
     
     // Try to add XP as unauthorized user
@@ -202,7 +198,7 @@ fn test_evolution_trigger() {
     
     // Add evolution rule
     let metadata_uri = String::from_str(&env, "ipfs://level2-metadata");
-    client.add_evolution_rule(&Address::generate(&env), &100, &2, &metadata_uri);
+    client.add_evolution_rule(&admin, &100, &2, &metadata_uri);
     
     // Add XP to trigger evolution
     client.add_xp(&oracle, &token_id, &150);
@@ -339,7 +335,7 @@ fn test_event_emission() {
 #[should_panic(expected = "Only owner can trigger evolution")]
 fn test_evolve_unauthorized() {
     let (env, _admin, _oracle, user, client) = setup();
-    let unauthorized = Address::generate(&env);
+    let unauthorized = Address::random(&env);
     let token_id = client.mint(&user);
     
     // Try to evolve as unauthorized user
@@ -350,7 +346,7 @@ fn test_evolve_unauthorized() {
 #[should_panic(expected = "Not admin")]
 fn test_evolution_rule_unauthorized() {
     let (env, _admin, _oracle, _user, client) = setup();
-    let unauthorized = Address::generate(&env);
+    let unauthorized = Address::random(&env);
     
     // Try to add evolution rule as unauthorized user
     client.add_evolution_rule(&unauthorized, &100, &2, &String::from_str(&env, "ipfs://level2"));
