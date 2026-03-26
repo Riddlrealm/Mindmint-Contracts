@@ -150,13 +150,12 @@ impl SocialWagerContract {
 
     pub fn create_wager(
         env: Env,
+        challenger: Address,
         opponent: Address,
         puzzle_id: u32,
         stake_amount: i128,
         wager_type: WagerType,
     ) -> Result<u64, SocialWagerError> {
-        opponent.require_auth();
-        let challenger = env.invoker();
         challenger.require_auth();
 
         if challenger == opponent {
@@ -201,6 +200,7 @@ impl SocialWagerContract {
 
     pub fn accept_wager(
         env: Env,
+        opponent: Address,
         wager_id: u64,
     ) -> Result<SocialWager, SocialWagerError> {
         let mut wager = Self::get_wager_internal(&env, wager_id)?;
@@ -208,7 +208,6 @@ impl SocialWagerContract {
             return Err(SocialWagerError::WagerExpired);
         }
 
-        let opponent = env.invoker();
         opponent.require_auth();
 
         if wager.status != WagerStatus::Pending {
@@ -235,12 +234,14 @@ impl SocialWagerContract {
 
     pub fn decline_wager(
         env: Env,
+        opponent: Address,
         wager_id: u64,
     ) -> Result<SocialWager, SocialWagerError> {
         let mut wager = Self::get_wager_internal(&env, wager_id)?;
-        Self::cancel_if_expired(&env, &mut wager)?;
+        if Self::cancel_if_expired(&env, &mut wager)? {
+            return Err(SocialWagerError::WagerExpired);
+        }
 
-        let opponent = env.invoker();
         opponent.require_auth();
 
         if wager.status != WagerStatus::Pending {
@@ -297,6 +298,7 @@ impl SocialWagerContract {
 
     pub fn claim_winnings(
         env: Env,
+        winner: Address,
         wager_id: u64,
     ) -> Result<SocialWager, SocialWagerError> {
         let mut wager = Self::get_wager_internal(&env, wager_id)?;
@@ -304,7 +306,6 @@ impl SocialWagerContract {
             return Err(SocialWagerError::InvalidStatus);
         }
 
-        let winner = env.invoker();
         winner.require_auth();
 
         let stored_winner = wager
