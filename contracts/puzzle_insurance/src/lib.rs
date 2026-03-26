@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, contractevent, token, Address, Env, String, Vec, Map};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Vec, Symbol, IntoVal};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,7 +31,7 @@ pub enum DataKey {
     UserPolicies(Address),
 }
 
-#[contractevent]
+#[contracttype]
 #[derive(Clone, Debug)]
 pub struct ClaimPaid {
     pub policy_id: u64,
@@ -39,14 +39,14 @@ pub struct ClaimPaid {
     pub amount: i128,
 }
 
-#[contractevent]
+#[contracttype]
 #[derive(Clone, Debug)]
 pub struct PolicyExpired {
     pub policy_id: u64,
     pub holder: Address,
 }
 
-#[contractevent]
+#[contracttype]
 #[derive(Clone, Debug)]
 pub struct PolicyPurchased {
     pub policy_id: u64,
@@ -144,13 +144,16 @@ impl PuzzleInsuranceContract {
         env.storage().persistent().set(&DataKey::UserPolicies(holder), &user_policies);
         
         // Emit event
-        env.events().publish_event(&PolicyPurchased {
-            policy_id: new_policy_id,
-            holder,
-            attempts_covered: attempts,
-            coverage_percent,
-            expires_at: current_time + duration,
-        });
+        env.events().publish(
+            (Symbol::new(&env, "policy_purchased"), policy_id.to_val()),
+            &PolicyPurchased {
+                policy_id: new_policy_id,
+                holder,
+                attempts_covered: attempts,
+                coverage_percent,
+                expires_at: current_time + duration,
+            },
+        );
         
         new_policy_id
     }
@@ -195,10 +198,13 @@ impl PuzzleInsuranceContract {
         // Check if policy is now exhausted
         if policy.attempts_used >= policy.attempts_covered {
             policy.active = false;
-            env.events().publish_event(&PolicyExpired {
-                policy_id,
-                holder: policy.holder.clone(),
-            });
+            env.events().publish(
+                (Symbol::new(&env, "policy_expired"), policy_id.to_val()),
+                &PolicyExpired {
+                    policy_id,
+                    holder: policy.holder.clone(),
+                },
+            );
         }
         
         // Store updated policy
@@ -210,11 +216,14 @@ impl PuzzleInsuranceContract {
         token_client.transfer(&env.current_contract_address(), &policy.holder, &payout);
         
         // Emit event
-        env.events().publish_event(&ClaimPaid {
-            policy_id,
-            holder: policy.holder,
-            amount: payout,
-        });
+        env.events().publish(
+            (Symbol::new(&env, "claim_paid"), policy_id.to_val()),
+            &ClaimPaid {
+                policy_id,
+                holder: policy.holder,
+                amount: payout,
+            },
+        );
         
         payout
     }
@@ -285,10 +294,13 @@ impl PuzzleInsuranceContract {
         policy.active = false;
         env.storage().persistent().set(&DataKey::Policy(policy_id), &policy);
         
-        env.events().publish_event(&PolicyExpired {
-            policy_id,
-            holder: policy.holder,
-        });
+        env.events().publish(
+            (Symbol::new(&env, "policy_expired"), policy_id.to_val()),
+            &PolicyExpired {
+                policy_id,
+                holder: policy.holder,
+            },
+        );
     }
 
     fn assert_admin(env: &Env, admin: &Address) {
@@ -297,6 +309,7 @@ impl PuzzleInsuranceContract {
             panic!("Not admin");
         }
     }
+}
 
 #[cfg(test)]
 mod test;
