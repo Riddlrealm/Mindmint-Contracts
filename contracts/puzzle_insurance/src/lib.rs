@@ -31,31 +31,6 @@ pub enum DataKey {
     UserPolicies(Address),
 }
 
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct ClaimPaid {
-    pub policy_id: u64,
-    pub holder: Address,
-    pub amount: i128,
-}
-
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct PolicyExpired {
-    pub policy_id: u64,
-    pub holder: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct PolicyPurchased {
-    pub policy_id: u64,
-    pub holder: Address,
-    pub attempts_covered: u32,
-    pub coverage_percent: u32,
-    pub expires_at: u64,
-}
-
 #[contract]
 pub struct PuzzleInsuranceContract;
 
@@ -145,14 +120,8 @@ impl PuzzleInsuranceContract {
         
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "policy_purchased"), policy_id.to_val()),
-            &PolicyPurchased {
-                policy_id: new_policy_id,
-                holder,
-                attempts_covered: attempts,
-                coverage_percent,
-                expires_at: current_time + duration,
-            },
+            (Symbol::new(&env, "policy_purchased"), new_policy_id.into_val(&env)),
+            (holder.to_val(), attempts.to_val(), coverage_percent.to_val(), (current_time + duration).to_val()),
         );
         
         new_policy_id
@@ -199,11 +168,8 @@ impl PuzzleInsuranceContract {
         if policy.attempts_used >= policy.attempts_covered {
             policy.active = false;
             env.events().publish(
-                (Symbol::new(&env, "policy_expired"), policy_id.to_val()),
-                &PolicyExpired {
-                    policy_id,
-                    holder: policy.holder.clone(),
-                },
+                (Symbol::new(&env, "policy_expired"), policy_id.into_val(&env)),
+                policy.holder.to_val(),
             );
         }
         
@@ -217,12 +183,8 @@ impl PuzzleInsuranceContract {
         
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "claim_paid"), policy_id.to_val()),
-            &ClaimPaid {
-                policy_id,
-                holder: policy.holder,
-                amount: payout,
-            },
+            (Symbol::new(&env, "claim_paid"), policy_id.into_val(&env)),
+            (policy.holder.to_val(), payout.to_val()),
         );
         
         payout
@@ -295,11 +257,8 @@ impl PuzzleInsuranceContract {
         env.storage().persistent().set(&DataKey::Policy(policy_id), &policy);
         
         env.events().publish(
-            (Symbol::new(&env, "policy_expired"), policy_id.to_val()),
-            &PolicyExpired {
-                policy_id,
-                holder: policy.holder,
-            },
+            (Symbol::new(&env, "policy_expired"), policy_id.into_val(&env)),
+            policy.holder.to_val(),
         );
     }
 
