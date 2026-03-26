@@ -258,7 +258,7 @@ impl PuzzleInsuranceContract {
         
         env.events().publish(
             (Symbol::new(&env, "policy_expired"), policy_id.into_val(&env)),
-            policy.holder.to_val(),
+            policy.holder.into_val(&env),
         );
     }
 
