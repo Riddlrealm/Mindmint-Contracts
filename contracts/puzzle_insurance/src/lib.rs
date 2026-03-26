@@ -121,7 +121,7 @@ impl PuzzleInsuranceContract {
         // Emit event
         env.events().publish(
             (Symbol::new(&env, "policy_purchased"), new_policy_id.into_val(&env)),
-            (holder.to_val(), attempts.to_val(), coverage_percent.to_val(), (current_time + duration).to_val()),
+            (holder.into_val(&env), attempts.into_val(&env), coverage_percent.into_val(&env), (current_time + duration).into_val(&env)),
         );
         
         new_policy_id
@@ -169,7 +169,7 @@ impl PuzzleInsuranceContract {
             policy.active = false;
             env.events().publish(
                 (Symbol::new(&env, "policy_expired"), policy_id.into_val(&env)),
-                policy.holder.to_val(),
+                policy.holder.into_val(&env),
             );
         }
         
@@ -184,7 +184,7 @@ impl PuzzleInsuranceContract {
         // Emit event
         env.events().publish(
             (Symbol::new(&env, "claim_paid"), policy_id.into_val(&env)),
-            (policy.holder.to_val(), payout.to_val()),
+            (policy.holder.into_val(&env), payout.into_val(&env)),
         );
         
         payout
