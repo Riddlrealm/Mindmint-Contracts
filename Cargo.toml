@@ -49,6 +49,7 @@ members = [
   "contracts/puzzle_bounty",
   "contracts/dynamic_nft",
   "contracts/social_tipping",
+  "contracts/social_wager",
   "contracts/nft_wrapper",
   "contracts/puzzle_crowdfund",
   "contracts/gamification_rewards",
