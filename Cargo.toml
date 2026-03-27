@@ -53,6 +53,7 @@ members = [
   "contracts/nft_wrapper",
   "contracts/puzzle_crowdfund",
   "contracts/gamification_rewards",
+  "contracts/proof_of_activity",
 ]
 
 [workspace.dependencies]
