@@ -16,11 +16,15 @@ fn test_initialize() {
     let admin = <soroban_sdk::Address as TestAddress>::generate(&env);
     
     // Test successful initialization
-    ProofOfActivityContract::initialize(env.clone(), admin.clone());
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::initialize(env.clone(), admin.clone()).unwrap();
+    });
     
     // Test duplicate initialization fails
-    let result = ProofOfActivityContract::initialize(env.clone(), admin.clone());
-    assert!(result.is_err());
+    env.as_contract(&contract_id, || {
+        let result = ProofOfActivityContract::initialize(env.clone(), admin.clone());
+        assert!(result.is_err());
+    });
 }
 
 #[test]
@@ -35,25 +39,33 @@ fn test_record_proof() {
     let player = <soroban_sdk::Address as TestAddress>::generate(&env);
     
     // Initialize contract
-    ProofOfActivityContract::initialize(env.clone(), admin.clone());
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::initialize(env.clone(), admin.clone()).unwrap();
+    });
     
     // Add oracle
-    ProofOfActivityContract::add_oracle(env.clone(), admin.clone(), oracle.clone());
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::add_oracle(env.clone(), admin.clone(), oracle.clone()).unwrap();
+    });
     
     // Record a proof
-    let proof_id = ProofOfActivityContract::record_proof(
-        env.clone(),
-        oracle.clone(),
-        player.clone(),
-        ActivityType::PuzzleSolved,
-        Symbol::new(&env, "puzzle_123"),
-        100,
-    ).unwrap();
+    let proof_id = env.as_contract(&contract_id, || {
+        ProofOfActivityContract::record_proof(
+            env.clone(),
+            oracle.clone(),
+            player.clone(),
+            ActivityType::PuzzleSolved,
+            Symbol::new(&env, "puzzle_123"),
+            100,
+        ).unwrap()
+    });
     
     assert_eq!(proof_id, 1);
     
     // Verify the proof
-    let proof = ProofOfActivityContract::get_proof(env.clone(), proof_id).unwrap();
+    let proof = env.as_contract(&contract_id, || {
+        ProofOfActivityContract::get_proof(env.clone(), proof_id).unwrap()
+    });
     assert_eq!(proof.0, player);
     assert_eq!(proof.1, ActivityType::PuzzleSolved as u32);
     assert_eq!(proof.4, 100);
@@ -71,17 +83,21 @@ fn test_unauthorized_oracle() {
     let player = <soroban_sdk::Address as TestAddress>::generate(&env);
     
     // Initialize contract
-    ProofOfActivityContract::initialize(env.clone(), admin.clone());
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::initialize(env.clone(), admin.clone()).unwrap();
+    });
     
     // Try to record proof with unauthorized oracle
-    let result = ProofOfActivityContract::record_proof(
-        env.clone(),
-        unauthorized_oracle.clone(),
-        player.clone(),
-        ActivityType::PuzzleSolved,
-        Symbol::new(&env, "puzzle_123"),
-        100,
-    );
+    let result = env.as_contract(&contract_id, || {
+        ProofOfActivityContract::record_proof(
+            env.clone(),
+            unauthorized_oracle.clone(),
+            player.clone(),
+            ActivityType::PuzzleSolved,
+            Symbol::new(&env, "puzzle_123"),
+            100,
+        )
+    });
     
     assert!(result.is_err());
 }
@@ -98,31 +114,41 @@ fn test_score_aggregation() {
     let player = <soroban_sdk::Address as TestAddress>::generate(&env);
     
     // Initialize contract
-    ProofOfActivityContract::initialize(env.clone(), admin.clone());
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::initialize(env.clone(), admin.clone()).unwrap();
+    });
     
     // Add oracle
-    ProofOfActivityContract::add_oracle(env.clone(), admin.clone(), oracle.clone());
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::add_oracle(env.clone(), admin.clone(), oracle.clone()).unwrap();
+    });
     
     // Record multiple proofs
-    ProofOfActivityContract::record_proof(
-        env.clone(),
-        oracle.clone(),
-        player.clone(),
-        ActivityType::PuzzleSolved,
-        Symbol::new(&env, "puzzle_1"),
-        100,
-    );
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::record_proof(
+            env.clone(),
+            oracle.clone(),
+            player.clone(),
+            ActivityType::PuzzleSolved,
+            Symbol::new(&env, "puzzle_1"),
+            100,
+        ).unwrap();
+    });
     
-    ProofOfActivityContract::record_proof(
-        env.clone(),
-        oracle.clone(),
-        player.clone(),
-        ActivityType::TournamentCompleted,
-        Symbol::new(&env, "tournament_1"),
-        200,
-    );
+    env.as_contract(&contract_id, || {
+        ProofOfActivityContract::record_proof(
+            env.clone(),
+            oracle.clone(),
+            player.clone(),
+            ActivityType::TournamentCompleted,
+            Symbol::new(&env, "tournament_1"),
+            200,
+        ).unwrap();
+    });
     
     // Check total score
-    let total_score = ProofOfActivityContract::get_activity_score(env.clone(), player.clone());
+    let total_score = env.as_contract(&contract_id, || {
+        ProofOfActivityContract::get_activity_score(env.clone(), player.clone())
+    });
     assert_eq!(total_score, 300);
 }
