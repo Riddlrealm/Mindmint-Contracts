@@ -1,406 +1,467 @@
 #![cfg(test)]
 
-use crate::{BattlePassContract, BattlePassContractClient, BattlePass, PassTier, SeasonInfo, SeasonRecord};
+use crate::{BattlePassContract, BattlePassContractClient, BattlePass, PassTier, Season, RewardType};
 use soroban_sdk::{testutils::Address as _, Address, Env};
 
 #[test]
-fn test_init_season() {
+fn test_contract_initialization() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
-    // Initialize first season
-    client.init_season(&1, &50_000_000u128);
+    let admin = Address::random(&env);
+    
+    // Initialize contract
+    client.init(&admin);
 
-    // Verify current season is 1
-    let current = client.get_current_season();
-    assert_eq!(current, 1);
+    // Verify admin is set
+    // Note: In a real test, you'd add a get_admin function to verify
 }
 
 #[test]
-fn test_purchase_free_pass() {
+fn test_create_season() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    
+    // Initialize
+    client.init(&admin);
+    
+    // Create season
+    let now = env.ledger().timestamp();
+    client.create_season(
+        &1,
+        &now,
+        &(now + 2_592_000), // 30 days later
+        &1000u128,
+        &oracle,
+    );
+}
+
+#[test]
+fn test_configure_season_tiers() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, BattlePassContract);
+    let client = BattlePassContractClient::new(&env, &contract_id);
+
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    
+    // Initialize and create season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(
+        &1,
+        &(now + 1000), // Start in future
+        &(now + 2_592_000 + 1000),
+        &1000u128,
+        &oracle,
+    );
+    
+    // Configure tiers
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 2500,
+        reward_type: RewardType::Cosmetic,
+        reward_amount: 1u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 5000,
+        reward_type: RewardType::Nft,
+        reward_amount: 1u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+}
+
+#[test]
+#[should_panic(expected = "Cannot configure after season start")]
+fn test_cannot_configure_after_start() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, BattlePassContract);
+    let client = BattlePassContractClient::new(&env, &contract_id);
+
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    
+    // Initialize and create season starting now
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(
+        &1,
+        &now,
+        &(now + 2_592_000),
+        &1000u128,
+        &oracle,
+    );
+    
+    // Try to configure after start - should fail
+    let tiers = Vec::new(&env);
+    client.configure_season_tiers(&1, &tiers);
+}
+
+#[test]
+fn test_purchase_pass() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, BattlePassContract);
+    let client = BattlePassContractClient::new(&env, &contract_id);
+
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
     let player = Address::random(&env);
-
-    // Initialize season
-    client.init_season(&1, &50_000_000u128);
-
-    // Purchase free pass
-    client.purchase_pass(&player, &PassTier::Free);
-
-    // Verify pass exists
-    let pass = client.get_player_pass(&player);
-    assert!(pass.is_some());
-    let pass = pass.unwrap();
-    assert_eq!(pass.owner, player);
-    assert_eq!(pass.current_level, 0);
-    assert_eq!(pass.season, 1);
+    
+    // Setup season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    // Configure and activate season
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    
+    // Purchase pass
+    client.purchase_pass(&player, &1);
+    
+    // TODO: Verify pass exists - would need get_pass_by_player function
 }
 
 #[test]
-fn test_purchase_premium_pass() {
+#[should_panic(expected = "Season is not active")]
+fn test_cannot_purchase_outside_window() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
     let player = Address::random(&env);
-
-    // Initialize season
-    client.init_season(&1, &50_000_000u128);
-
-    // Purchase premium pass
-    client.purchase_pass(&player, &PassTier::Premium);
-
-    // Verify pass is premium
-    let pass = client.get_player_pass(&player);
-    assert!(pass.is_some());
-    let pass = pass.unwrap();
-    assert!(matches!(pass.tier, PassTier::Premium));
+    
+    // Setup season in future
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(
+        &1,
+        &(now + 1000), // Start in future
+        &(now + 2_592_000 + 1000),
+        &1000u128,
+        &oracle,
+    );
+    
+    client.activate_season(&1);
+    
+    // Try to purchase before season starts - should fail
+    client.purchase_pass(&player, &1);
 }
 
 #[test]
-#[should_panic(expected = "already owns")]
-fn test_cannot_purchase_twice() {
+fn test_add_xp_and_tier_advancement() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
     let player = Address::random(&env);
-
-    // Initialize season
-    client.init_season(&1, &50_000_000u128);
-
-    // Purchase twice
-    client.purchase_pass(&player, &PassTier::Free);
-    client.purchase_pass(&player, &PassTier::Premium);
+    
+    // Setup season with tiers
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 2500,
+        reward_type: RewardType::Token,
+        reward_amount: 200u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    // Get pass ID - would need get_pass_by_player function
+    // For now, assume pass ID is 1
+    let pass_id = 1u32;
+    
+    // Add XP as oracle
+    client.add_xp(&pass_id, &1500);
+    
+    // Check tier advancement
+    let (xp, tier, claimed) = client.get_pass(&pass_id);
+    assert_eq!(xp, 1500);
+    assert_eq!(tier, 1); // Should have reached tier 1 (1000 XP)
+    assert_eq!(claimed.len(), 0);
 }
 
 #[test]
-fn test_add_xp_and_level_up() {
+fn test_claim_tier_reward() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
     let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-
-    // Add XP
-    client.add_xp(&player, &1000);
-
-    // Verify level
-    let xp = client.get_player_xp(&player);
-    assert_eq!(xp, 1000);
-
-    let pass = client.get_player_pass(&player).unwrap();
-    assert_eq!(pass.current_level, 1);
+    
+    // Setup season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    let pass_id = 1u32;
+    
+    // Add XP to reach tier
+    client.add_xp(&pass_id, &1500);
+    
+    // Claim reward
+    let reward = client.claim_tier_reward(&pass_id, &0);
+    assert_eq!(reward.reward_amount, 100u128);
+    assert!(matches!(reward.reward_type, RewardType::Token));
+    
+    // Verify reward is marked as claimed
+    let (_, _, claimed) = client.get_pass(&pass_id);
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed.get(0).unwrap(), &0);
 }
 
 #[test]
-fn test_xp_with_bonus_event() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-
-    // Set 2x bonus XP
-    client.set_bonus_xp_event(&2);
-
-    // Add XP
-    client.add_xp(&player, &500); // Should become 1000 with 2x multiplier
-
-    // Verify
-    let xp = client.get_player_xp(&player);
-    assert_eq!(xp, 1000);
-
-    let multiplier = client.get_bonus_xp_multiplier();
-    assert_eq!(multiplier, 2);
-}
-
-#[test]
-fn test_claim_reward() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-
-    // Level up to 5
-    client.add_xp(&player, &5000);
-
-    // Claim reward for level 3
-    let reward = client.claim_reward(&player, &3);
-    assert!(reward > 0);
-}
-
-#[test]
-#[should_panic(expected = "not yet unlocked")]
-fn test_cannot_claim_unreached_level() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-    client.add_xp(&player, &2000); // Level 2 only
-
-    // Try to claim level 5
-    client.claim_reward(&player, &5);
-}
-
-#[test]
-#[should_panic(expected = "Premium rewards")]
-fn test_free_tier_cannot_claim_premium_rewards() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup with free tier
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-    client.add_xp(&player, &60000); // Level 60 (premium only)
-
-    // Try to claim premium reward
-    client.claim_reward(&player, &55);
-}
-
-#[test]
-fn test_retroactive_claim() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup - start with free pass
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-
-    // Level up
-    client.add_xp(&player, &30000); // Level 30
-
-    // Transfer to premium (simulated by gift + setup)
-    // For this test, we'll create a new season with premium immediately
-    let env2 = Env::default();
-    let contract_id2 = env2.register_contract(None, BattlePassContract);
-    let client2 = BattlePassContractClient::new(&env2, &contract_id2);
-
-    client2.init_season(&1, &50_000_000u128);
-    client2.purchase_pass(&player, &PassTier::Premium);
-    client2.add_xp(&player, &30000); // Level 30
-
-    // Claim retroactive rewards
-    let total = client2.claim_retroactive_rewards(&player);
-    assert!(total > 0);
-}
-
-#[test]
-fn test_transfer_pass() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player1 = Address::random(&env);
-    let player2 = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player1, &PassTier::Free);
-    client.add_xp(&player1, &5000);
-
-    // Transfer pass
-    client.transfer_pass(&player1, &player2);
-
-    // Verify transfer
-    let pass1 = client.get_player_pass(&player1);
-    assert!(pass1.is_none()); // Player1 no longer has it
-
-    let pass2 = client.get_player_pass(&player2);
-    assert!(pass2.is_some());
-    let pass2 = pass2.unwrap();
-    assert_eq!(pass2.owner, player2);
-    assert_eq!(pass2.current_level, 5); // Level preserved
-
-    // Verify XP transferred
-    let xp2 = client.get_player_xp(&player2);
-    assert_eq!(xp2, 5000);
-}
-
-#[test]
-#[should_panic(expected = "already owns")]
-fn test_cannot_transfer_to_existing_owner() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player1 = Address::random(&env);
-    let player2 = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player1, &PassTier::Free);
-    client.purchase_pass(&player2, &PassTier::Free);
-
-    // Try to transfer from player1 to player2 (who already owns)
-    client.transfer_pass(&player1, &player2);
-}
-
-#[test]
-fn test_season_expiration() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-
-    // Deactivate season
-    client.deactivate_season(&1);
-
-    // Verify season is inactive
-    // Note: This would normally require checking the season status
-}
-
-#[test]
-fn test_season_history() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup season 1
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Premium);
-    client.add_xp(&player, &30000); // Level 30
-
-    // Archive season 1
-    client.archive_season(&player);
-
-    // Verify history
-    let history = client.get_season_history(&player);
-    assert_eq!(history.len(), 1);
-    let record = history.get(0).unwrap();
-    assert_eq!(record.season, 1);
-    assert_eq!(record.final_level, 30);
-    assert_eq!(record.total_xp, 30000);
-}
-
-#[test]
-fn test_multiple_seasons() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Season 1
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-    client.add_xp(&player, &10000);
-
-    // Archive season 1
-    client.archive_season(&player);
-
-    // Season 2
-    client.init_season(&2, &75_000_000u128);
-    client.purchase_pass(&player, &PassTier::Premium);
-    client.add_xp(&player, &20000);
-
-    // Verify we're in season 2
-    let current = client.get_current_season();
-    assert_eq!(current, 2);
-
-    // Verify history has both seasons
-    let history = client.get_season_history(&player);
-    assert_eq!(history.len(), 1); // Only archived seasons show
-}
-
-#[test]
-fn test_progressive_rewards() {
-    let env = Env::default();
-    let contract_id = env.register_contract(None, BattlePassContract);
-    let client = BattlePassContractClient::new(&env, &contract_id);
-
-    let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Premium);
-
-    // Level to 50
-    client.add_xp(&player, &50000);
-
-    // Claim rewards at different levels
-    let reward_5 = client.claim_reward(&player, &5);
-    let reward_10 = client.claim_reward(&player, &10);
-    let reward_20 = client.claim_reward(&player, &20);
-    let reward_50 = client.claim_reward(&player, &50);
-
-    // Later levels should have higher rewards due to progressive scaling
-    assert!(reward_10 > reward_5);
-    assert!(reward_20 > reward_10);
-    assert!(reward_50 > reward_20);
-}
-
-#[test]
+#[should_panic(expected = "Reward already claimed")]
 fn test_cannot_claim_same_reward_twice() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
     let player = Address::random(&env);
-
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
-    client.add_xp(&player, &5000);
-
-    // Claim once
-    client.claim_reward(&player, &3);
-
+    
+    // Setup season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    let pass_id = 1u32;
+    
+    // Add XP and claim
+    client.add_xp(&pass_id, &1500);
+    client.claim_tier_reward(&pass_id, &0);
+    
     // Try to claim again - should fail
-    // Note: This requires the contract to track claimed rewards
+    client.claim_tier_reward(&pass_id, &0);
 }
 
 #[test]
-fn test_max_level_cap() {
+#[should_panic(expected = "Tier not reached yet")]
+fn test_cannot_claim_unreached_tier() {
     let env = Env::default();
     let contract_id = env.register_contract(None, BattlePassContract);
     let client = BattlePassContractClient::new(&env, &contract_id);
 
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
     let player = Address::random(&env);
+    
+    // Setup season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 2500,
+        reward_type: RewardType::Token,
+        reward_amount: 200u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    let pass_id = 1u32;
+    
+    // Add XP for only tier 0
+    client.add_xp(&pass_id, &1500);
+    
+    // Try to claim tier 1 - should fail
+    client.claim_tier_reward(&pass_id, &1);
+}
 
-    // Setup
-    client.init_season(&1, &50_000_000u128);
-    client.purchase_pass(&player, &PassTier::Free);
+#[test]
+#[should_panic(expected = "Season is not active")]
+fn test_cannot_add_xp_expired_season() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, BattlePassContract);
+    let client = BattlePassContractClient::new(&env, &contract_id);
 
-    // Try to level beyond max
-    client.add_xp(&player, &200000); // Way over max
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    let player = Address::random(&env);
+    
+    // Setup expired season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(
+        &1,
+        &(now - 2_592_000), // Started 30 days ago
+        &(now - 1000),     // Ended 1000 seconds ago
+        &1000u128,
+        &oracle,
+    );
+    
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    let pass_id = 1u32;
+    
+    // Try to add XP to expired season - should fail
+    client.add_xp(&pass_id, &1000);
+}
 
-    // Verify capped at 100
-    let pass = client.get_player_pass(&player).unwrap();
-    assert!(pass.current_level <= 100);
+#[test]
+fn test_multiple_reward_types() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, BattlePassContract);
+    let client = BattlePassContractClient::new(&env, &contract_id);
+
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    let player = Address::random(&env);
+    
+    // Setup season with different reward types
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 2500,
+        reward_type: RewardType::Cosmetic,
+        reward_amount: 1u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 5000,
+        reward_type: RewardType::Nft,
+        reward_amount: 1u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    let pass_id = 1u32;
+    
+    // Add enough XP for all tiers
+    client.add_xp(&pass_id, &6000);
+    
+    // Claim different reward types
+    let token_reward = client.claim_tier_reward(&pass_id, &0);
+    assert!(matches!(token_reward.reward_type, RewardType::Token));
+    
+    let cosmetic_reward = client.claim_tier_reward(&pass_id, &1);
+    assert!(matches!(cosmetic_reward.reward_type, RewardType::Cosmetic));
+    
+    let nft_reward = client.claim_tier_reward(&pass_id, &2);
+    assert!(matches!(nft_reward.reward_type, RewardType::Nft));
+}
+
+#[test]
+fn test_tier_advancement_events() {
+    let env = Env::default();
+    let contract_id = env.register_contract(None, BattlePassContract);
+    let client = BattlePassContractClient::new(&env, &contract_id);
+
+    let admin = Address::random(&env);
+    let oracle = Address::random(&env);
+    let player = Address::random(&env);
+    
+    // Setup season
+    client.init(&admin);
+    
+    let now = env.ledger().timestamp();
+    client.create_season(&1, &now, &(now + 2_592_000), &1000u128, &oracle);
+    
+    let mut tiers = Vec::new(&env);
+    tiers.push_back(PassTier {
+        required_xp: 1000,
+        reward_type: RewardType::Token,
+        reward_amount: 100u128,
+    });
+    tiers.push_back(PassTier {
+        required_xp: 2500,
+        reward_type: RewardType::Token,
+        reward_amount: 200u128,
+    });
+    
+    client.configure_season_tiers(&1, &tiers);
+    client.activate_season(&1);
+    client.purchase_pass(&player, &1);
+    
+    let pass_id = 1u32;
+    
+    // Add XP to advance multiple tiers
+    client.add_xp(&pass_id, &3000);
+    
+    // TODO: Verify TierReached events were emitted
+    // In a real test, you'd check the event logs
 }
