@@ -56,6 +56,7 @@ members = [
   "contracts/proof_of_activity",
   "contracts/player_sponsorship",
   "contracts/tournament_prize_pool",
+  "contracts/loyalty_points",
 ]
 
 [workspace.dependencies]
