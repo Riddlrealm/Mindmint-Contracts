@@ -55,6 +55,7 @@ members = [
   "contracts/gamification_rewards",
   "contracts/proof_of_activity",
   "contracts/player_sponsorship",
+  "contracts/emergency_pause",
 ]
 
 [workspace.dependencies]
