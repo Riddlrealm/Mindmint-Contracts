@@ -24,7 +24,8 @@ pub struct EvolutionRule {
 #[contracttype]
 pub enum DataKey {
     Admin(Address),
-    Oracle(Address),
+    /// Active oracle address (single slot; replaces keyed `Oracle(Address)` pattern).
+    CurrentOracle,
     DynamicNft(u32),
     NextTokenId,
     EvolutionRules,
@@ -67,7 +68,7 @@ impl DynamicNftContract {
         }
         
         env.storage().persistent().set(&DataKey::Admin(admin.clone()), &true);
-        env.storage().persistent().set(&DataKey::Oracle(oracle), &true);
+        env.storage().persistent().set(&DataKey::CurrentOracle, &oracle);
         env.storage().persistent().set(&DataKey::NextTokenId, &1u32);
         env.storage().persistent().set(&DataKey::EvolutionRules, &Map::<u64, EvolutionRule>::new(&env));
     }
@@ -190,17 +191,9 @@ impl DynamicNftContract {
     pub fn update_oracle(env: Env, admin: Address, new_oracle: Address) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
-        
-        // Remove old oracle
-        let old_oracle: Option<Address> = env.storage().persistent()
-            .get(&DataKey::Oracle(new_oracle.clone()));
-        
-        if let Some(old) = old_oracle {
-            env.storage().persistent().remove(&DataKey::Oracle(old));
-        }
-        
-        // Set new oracle
-        env.storage().persistent().set(&DataKey::Oracle(new_oracle.clone()), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::CurrentOracle, &new_oracle);
     }
 
     fn check_and_evolve(env: &Env, token_id: u32) {
@@ -251,10 +244,12 @@ impl DynamicNftContract {
     }
 
     fn assert_oracle(env: &Env, oracle: &Address) {
-        let is_oracle: bool = env.storage().persistent()
-            .get(&DataKey::Oracle(oracle.clone()))
-            .unwrap_or(false);
-        if !is_oracle {
+        let current: Address = env
+            .storage()
+            .persistent()
+            .get(&DataKey::CurrentOracle)
+            .expect("No oracle");
+        if current != *oracle {
             panic!("Not oracle");
         }
     }

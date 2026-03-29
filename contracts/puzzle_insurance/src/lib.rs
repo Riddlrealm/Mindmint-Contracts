@@ -1,6 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Vec, Symbol, IntoVal};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -116,12 +116,14 @@ impl PuzzleInsuranceContract {
             .get(&DataKey::UserPolicies(holder.clone()))
             .unwrap_or(Vec::new(&env));
         user_policies.push_back(new_policy_id);
-        env.storage().persistent().set(&DataKey::UserPolicies(holder), &user_policies);
+        env.storage()
+            .persistent()
+            .set(&DataKey::UserPolicies(holder.clone()), &user_policies);
         
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "policy_purchased"), new_policy_id.into_val(&env)),
-            (holder.into_val(&env), attempts.into_val(&env), coverage_percent.into_val(&env), (current_time + duration).into_val(&env)),
+            (symbol_short!("pol_purch"), new_policy_id),
+            (holder.clone(), attempts, coverage_percent, current_time + duration),
         );
         
         new_policy_id
@@ -168,8 +170,8 @@ impl PuzzleInsuranceContract {
         if policy.attempts_used >= policy.attempts_covered {
             policy.active = false;
             env.events().publish(
-                (Symbol::new(&env, "policy_expired"), policy_id.into_val(&env)),
-                policy.holder.into_val(&env),
+                (symbol_short!("pol_exp"), policy_id),
+                policy.holder.clone(),
             );
         }
         
@@ -183,8 +185,8 @@ impl PuzzleInsuranceContract {
         
         // Emit event
         env.events().publish(
-            (Symbol::new(&env, "claim_paid"), policy_id.into_val(&env)),
-            (policy.holder.into_val(&env), payout.into_val(&env)),
+            (symbol_short!("clm_paid"), policy_id),
+            (policy.holder.clone(), payout),
         );
         
         payout
@@ -257,8 +259,8 @@ impl PuzzleInsuranceContract {
         env.storage().persistent().set(&DataKey::Policy(policy_id), &policy);
         
         env.events().publish(
-            (Symbol::new(&env, "policy_expired"), policy_id.into_val(&env)),
-            policy.holder.into_val(&env),
+            (symbol_short!("pol_exp"), policy_id),
+            policy.holder.clone(),
         );
     }
 
