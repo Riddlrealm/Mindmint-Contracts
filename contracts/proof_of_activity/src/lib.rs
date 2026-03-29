@@ -136,6 +136,14 @@ impl ProofOfActivityContract {
             .unwrap_or(0)
     }
 
+    pub fn get_activity_count(env: Env, player: Address, activity_type: u32) -> u32 {
+        if activity_type > 2 {
+            panic!("Invalid activity type");
+        }
+        let count_key = (symbol_short!("CNT"), player, activity_type);
+        env.storage().persistent().get(&count_key).unwrap_or(0)
+    }
+
     pub fn add_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), ContractError> {
         admin.require_auth();
         
