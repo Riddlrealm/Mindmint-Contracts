@@ -60,6 +60,7 @@ members = [
   "contracts/loyalty_points",
   "contracts/nft_upgrade",
   "contracts/nft_bundle",
+  "contracts/puzzle_voting",
 ]
 
 [workspace.dependencies]
