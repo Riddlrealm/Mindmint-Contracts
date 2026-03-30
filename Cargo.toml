@@ -59,6 +59,7 @@ members = [
   "contracts/tournament_prize_pool",
   "contracts/loyalty_points",
   "contracts/nft_upgrade",
+  "contracts/nft_bundle",
 ]
 
 [workspace.dependencies]
