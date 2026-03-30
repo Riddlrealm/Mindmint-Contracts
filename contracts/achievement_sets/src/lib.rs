@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, vec, Address, Env, String, Symbol, Vec,
 };
 
 // ──────────────────────────────────────────────────────────
@@ -32,14 +32,10 @@ pub struct Config {
 pub struct AchievementSet {
     pub id: u32,
     pub name: String,
-    /// Required puzzle IDs (the `puzzle_id` stored in `achievement_nft`).
     pub required_puzzle_ids: Vec<u32>,
     pub tier: SetTier,
-    /// Base bonus rewarded when the set is claimed.
     pub base_bonus: i128,
-    /// If set, only the first `cap` successful claims can claim this set.
     pub limited_edition_cap: Option<u32>,
-    /// Content unlock key granted on claim.
     pub unlock_key: Symbol,
 }
 
@@ -86,33 +82,22 @@ pub struct EditionToken {
 
 #[contracttype]
 pub enum DataKey {
-    Config, // Config
+    Config,
     NextSetId,
     NextSynergyId,
-
-    Set(u32),     // AchievementSet
-    Synergy(u32), // Synergy
-
-    // Player progress is derived from achievement NFTs but cached here.
-    PlayerProgress(Address, u32), // Vec<u32> completed puzzle ids for (player, set_id)
-    SetClaimed(Address, u32),     // bool
-    SynergyClaimed(Address, u32), // bool
-
-    // Limited editions (cap enforced at claim time)
-    SetClaims(u32), // u32 number of successful unique claims
-
-    // Unlocks
-    Unlocks(Address), // Vec<Symbol>
-
-    // Leaderboards
-    SetLeaderboard(u32), // Vec<SetLeaderboardEntry>
-    GlobalLeaderboard,   // Vec<SetLeaderboardEntry> (score = total bonus claimed)
-    PlayerTotalBonus(Address), // i128
-
-    // Limited edition tradable tokens
+    Set(u32),
+    Synergy(u32),
+    PlayerProgress(Address, u32),
+    SetClaimed(Address, u32),
+    SynergyClaimed(Address, u32),
+    SetClaims(u32),
+    Unlocks(Address),
+    SetLeaderboard(u32),
+    GlobalLeaderboard,
+    PlayerTotalBonus(Address),
     NextEditionTokenId,
-    EditionToken(u32), // EditionToken
-    EditionByOwner(Address), // Vec<u32> token ids
+    EditionToken(u32),
+    EditionByOwner(Address),
 }
 
 // ──────────────────────────────────────────────────────────
@@ -128,13 +113,11 @@ const EVT_ED_XFER: Symbol = symbol_short!("edxfer");
 // EXTERNAL CLIENTS
 // ──────────────────────────────────────────────────────────
 
-// We only need a small view API from the NFT contract.
 #[soroban_sdk::contractclient(name = "AchievementNFTClient")]
 pub trait AchievementNFT {
     fn puzzle_ids_of(env: Env, owner: Address) -> Vec<u32>;
 }
 
-// We only need mint from reward_token (bonus distribution).
 #[soroban_sdk::contractclient(name = "RewardTokenClient")]
 pub trait RewardToken {
     fn mint(env: Env, minter: Address, to: Address, amount: i128);
@@ -161,7 +144,6 @@ impl AchievementSets {
         if env.storage().persistent().has(&DataKey::Config) {
             panic!("Already initialized");
         }
-
         if max_top_entries == 0 {
             panic!("max_top_entries must be positive");
         }
@@ -250,7 +232,6 @@ impl AchievementSets {
             panic!("bonus must be positive");
         }
 
-        // Ensure sets exist
         for sid in required_set_ids.iter() {
             let set_id = sid.clone();
             Self::load_set(&env, set_id);
@@ -314,7 +295,8 @@ impl AchievementSets {
 
         let required_count = set.required_puzzle_ids.len();
         let completed_count = completed.len();
-        let is_completed = completed_count >= required_count && Self::is_completed(&set, &completed);
+        let is_completed =
+            completed_count >= required_count && Self::is_completed(&set, &completed);
 
         SetProgressView {
             completed_puzzle_ids: completed,
@@ -384,7 +366,6 @@ impl AchievementSets {
 
     // ───────────── Core: sync + claim ─────────────
 
-    /// Sync cached progress for a player & set by reading real `achievement_nft` ownership.
     pub fn sync_player_set(env: Env, player: Address, set_id: u32) -> SetProgressView {
         let set = Self::load_set(&env, set_id);
         let cfg = Self::load_config(&env);
@@ -407,14 +388,12 @@ impl AchievementSets {
         Self::progress(env, player, set_id)
     }
 
-    /// Claim the set bonus if completed. This auto-detects completion via `achievement_nft`.
     pub fn claim_set_bonus(env: Env, player: Address, set_id: u32) -> i128 {
         player.require_auth();
 
         let set = Self::load_set(&env, set_id);
         let cfg = Self::load_config(&env);
 
-        // Prevent double-claim
         let already: bool = env
             .storage()
             .persistent()
@@ -424,7 +403,6 @@ impl AchievementSets {
             panic!("already claimed");
         }
 
-        // Enforce limited edition cap (cap is on claims, not on progress)
         if let Some(cap) = set.limited_edition_cap {
             let claimed: u32 = env
                 .storage()
@@ -436,29 +414,25 @@ impl AchievementSets {
             }
         }
 
-        // Sync progress from NFTs and verify completion
         let view = Self::sync_player_set(env.clone(), player.clone(), set_id);
         if !view.is_completed {
             panic!("not completed");
         }
 
-        // Compute bonus
         let tier_bonus = Self::tier_bonus(set.tier);
         let bonus = set.base_bonus + tier_bonus;
 
-        // Mint reward tokens to player (authorize as current contract for auth subtree)
         let token = RewardTokenClient::new(&env, &cfg.reward_token);
         let minter = env.current_contract_address();
 
-        env.authorize_as_current_contract(vec![]);
+        // Fix 1: vec![] requires soroban_sdk::vec import (added to use block at top)
+        env.authorize_as_current_contract(vec![&env]);
         token.mint(&minter, &player, &bonus);
 
-        // Mark claim
         env.storage()
             .persistent()
             .set(&DataKey::SetClaimed(player.clone(), set_id), &true);
 
-        // Bump limited edition count + mint a tradable edition token (if applicable)
         if let Some(_cap) = set.limited_edition_cap {
             let claimed: u32 = env
                 .storage()
@@ -490,7 +464,7 @@ impl AchievementSets {
                 .persistent()
                 .set(&DataKey::EditionToken(token_id), &ed);
 
-            let mut owned = env
+            let mut owned: Vec<u32> = env
                 .storage()
                 .persistent()
                 .get(&DataKey::EditionByOwner(player.clone()))
@@ -504,10 +478,7 @@ impl AchievementSets {
                 .publish((EVT_ED_MINT, player.clone()), (set_id, token_id, new_claimed));
         }
 
-        // Unlock content
         Self::grant_unlock(&env, &player, set.unlock_key);
-
-        // Update totals + leaderboards
         Self::add_player_bonus(&env, &cfg, &player, bonus);
         Self::update_set_leaderboard(&env, &cfg, set_id, &player, bonus);
 
@@ -517,7 +488,6 @@ impl AchievementSets {
         bonus
     }
 
-    /// Claim a synergy bonus (requires completing all required sets).
     pub fn claim_synergy_bonus(env: Env, player: Address, synergy_id: u32) -> i128 {
         player.require_auth();
 
@@ -533,7 +503,6 @@ impl AchievementSets {
             panic!("already claimed");
         }
 
-        // Must be completed (not necessarily claimed) for all sets
         for sid in syn.required_set_ids.iter() {
             let set_id = sid.clone();
             let view = Self::sync_player_set(env.clone(), player.clone(), set_id);
@@ -545,7 +514,8 @@ impl AchievementSets {
         let token = RewardTokenClient::new(&env, &cfg.reward_token);
         let minter = env.current_contract_address();
 
-        env.authorize_as_current_contract(vec![]);
+        // Fix 1 (same): vec![] → vec![&env]
+        env.authorize_as_current_contract(vec![&env]);
         token.mint(&minter, &player, &syn.bonus);
 
         env.storage()
@@ -581,7 +551,6 @@ impl AchievementSets {
             panic!("Not the owner");
         }
 
-        // Remove from from's list
         let mut from_list: Vec<u32> = env
             .storage()
             .persistent()
@@ -594,7 +563,6 @@ impl AchievementSets {
             .persistent()
             .set(&DataKey::EditionByOwner(from.clone()), &from_list);
 
-        // Add to to's list
         let mut to_list: Vec<u32> = env
             .storage()
             .persistent()
@@ -607,7 +575,6 @@ impl AchievementSets {
             .persistent()
             .set(&DataKey::EditionByOwner(to.clone()), &to_list);
 
-        // Update owner
         token.owner = to.clone();
         env.storage()
             .persistent()
@@ -694,19 +661,24 @@ impl AchievementSets {
             .persistent()
             .set(&DataKey::PlayerTotalBonus(player.clone()), &total);
 
-        // global leaderboard uses the latest total
         Self::update_global_leaderboard(env, cfg, player);
     }
 
-    fn update_set_leaderboard(env: &Env, cfg: &Config, set_id: u32, player: &Address, score: i128) {
+    fn update_set_leaderboard(
+        env: &Env,
+        cfg: &Config,
+        set_id: u32,
+        player: &Address,
+        score: i128,
+    ) {
         let now = env.ledger().timestamp();
-        let mut lb: Vec<SetLeaderboardEntry> = env
+        // Fix 2: `let mut lb` — variable doesn't need to be mutable; use directly
+        let lb: Vec<SetLeaderboardEntry> = env
             .storage()
             .persistent()
             .get(&DataKey::SetLeaderboard(set_id))
             .unwrap_or(Vec::new(env));
 
-        // Remove any existing entry for player
         let mut filtered = Vec::new(env);
         for e in lb.iter() {
             if e.player != *player {
@@ -714,7 +686,6 @@ impl AchievementSets {
             }
         }
 
-        // Insert in descending score order
         let entry = SetLeaderboardEntry {
             player: player.clone(),
             score,
@@ -749,13 +720,13 @@ impl AchievementSets {
             .get(&DataKey::PlayerTotalBonus(player.clone()))
             .unwrap_or(0);
 
-        let mut lb: Vec<SetLeaderboardEntry> = env
+        // Fix 2: same — not mut
+        let lb: Vec<SetLeaderboardEntry> = env
             .storage()
             .persistent()
             .get(&DataKey::GlobalLeaderboard)
             .unwrap_or(Vec::new(env));
 
-        // Remove any existing entry for player
         let mut filtered = Vec::new(env);
         for e in lb.iter() {
             if e.player != *player {
@@ -763,7 +734,6 @@ impl AchievementSets {
             }
         }
 
-        // Insert in descending total order
         let entry = SetLeaderboardEntry {
             player: player.clone(),
             score: total,
@@ -785,10 +755,10 @@ impl AchievementSets {
             out.push_back(entry);
         }
 
-        env.storage().persistent().set(&DataKey::GlobalLeaderboard, &out);
+        env.storage()
+            .persistent()
+            .set(&DataKey::GlobalLeaderboard, &out);
     }
 }
 
 mod test;
-
-
