@@ -4,7 +4,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Vec, symbol_short, BytesN, Symbol};
+use soroban_sdk::{contract, contractimpl, Address, Env, Vec, symbol_short, BytesN, Symbol, IntoVal};
 use soroban_sdk::token::Client as TokenClient;
 use crate::storage::*;
 
