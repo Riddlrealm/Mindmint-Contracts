@@ -66,6 +66,7 @@ members = [
   "contracts/liquidity_mining",
   "contracts/puzzle_voting",
   "contracts/delegation",
+  "contracts/identity",
   "contracts/token_swap",
 ]
 
