@@ -67,6 +67,7 @@ members = [
   "contracts/puzzle_voting",
   "contracts/delegation",
   "contracts/identity",
+  "contracts/token_swap",
 ]
 
 [workspace.dependencies]
