@@ -61,6 +61,9 @@ members = [
   "contracts/nft_upgrade",
   "contracts/nft_bundle",
   "contracts/puzzle_voting", "contracts/nft_composability",
+  "contracts/liquidity_mining",
+  "contracts/puzzle_voting",
+  "contracts/delegation",
 ]
 
 [workspace.dependencies]
