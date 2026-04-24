@@ -71,6 +71,7 @@ members = [
   "contracts/identity",
   "contracts/token_swap",
   "contracts/airdrop_merkle_claim",
+  "contracts/nft_trait_marketplace",
 ]
 
 [workspace.dependencies]
