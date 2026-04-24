@@ -5,6 +5,7 @@ members = [
   "contracts/achievement_collection",
   "contracts/achievement_nft",
   "contracts/fractional_nft",
+  "contracts/nft_staking",
   "contracts/achievement_sets",
   "contracts/auction",
   "contracts/battle_pass",
