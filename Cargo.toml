@@ -70,6 +70,7 @@ members = [
   "contracts/delegation",
   "contracts/identity",
   "contracts/token_swap",
+  "contracts/airdrop_merkle_claim",
 ]
 
 [workspace.dependencies]
