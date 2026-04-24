@@ -29,6 +29,7 @@ members = [
   "contracts/tournament",
   "contracts/bounty",
   "contracts/charity_donation",
+  "contracts/community_grant",
   "contracts/vesting",
   "contracts/insurance",
   "contracts/whitelist",
