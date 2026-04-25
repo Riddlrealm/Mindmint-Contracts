@@ -75,6 +75,7 @@ members = [
   "contracts/puzzle_subscription_tier",
   "contracts/airdrop_merkle_claim",
   "contracts/nft_trait_marketplace",
+  "contracts/conditional_reward",
 ]
 
 [workspace.dependencies]
