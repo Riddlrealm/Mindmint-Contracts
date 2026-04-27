@@ -78,6 +78,7 @@ members = [
   "contracts/puzzle_co_creation",
   "contracts/conditional_reward",
   "contracts/subscription_dao",
+  "contracts/payment_splitter",
 ]
 
 [workspace.dependencies]
