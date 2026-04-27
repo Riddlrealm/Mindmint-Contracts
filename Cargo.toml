@@ -66,10 +66,8 @@ members = [
   "contracts/nft_bundle",
   "contracts/flash_challenge",
   "contracts/liquidity_mining",
-  "contracts/puzzle_voting", "contracts/nft_composability",
-  "contracts/liquidity_mining",
   "contracts/puzzle_voting",
-  "contracts/delegation",
+  "contracts/nft_composability",
   "contracts/identity",
   "contracts/token_swap",
   "contracts/puzzle_subscription_tier",
@@ -77,6 +75,7 @@ members = [
   "contracts/nft_trait_marketplace",
   "contracts/puzzle_co_creation",
   "contracts/conditional_reward",
+  "contracts/puzzle_pool_staking",
 ]
 
 [workspace.dependencies]
