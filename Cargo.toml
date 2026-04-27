@@ -77,6 +77,8 @@ members = [
   "contracts/nft_trait_marketplace",
   "contracts/puzzle_co_creation",
   "contracts/conditional_reward",
+  "contracts/oracle_price_feed",
+  "contracts/event_ticket",
 ]
 
 [workspace.dependencies]
