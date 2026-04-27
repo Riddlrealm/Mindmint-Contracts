@@ -76,6 +76,8 @@ members = [
   "contracts/puzzle_co_creation",
   "contracts/conditional_reward",
   "contracts/puzzle_pool_staking",
+  "contracts/oracle_price_feed",
+  "contracts/event_ticket",
 ]
 
 [workspace.dependencies]
