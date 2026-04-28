@@ -75,6 +75,8 @@ members = [
   "contracts/nft_trait_marketplace",
   "contracts/puzzle_co_creation",
   "contracts/conditional_reward",
+  "contracts/subscription_dao",
+  "contracts/payment_splitter",
   "contracts/puzzle_pool_staking",
   "contracts/oracle_price_feed",
   "contracts/event_ticket",
