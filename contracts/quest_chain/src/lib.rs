@@ -42,6 +42,7 @@ pub struct QuestChain {
     pub total_reward: i128,
     pub start_time: Option<u64>, // None = no time limit
     pub end_time: Option<u64>, // None = no time limit
+    pub max_participants: Option<u32>, // None = no participant limit
     pub created_at: u64,
     pub active: bool,
 }
@@ -94,6 +95,7 @@ pub enum DataKey {
     PlayerProgress(Address, u32), // PlayerProgress - (player, chain_id)
     CompletionLeaderboard(u32), // Vec<CompletionRecord> - sorted by duration (fastest first)
     ChainCompletions(u32), // u32 - total completions for chain
+    ChainParticipants(u32), // u32 - current participant count for chain
     RewardPool(u32), // i128 - reward pool for chain (if using token rewards)
     PendingRewards(Address, u32), // i128 - pending rewards for player in chain
 }
@@ -170,6 +172,7 @@ impl QuestChainContract {
     /// * `quests` - Vector of quests in the chain
     /// * `start_time` - Optional start time (None for no time limit)
     /// * `end_time` - Optional end time (None for no time limit)
+    /// * `max_participants` - Optional maximum participants (None for no limit)
     pub fn create_chain(
         env: Env,
         admin: Address,
@@ -178,6 +181,7 @@ impl QuestChainContract {
         quests: Vec<Quest>,
         start_time: Option<u64>,
         end_time: Option<u64>,
+        max_participants: Option<u32>,
     ) -> u32 {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
@@ -221,6 +225,7 @@ impl QuestChainContract {
             total_reward,
             start_time,
             end_time,
+            max_participants,
             created_at: env.ledger().timestamp(),
             active: true,
         };
@@ -230,6 +235,9 @@ impl QuestChainContract {
         env.storage()
             .persistent()
             .set(&DataKey::ChainCompletions(counter), &0u32);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ChainParticipants(counter), &0u32);
 
         // Initialize empty leaderboard
         let leaderboard: Vec<CompletionRecord> = Vec::new(&env);
@@ -278,6 +286,18 @@ impl QuestChainContract {
             }
         }
 
+        // Check participant limit
+        if let Some(max) = chain.max_participants {
+            let current_participants: u32 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::ChainParticipants(chain_id))
+                .unwrap_or(0);
+            if current_participants >= max {
+                panic!("Participant limit reached");
+            }
+        }
+
         // Check if player already has progress
         if env
             .storage()
@@ -303,6 +323,17 @@ impl QuestChainContract {
         env.storage()
             .persistent()
             .set(&DataKey::PlayerProgress(player.clone(), chain_id), &progress);
+
+        // Increment participant count
+        let mut participant_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ChainParticipants(chain_id))
+            .unwrap_or(0);
+        participant_count += 1;
+        env.storage()
+            .persistent()
+            .set(&DataKey::ChainParticipants(chain_id), &participant_count);
     }
 
     /// Complete a quest in a chain
@@ -528,6 +559,19 @@ impl QuestChainContract {
             .persistent()
             .remove(&DataKey::PlayerProgress(player.clone(), chain_id));
 
+        // Decrement participant count
+        let mut participant_count: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ChainParticipants(chain_id))
+            .unwrap_or(0);
+        if participant_count > 0 {
+            participant_count -= 1;
+            env.storage()
+                .persistent()
+                .set(&DataKey::ChainParticipants(chain_id), &participant_count);
+        }
+
         // Clear pending rewards if any
         if env
             .storage()
@@ -586,6 +630,14 @@ impl QuestChainContract {
         env.storage()
             .persistent()
             .get(&DataKey::ChainCompletions(chain_id))
+            .unwrap_or(0)
+    }
+
+    /// Get current participant count for a chain
+    pub fn get_chain_participants(env: Env, chain_id: u32) -> u32 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::ChainParticipants(chain_id))
             .unwrap_or(0)
     }
 
