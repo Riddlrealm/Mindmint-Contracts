@@ -138,6 +138,7 @@ fn test_create_chain() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     assert_eq!(chain_id, 1);
@@ -169,6 +170,7 @@ fn test_create_time_limited_chain() {
         &quests,
         &start_time,
         &end_time,
+        &None,
     );
 
     let chain = client.get_chain(&chain_id);
@@ -192,6 +194,7 @@ fn test_create_chain_too_few_quests() {
         &empty_quests,
         &None,
         &None,
+        &None,
     );
 }
 
@@ -209,6 +212,7 @@ fn test_start_chain() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -241,6 +245,7 @@ fn test_start_chain_twice() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -265,6 +270,7 @@ fn test_start_chain_before_start_time() {
         &quests,
         &Some(2000u64),
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -288,6 +294,7 @@ fn test_start_chain_after_end_time() {
         &quests,
         &Some(1000u64),
         &Some(2000u64),
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -308,6 +315,7 @@ fn test_sequential_quest_completion() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -347,6 +355,7 @@ fn test_complete_quest_without_prerequisites() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -370,6 +379,7 @@ fn test_branching_paths() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -409,6 +419,7 @@ fn test_progress_checkpointing() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -444,6 +455,7 @@ fn test_reset_to_checkpoint() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -489,6 +501,7 @@ fn test_reset_to_checkpoint_no_checkpoint() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -512,6 +525,7 @@ fn test_reset_chain() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -542,6 +556,7 @@ fn test_chain_completion() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -578,6 +593,7 @@ fn test_cumulative_rewards() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -623,6 +639,7 @@ fn test_leaderboard() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -682,6 +699,7 @@ fn test_multiple_players_same_chain() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player1 = Address::generate(&env);
@@ -726,6 +744,7 @@ fn test_admin_functions() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     client.set_chain_active(&admin, &chain_id, &false);
@@ -762,6 +781,7 @@ fn test_complete_quest_twice() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -785,6 +805,7 @@ fn test_complete_unlocked_quest() {
         &Symbol::new(&env, "Test Chain"),
         &Symbol::new(&env, "A test quest chain"),
         &quests,
+        &None,
         &None,
         &None,
     );
@@ -829,6 +850,7 @@ fn test_pending_rewards_tracking() {
         &quests,
         &None,
         &None,
+        &None,
     );
 
     let player = Address::generate(&env);
@@ -845,4 +867,222 @@ fn test_pending_rewards_tracking() {
     client.complete_quest(&player, &chain_id, &2);
     let pending = client.get_pending_rewards(&player, &chain_id);
     assert_eq!(pending, 250); // Quest 1 + Quest 2 rewards
+}
+
+#[test]
+fn test_create_chain_with_participant_limit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let max_participants = 5u32;
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Limited Chain"),
+        &Symbol::new(&env, "A chain with participant limit"),
+        &quests,
+        &None,
+        &None,
+        &Some(max_participants),
+    );
+
+    let chain = client.get_chain(&chain_id);
+    assert_eq!(chain.max_participants, Some(max_participants));
+    
+    // Initial participant count should be 0
+    let participant_count = client.get_chain_participants(&chain_id);
+    assert_eq!(participant_count, 0);
+}
+
+#[test]
+fn test_start_chain_within_limit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let max_participants = 3u32;
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Limited Chain"),
+        &Symbol::new(&env, "A chain with participant limit"),
+        &quests,
+        &None,
+        &None,
+        &Some(max_participants),
+    );
+
+    // Add 3 players (at the limit)
+    for i in 0..3 {
+        let player = Address::generate(&env);
+        client.start_chain(&player, &chain_id);
+    }
+
+    let participant_count = client.get_chain_participants(&chain_id);
+    assert_eq!(participant_count, 3);
+}
+
+#[test]
+#[should_panic(expected = "Participant limit reached")]
+fn test_start_chain_exceeds_limit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let max_participants = 2u32;
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Limited Chain"),
+        &Symbol::new(&env, "A chain with participant limit"),
+        &quests,
+        &None,
+        &None,
+        &Some(max_participants),
+    );
+
+    // Add 2 players (at the limit)
+    for _ in 0..2 {
+        let player = Address::generate(&env);
+        client.start_chain(&player, &chain_id);
+    }
+
+    // Try to add a 3rd player (should panic)
+    let extra_player = Address::generate(&env);
+    client.start_chain(&extra_player, &chain_id);
+}
+
+#[test]
+fn test_chain_without_participant_limit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    // Create chain with no participant limit
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Unlimited Chain"),
+        &Symbol::new(&env, "A chain without participant limit"),
+        &quests,
+        &None,
+        &None,
+        &None, // No participant limit
+    );
+
+    let chain = client.get_chain(&chain_id);
+    assert_eq!(chain.max_participants, None);
+
+    // Should be able to add many players without limit
+    for _ in 0..10 {
+        let player = Address::generate(&env);
+        client.start_chain(&player, &chain_id);
+    }
+
+    let participant_count = client.get_chain_participants(&chain_id);
+    assert_eq!(participant_count, 10);
+}
+
+#[test]
+fn test_reset_chain_decrements_participant_count() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let max_participants = 5u32;
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Limited Chain"),
+        &Symbol::new(&env, "A chain with participant limit"),
+        &quests,
+        &None,
+        &None,
+        &Some(max_participants),
+    );
+
+    // Add 3 players
+    let player1 = Address::generate(&env);
+    let player2 = Address::generate(&env);
+    let player3 = Address::generate(&env);
+    
+    client.start_chain(&player1, &chain_id);
+    client.start_chain(&player2, &chain_id);
+    client.start_chain(&player3, &chain_id);
+
+    let participant_count = client.get_chain_participants(&chain_id);
+    assert_eq!(participant_count, 3);
+
+    // Reset player2's progress
+    client.reset_chain(&player2, &chain_id);
+
+    // Participant count should decrement
+    let participant_count = client.get_chain_participants(&chain_id);
+    assert_eq!(participant_count, 2);
+
+    // Should be able to add a new player now
+    let player4 = Address::generate(&env);
+    client.start_chain(&player4, &chain_id);
+
+    let participant_count = client.get_chain_participants(&chain_id);
+    assert_eq!(participant_count, 3);
+}
+
+#[test]
+fn test_participant_count_accuracy() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+        &None,
+    );
+
+    // Initial count
+    assert_eq!(client.get_chain_participants(&chain_id), 0);
+
+    // Add first player
+    let player1 = Address::generate(&env);
+    client.start_chain(&player1, &chain_id);
+    assert_eq!(client.get_chain_participants(&chain_id), 1);
+
+    // Add second player
+    let player2 = Address::generate(&env);
+    client.start_chain(&player2, &chain_id);
+    assert_eq!(client.get_chain_participants(&chain_id), 2);
+
+    // Try to add same player again (should fail)
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.start_chain(&player1, &chain_id);
+    }));
+    assert!(result.is_err());
+    assert_eq!(client.get_chain_participants(&chain_id), 2); // Count unchanged
+
+    // Remove one player
+    client.reset_chain(&player1, &chain_id);
+    assert_eq!(client.get_chain_participants(&chain_id), 1);
+
+    // Remove another player
+    client.reset_chain(&player2, &chain_id);
+    assert_eq!(client.get_chain_participants(&chain_id), 0);
 }
