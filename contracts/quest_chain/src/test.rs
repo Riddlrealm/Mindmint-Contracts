@@ -846,3 +846,364 @@ fn test_pending_rewards_tracking() {
     let pending = client.get_pending_rewards(&player, &chain_id);
     assert_eq!(pending, 250); // Quest 1 + Quest 2 rewards
 }
+
+#[test]
+fn test_rate_quest_after_completion() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+
+    // Complete quest 1
+    client.complete_quest(&player, &chain_id, &1);
+
+    // Rate quest 1 with a valid rating
+    client.rate_quest(&player, &1, &5);
+
+    // Verify rating was recorded
+    assert!(client.has_player_rated_quest(&player, &1));
+    let ratings = client.get_quest_ratings(&1);
+    assert_eq!(ratings.len(), 1);
+    assert_eq!(ratings.get(0).unwrap(), 5);
+}
+
+#[test]
+#[should_panic(expected = "Rating must be between 1 and 5")]
+fn test_rate_quest_invalid_rating_too_low() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+
+    // Try to rate with 0 (invalid)
+    client.rate_quest(&player, &1, &0);
+}
+
+#[test]
+#[should_panic(expected = "Rating must be between 1 and 5")]
+fn test_rate_quest_invalid_rating_too_high() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+
+    // Try to rate with 6 (invalid)
+    client.rate_quest(&player, &1, &6);
+}
+
+#[test]
+#[should_panic(expected = "Must complete quest before rating")]
+fn test_rate_quest_without_completion() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+
+    // Try to rate quest 1 without completing it
+    client.rate_quest(&player, &1, &5);
+}
+
+#[test]
+#[should_panic(expected = "Already rated this quest")]
+fn test_rate_quest_duplicate_rating() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+
+    // Rate quest 1
+    client.rate_quest(&player, &1, &5);
+
+    // Try to rate again
+    client.rate_quest(&player, &1, &4);
+}
+
+#[test]
+fn test_get_average_rating() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    // Create multiple players
+    let player1 = Address::generate(&env);
+    let player2 = Address::generate(&env);
+    let player3 = Address::generate(&env);
+
+    // All players complete quest 1
+    client.start_chain(&player1, &chain_id);
+    client.complete_quest(&player1, &chain_id, &1);
+
+    client.start_chain(&player2, &chain_id);
+    client.complete_quest(&player2, &chain_id, &1);
+
+    client.start_chain(&player3, &chain_id);
+    client.complete_quest(&player3, &chain_id, &1);
+
+    // Rate quest 1 with different ratings
+    client.rate_quest(&player1, &1, &5);
+    client.rate_quest(&player2, &1, &3);
+    client.rate_quest(&player3, &1, &4);
+
+    // Average should be (5 + 3 + 4) / 3 = 4
+    let avg_rating = client.get_average_rating(&1);
+    assert_eq!(avg_rating, 4);
+}
+
+#[test]
+fn test_get_average_rating_no_ratings() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, admin) = setup_contract(&env);
+
+    // Try to get average rating for a quest with no ratings
+    let avg_rating = client.get_average_rating(&1);
+    assert_eq!(avg_rating, 0);
+}
+
+#[test]
+fn test_get_average_rating_single_rating() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+
+    // Rate with 5
+    client.rate_quest(&player, &1, &5);
+
+    let avg_rating = client.get_average_rating(&1);
+    assert_eq!(avg_rating, 5);
+}
+
+#[test]
+fn test_rate_quest_different_chains() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    // Create two chains with the same quest ID
+    let chain_id1 = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Chain 1"),
+        &Symbol::new(&env, "First chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let chain_id2 = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Chain 2"),
+        &Symbol::new(&env, "Second chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+
+    // Complete quest 1 in chain 1
+    client.start_chain(&player, &chain_id1);
+    client.complete_quest(&player, &chain_id1, &1);
+
+    // Should be able to rate quest 1
+    client.rate_quest(&player, &1, &5);
+    assert!(client.has_player_rated_quest(&player, &1));
+
+    // Try to rate again - should fail
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        client.rate_quest(&player, &1, &4);
+    }));
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_multiple_players_same_quest() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player1 = Address::generate(&env);
+    let player2 = Address::generate(&env);
+    let player3 = Address::generate(&env);
+
+    // All players complete quest 1
+    client.start_chain(&player1, &chain_id);
+    client.complete_quest(&player1, &chain_id, &1);
+
+    client.start_chain(&player2, &chain_id);
+    client.complete_quest(&player2, &chain_id, &1);
+
+    client.start_chain(&player3, &chain_id);
+    client.complete_quest(&player3, &chain_id, &1);
+
+    // Each player rates quest 1
+    client.rate_quest(&player1, &1, &5);
+    client.rate_quest(&player2, &1, &4);
+    client.rate_quest(&player3, &1, &3);
+
+    // Verify all ratings are recorded
+    let ratings = client.get_quest_ratings(&1);
+    assert_eq!(ratings.len(), 3);
+
+    // Verify each player has rated
+    assert!(client.has_player_rated_quest(&player1, &1));
+    assert!(client.has_player_rated_quest(&player2, &1));
+    assert!(client.has_player_rated_quest(&player3, &1));
+
+    // Verify average
+    let avg = client.get_average_rating(&1);
+    assert_eq!(avg, 4); // (5 + 4 + 3) / 3 = 4
+}
+
+#[test]
+fn test_rating_boundary_values() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "Test Chain"),
+        &Symbol::new(&env, "A test quest chain"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player1 = Address::generate(&env);
+    let player2 = Address::generate(&env);
+
+    client.start_chain(&player1, &chain_id);
+    client.complete_quest(&player1, &chain_id, &1);
+
+    client.start_chain(&player2, &chain_id);
+    client.complete_quest(&player2, &chain_id, &1);
+
+    // Test minimum valid rating (1)
+    client.rate_quest(&player1, &1, &1);
+
+    // Test maximum valid rating (5)
+    client.rate_quest(&player2, &1, &5);
+
+    let avg = client.get_average_rating(&1);
+    assert_eq!(avg, 3); // (1 + 5) / 2 = 3
+}
