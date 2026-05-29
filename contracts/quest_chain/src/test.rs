@@ -2,9 +2,8 @@
 
 use super::*;
 use soroban_sdk::{
-    symbol_short,
     testutils::{Address as _, Events, Ledger},
-    Address, Env, IntoVal,
+    Address, Env, Symbol, TryFromVal,
 };
 
 fn setup_contract(env: &Env) -> (QuestChainContractClient, Address) {
@@ -833,6 +832,197 @@ fn test_reward_token_configuration() {
 
     let config = client.get_config();
     assert_eq!(config.reward_token, Some(reward_token));
+}
+
+// ──────────────────────────────────────────────────────────
+// EVENT TESTS
+// ──────────────────────────────────────────────────────────
+
+fn find_event_by_name(
+    env: &Env,
+    events: &soroban_sdk::Vec<(Address, soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val)>,
+    name: &Symbol,
+) -> Option<(Address, soroban_sdk::Vec<soroban_sdk::Val>, soroban_sdk::Val)> {
+    for event in events.iter() {
+        let topics = &event.1;
+        if let Some(first) = topics.get(0) {
+            if let Ok(sym) = Symbol::try_from_val(env, &first) {
+                if sym == *name {
+                    return Some(event.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn test_event_chain_created() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "TestChain"),
+        &Symbol::new(&env, "Desc"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let events = env.events().all();
+    let event = find_event_by_name(&env, &events, &CHAIN_CREATED);
+    assert!(event.is_some(), "CHAIN_CREATED event not found");
+    let (_, topics, _) = event.unwrap();
+    assert_eq!(Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap(), CHAIN_CREATED);
+    assert_eq!(u32::try_from_val(&env, &topics.get(1).unwrap()).unwrap(), chain_id);
+}
+
+#[test]
+fn test_event_chain_started() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "TestChain"),
+        &Symbol::new(&env, "Desc"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+
+    let events = env.events().all();
+    let event = find_event_by_name(&env, &events, &CHAIN_STARTED);
+    assert!(event.is_some(), "CHAIN_STARTED event not found");
+    let (_, topics, _) = event.unwrap();
+    assert_eq!(Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap(), CHAIN_STARTED);
+    assert_eq!(Address::try_from_val(&env, &topics.get(1).unwrap()).unwrap(), player);
+    assert_eq!(u32::try_from_val(&env, &topics.get(2).unwrap()).unwrap(), chain_id);
+}
+
+#[test]
+fn test_event_quest_completed() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "TestChain"),
+        &Symbol::new(&env, "Desc"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+
+    let events = env.events().all();
+    let event = find_event_by_name(&env, &events, &QUEST_COMPLETED);
+    assert!(event.is_some(), "QUEST_COMPLETED event not found");
+    let (_, topics, _) = event.unwrap();
+    assert_eq!(Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap(), QUEST_COMPLETED);
+    assert_eq!(Address::try_from_val(&env, &topics.get(1).unwrap()).unwrap(), player);
+    assert_eq!(u32::try_from_val(&env, &topics.get(2).unwrap()).unwrap(), chain_id);
+}
+
+#[test]
+fn test_event_chain_completed() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    let quests = create_test_quests(&env);
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "TestChain"),
+        &Symbol::new(&env, "Desc"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+    client.complete_quest(&player, &chain_id, &2);
+    client.complete_quest(&player, &chain_id, &3);
+    client.complete_quest(&player, &chain_id, &4);
+    env.ledger().set_timestamp(2000);
+    client.complete_quest(&player, &chain_id, &5);
+
+    let events = env.events().all();
+    let event = find_event_by_name(&env, &events, &CHAIN_COMPLETED);
+    assert!(event.is_some(), "CHAIN_COMPLETED event not found");
+    let (_, topics, _) = event.unwrap();
+    assert_eq!(Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap(), CHAIN_COMPLETED);
+    assert_eq!(Address::try_from_val(&env, &topics.get(1).unwrap()).unwrap(), player);
+    assert_eq!(u32::try_from_val(&env, &topics.get(2).unwrap()).unwrap(), chain_id);
+}
+
+#[test]
+fn test_event_reward_claimed() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let admin = Address::generate(&env);
+    let sac = env.register_stellar_asset_contract_v2(admin.clone());
+    let reward_token = sac.address();
+    let sac_client = soroban_sdk::token::StellarAssetClient::new(&env, &reward_token);
+
+    let contract_id = env.register_contract(None, QuestChainContract);
+    let client = QuestChainContractClient::new(&env, &contract_id);
+    client.initialize(&admin, &Some(reward_token.clone()));
+
+    let quests = create_test_quests(&env);
+    let chain_id = client.create_chain(
+        &admin,
+        &Symbol::new(&env, "TestChain"),
+        &Symbol::new(&env, "Desc"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    // Mint tokens to the quest chain contract so it can pay out rewards
+    sac_client.mint(&contract_id, &10000i128);
+
+    // Seed reward pool directly in storage
+    env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .set(&DataKey::RewardPool(chain_id), &10000i128);
+    });
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    client.complete_quest(&player, &chain_id, &1);
+    client.claim_rewards(&player, &chain_id);
+
+    let events = env.events().all();
+    let event = find_event_by_name(&env, &events, &REWARD_CLAIMED);
+    assert!(event.is_some(), "REWARD_CLAIMED event not found");
+    let (_, topics, _) = event.unwrap();
+    assert_eq!(Symbol::try_from_val(&env, &topics.get(0).unwrap()).unwrap(), REWARD_CLAIMED);
+    assert_eq!(Address::try_from_val(&env, &topics.get(1).unwrap()).unwrap(), player);
+    assert_eq!(u32::try_from_val(&env, &topics.get(2).unwrap()).unwrap(), chain_id);
 }
 
 #[test]
