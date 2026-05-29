@@ -33,6 +33,7 @@ pub enum DataKey {
     History(u64),
     Admin,
     Oracle,
+    Claimed(Address),
 }
 
 // ================= CONTRACT =================
@@ -97,6 +98,12 @@ impl ProgressiveJackpot {
         let oracle: Address = env.storage().instance().get(&DataKey::Oracle).unwrap();
         oracle.require_auth(); // proof verified off-chain
 
+        // Check if player has already claimed
+        let claimed_key = DataKey::Claimed(player.clone());
+        if env.storage().persistent().has(&claimed_key) {
+            panic!("Already claimed");
+        }
+
         let mut jackpot: Jackpot = env.storage().instance().get(&DataKey::Current).unwrap();
 
         if jackpot.cycle_id != cycle_id {
@@ -118,6 +125,9 @@ impl ProgressiveJackpot {
         jackpot.balance = 0;
         jackpot.winner = Some(player.clone());
         jackpot.status = JackpotStatus::Claimed;
+
+        // Persistently mark as claimed per participant
+        env.storage().persistent().set(&claimed_key, &amount);
 
         // Save history
         env.storage().persistent().set(&DataKey::History(cycle_id), &jackpot);
@@ -176,5 +186,15 @@ impl ProgressiveJackpot {
     // 🔹 Get history (single cycle)
     pub fn get_jackpot_history(env: Env, cycle_id: u64) -> Jackpot {
         env.storage().persistent().get(&DataKey::History(cycle_id)).unwrap()
+    }
+
+    // 🔹 Check if player has claimed a jackpot
+    pub fn has_claimed(env: Env, player: Address) -> bool {
+        env.storage().persistent().has(&DataKey::Claimed(player))
+    }
+
+    // 🔹 Get claimed jackpot reward amount for player
+    pub fn get_claimed_amount(env: Env, player: Address) -> i128 {
+        env.storage().persistent().get(&DataKey::Claimed(player)).unwrap_or(0)
     }
 }
