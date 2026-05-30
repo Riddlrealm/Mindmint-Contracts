@@ -1,0 +1,12 @@
+[package]
+name = "yield-aggregator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ink = { version = "5", default-features = false }
+scale = "0.9"
+scale-info = "2"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
