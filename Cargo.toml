@@ -21,6 +21,7 @@ members = [
   "contracts/oracle",
   "contracts/puzzle_verification",
   "contracts/puzzle_insurance",
+  "contracts/quest",
   "contracts/quest_chain",
   "contracts/referral",
   "contracts/reputation",
