@@ -57,6 +57,10 @@ pub enum DataKey {
     Quest(u64),
     /// Index of quest ids per tag, for efficient lookup.
     TagIndex(String),
+    /// Authorized admin address (can pause/unpause and is set on init).
+    Admin,
+    /// Whether the contract is currently paused (true = paused).
+    Paused,
 }
 
 //
@@ -72,6 +76,11 @@ pub enum QuestError {
     EmptyTitle = 2,
     TooManyTags = 3,
     EmptyTag = 4,
+    NotInitialized = 5,
+    AlreadyInitialized = 6,
+    Unauthorized = 7,
+    Paused = 8,
+    NotPaused = 9,
 }
 
 const MAX_TAGS_PER_QUEST: u32 = 10;
@@ -87,10 +96,61 @@ pub struct QuestContract;
 
 #[contractimpl]
 impl QuestContract {
+    /// One-time initialization: sets the authorized admin who can pause/unpause.
+    /// Subsequent calls panic with `AlreadyInitialized`.
+    pub fn initialize(env: Env, admin: Address) {
+        if env.storage().instance().has(&DataKey::Admin) {
+            panic_with_error(&env, QuestError::AlreadyInitialized);
+        }
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::Paused, &false);
+        events::contract_initialized(&env, admin);
+    }
+
+    /// Pause the contract. Only the admin may call this. While paused,
+    /// state-mutating ("sensitive") functions like `create_quest` are
+    /// rejected; read-only getters remain available.
+    pub fn pause(env: Env, caller: Address) {
+        require_admin(&env, &caller);
+        if is_paused_internal(&env) {
+            panic_with_error(&env, QuestError::Paused);
+        }
+        env.storage().instance().set(&DataKey::Paused, &true);
+        events::contract_paused(&env, caller);
+    }
+
+    /// Resume normal operation. Only the admin may call this.
+    pub fn unpause(env: Env, caller: Address) {
+        require_admin(&env, &caller);
+        if !is_paused_internal(&env) {
+            panic_with_error(&env, QuestError::NotPaused);
+        }
+        env.storage().instance().set(&DataKey::Paused, &false);
+        events::contract_unpaused(&env, caller);
+    }
+
+    /// Returns whether the contract is currently paused. Defaults to `false`
+    /// (i.e. unpaused) before `initialize` is called.
+    pub fn is_paused(env: Env) -> bool {
+        is_paused_internal(&env)
+    }
+
+    /// Returns the configured admin address. Panics if the contract has not
+    /// been initialized.
+    pub fn get_admin(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| panic_with_error(&env, QuestError::NotInitialized))
+    }
+
     /// Create a new quest with an optional list of tags/categories.
     ///
     /// Tags are stored on-chain on the quest itself and indexed so that
     /// `get_quests_by_tag` can return all quests carrying a given tag.
+    ///
+    /// Sensitive: rejected while the contract is paused.
     pub fn create_quest(
         env: Env,
         creator: Address,
@@ -99,6 +159,7 @@ impl QuestContract {
         tags: Vec<String>,
         reward: i128,
     ) -> u64 {
+        require_not_paused(&env);
         creator.require_auth();
 
         if title.is_empty() {
@@ -227,4 +288,29 @@ fn panic_with_error(env: &Env, err: QuestError) -> ! {
     // then panic to abort the invocation.
     env.events().publish(("quest_error",), err as u32);
     panic!("quest contract error");
+}
+
+fn is_paused_internal(env: &Env) -> bool {
+    env.storage()
+        .instance()
+        .get(&DataKey::Paused)
+        .unwrap_or(false)
+}
+
+fn require_not_paused(env: &Env) {
+    if is_paused_internal(env) {
+        panic_with_error(env, QuestError::Paused);
+    }
+}
+
+fn require_admin(env: &Env, caller: &Address) {
+    let admin: Address = env
+        .storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .unwrap_or_else(|| panic_with_error(env, QuestError::NotInitialized));
+    if &admin != caller {
+        panic_with_error(env, QuestError::Unauthorized);
+    }
+    caller.require_auth();
 }

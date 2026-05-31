@@ -43,3 +43,15 @@ pub fn quest_cancelled(
         (),
     );
 }
+
+pub fn contract_initialized(env: &Env, admin: Address) {
+    env.events().publish(("initialized",), admin);
+}
+
+pub fn contract_paused(env: &Env, by: Address) {
+    env.events().publish(("paused",), by);
+}
+
+pub fn contract_unpaused(env: &Env, by: Address) {
+    env.events().publish(("unpaused",), by);
+}
