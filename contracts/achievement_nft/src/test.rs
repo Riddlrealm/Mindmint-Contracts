@@ -45,6 +45,12 @@ fn test_nft_lifecycle() {
     assert_eq!(user_b_collection.len(), 1);
     assert_eq!(user_b_collection.get(0).unwrap(), token_id);
 
+    // Check puzzle IDs
+    let user_b_puzzles = client.puzzle_ids_of(&user_b);
+    assert_eq!(user_b_puzzles.len(), 1);
+    assert_eq!(user_b_puzzles.get(0).unwrap(), puzzle_id);
+    assert!(client.has_puzzle(&user_b, &puzzle_id));
+
     // Burn from current owner (user_b)
     client.burn(&token_id);
 
