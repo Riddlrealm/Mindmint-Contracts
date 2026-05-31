@@ -29,6 +29,9 @@ pub struct Quest {
     pub prerequisites: Vec<u32>, // Quest IDs that must be completed first
     pub branches: Vec<u32>,      // Alternative quest IDs (for branching paths)
     pub checkpoint: bool,        // Whether this quest saves progress
+    pub branches: Vec<u32>, // Alternative quest IDs (for branching paths)
+    pub checkpoint: bool, // Whether this quest saves progress
+    pub expires_at: Option<u64>, // Optional expiry timestamp; None = no deadline
 }
 
 #[contracttype]
@@ -118,11 +121,15 @@ const MAX_LEADERBOARD_ENTRIES: u32 = 100;
 //
 
 const CHAIN_CREATED: Symbol = symbol_short!("chain_crt");
+const CHAIN_STARTED: Symbol = symbol_short!("chn_start");
 const QUEST_UNLOCKED: Symbol = symbol_short!("qst_unlck");
 const QUEST_COMPLETED: Symbol = symbol_short!("qst_done");
+const QUEST_EXPIRED: Symbol = symbol_short!("qst_exprd");
 const CHAIN_COMPLETED: Symbol = symbol_short!("chn_done");
 const PROGRESS_CHECKPOINT: Symbol = symbol_short!("checkpt");
 const CHAIN_RESET: Symbol = symbol_short!("chn_reset");
+const REWARD_CLAIMED: Symbol = symbol_short!("rwrd_clmd");
+const POOL_FUNDED: Symbol = symbol_short!("pool_fund");
 
 //
 // ──────────────────────────────────────────────────────────
@@ -308,9 +315,13 @@ impl QuestChainContract {
             path_taken: Vec::new(&env),
         };
 
-        env.storage().persistent().set(
-            &DataKey::PlayerProgress(player.clone(), chain_id),
-            &progress,
+        env.storage()
+            .persistent()
+            .set(&DataKey::PlayerProgress(player.clone(), chain_id), &progress);
+
+        env.events().publish(
+            (CHAIN_STARTED, player.clone(), chain_id),
+            (progress.start_time,),
         );
     }
 
@@ -345,6 +356,18 @@ impl QuestChainContract {
             panic!("Quest not found");
         }
         let quest = quest.unwrap();
+
+        // Enforce quest expiry deadline
+        if let Some(expires_at) = quest.expires_at {
+            let current_time = env.ledger().timestamp();
+            if current_time >= expires_at {
+                env.events().publish(
+                    (QUEST_EXPIRED, player.clone()),
+                    (chain_id, quest_id, expires_at),
+                );
+                panic!("Quest: expired");
+            }
+        }
 
         // Check if quest is already completed
         if progress.completed_quests.contains(&quest_id) {
@@ -385,8 +408,10 @@ impl QuestChainContract {
         // Save checkpoint if this quest is a checkpoint
         if quest.checkpoint {
             progress.checkpoint_quest = Some(quest_id);
-            env.events()
-                .publish((PROGRESS_CHECKPOINT, player.clone()), (chain_id, quest_id));
+            env.events().publish(
+                (PROGRESS_CHECKPOINT, player.clone(), chain_id),
+                (quest_id,),
+            );
         }
 
         // Determine next quest(s)
@@ -412,8 +437,8 @@ impl QuestChainContract {
                 .set(&DataKey::ChainCompletions(chain_id), &completions);
 
             env.events().publish(
-                (CHAIN_COMPLETED, player.clone()),
-                (chain_id, duration, progress.total_reward_earned),
+                (CHAIN_COMPLETED, player.clone(), chain_id),
+                (duration, progress.total_reward_earned),
             );
         }
 
@@ -423,8 +448,8 @@ impl QuestChainContract {
         );
 
         env.events().publish(
-            (QUEST_COMPLETED, player.clone()),
-            (chain_id, quest_id, quest.reward),
+            (QUEST_COMPLETED, player.clone(), chain_id),
+            (quest_id, quest.reward),
         );
     }
 
@@ -511,6 +536,13 @@ impl QuestChainContract {
         env.storage().persistent().set(
             &DataKey::PlayerProgress(player.clone(), chain_id),
             &progress,
+        env.storage()
+            .persistent()
+            .set(&DataKey::PlayerProgress(player.clone(), chain_id), &progress);
+
+        env.events().publish(
+            (CHAIN_RESET, player.clone(), chain_id),
+            (checkpoint_id,),
         );
 
         env.events()
@@ -550,6 +582,7 @@ impl QuestChainContract {
 
         env.events()
             .publish((CHAIN_RESET, player.clone()), (chain_id, 0u32));
+        env.events().publish((CHAIN_RESET, player.clone(), chain_id), (0u32,));
     }
 
     // ───────────── VIEW FUNCTIONS ─────────────
@@ -672,8 +705,8 @@ impl QuestChainContract {
             .remove(&DataKey::PendingRewards(player.clone(), chain_id));
 
         env.events().publish(
-            (symbol_short!("rwrd_clmd"), player.clone()),
-            (chain_id, pending),
+            (REWARD_CLAIMED, player.clone(), chain_id),
+            (pending,),
         );
 
         pending
@@ -770,8 +803,8 @@ impl QuestChainContract {
             .set(&DataKey::RewardPool(chain_id), &(current_pool + amount));
 
         env.events().publish(
-            (symbol_short!("pool_fund"), admin),
-            (chain_id, amount, current_pool + amount),
+            (POOL_FUNDED, admin, chain_id),
+            (amount, current_pool + amount),
         );
     }
 

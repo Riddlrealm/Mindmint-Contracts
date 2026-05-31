@@ -80,6 +80,7 @@ members = [
   "contracts/puzzle_pool_staking",
   "contracts/oracle_price_feed",
   "contracts/event_ticket",
+  "contracts/progressive_jackpot",
 ]
 
 [workspace.dependencies]
