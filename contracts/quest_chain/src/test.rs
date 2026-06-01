@@ -29,7 +29,7 @@ fn create_test_quests(env: &Env) -> Vec<Quest> {
         prerequisites: Vec::new(env),
         branches: Vec::new(env),
         checkpoint: true,
-        expires_at: None,
+        expiry_timestamp: None,
     });
 
     // Quest 2: Requires quest 1
@@ -45,7 +45,7 @@ fn create_test_quests(env: &Env) -> Vec<Quest> {
         },
         branches: Vec::new(env),
         checkpoint: false,
-        expires_at: None,
+        expiry_timestamp: None,
     });
 
     // Quest 3: Also requires quest 1 (branching path)
@@ -61,7 +61,7 @@ fn create_test_quests(env: &Env) -> Vec<Quest> {
         },
         branches: Vec::new(env),
         checkpoint: true,
-        expires_at: None,
+        expiry_timestamp: None,
     });
 
     // Quest 4: Requires quest 2 OR quest 3 (branch merge)
@@ -81,7 +81,7 @@ fn create_test_quests(env: &Env) -> Vec<Quest> {
             branches
         },
         checkpoint: false,
-        expires_at: None,
+        expiry_timestamp: None,
     });
 
     // Quest 5: Final quest, requires quest 4
@@ -97,7 +97,7 @@ fn create_test_quests(env: &Env) -> Vec<Quest> {
         },
         branches: Vec::new(env),
         checkpoint: true,
-        expires_at: None,
+        expiry_timestamp: None,
     });
 
     quests
@@ -890,6 +890,88 @@ fn test_complete_quest_twice() {
 fn test_complete_unlocked_quest() {
     let env = Env::default();
     env.mock_all_auths();
+}
+
+#[test]
+fn test_quest_expiry_and_cancellation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    
+    let mut quests = Vec::new(&env);
+    quests.push_back(Quest {
+        id: 1, puzzle_id: 101, reward: 100, status: QuestStatus::Locked,
+        prerequisites: Vec::new(&env), branches: Vec::new(&env), checkpoint: true,
+        expiry_timestamp: Some(2000), // Expires at 2000
+    });
+
+    let chain_id = client.create_chain(
+        &admin, &symbol_short!("Expiry"), &symbol_short!("expchn"),
+        &quests, &None, &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+    
+    // Complete before expiry succeeds
+    env.ledger().set_timestamp(1500);
+    client.complete_quest(&player, &chain_id, &1);
+
+    // Now test cancellation on a fresh chain
+    let mut quests2 = Vec::new(&env);
+    quests2.push_back(Quest {
+        id: 1, puzzle_id: 101, reward: 100, status: QuestStatus::Locked,
+        prerequisites: Vec::new(&env), branches: Vec::new(&env), checkpoint: true,
+        expiry_timestamp: Some(2500),
+    });
+
+    let chain_id_2 = client.create_chain(
+        &admin, &symbol_short!("Expiry2"), &symbol_short!("expchn2"),
+        &quests2, &None, &None,
+    );
+
+    let player2 = Address::generate(&env);
+    client.start_chain(&player2, &chain_id_2);
+
+    // Cancel expired quests after time passes
+    env.ledger().set_timestamp(3000);
+    client.cancel_expired_quests(&admin, &chain_id_2);
+
+    let chain = client.get_chain(&chain_id_2);
+    let q = chain.quests.get(0).unwrap();
+    assert_eq!(q.status, QuestStatus::Locked);
+}
+
+#[test]
+#[should_panic(expected = "Quest: expired")]
+fn test_complete_expired_quest() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, admin) = setup_contract(&env);
+    
+    let mut quests = Vec::new(&env);
+    quests.push_back(Quest {
+        id: 1, puzzle_id: 101, reward: 100, status: QuestStatus::Locked,
+        prerequisites: Vec::new(&env), branches: Vec::new(&env), checkpoint: true,
+        expiry_timestamp: Some(1500), // Expires at 1500
+    });
+
+    let chain_id = client.create_chain(
+        &admin, &symbol_short!("Expiry"), &symbol_short!("expchn"),
+        &quests, &None, &None,
+    );
+
+    let player = Address::generate(&env);
+    client.start_chain(&player, &chain_id);
+
+    // Time passes expiry
+    env.ledger().set_timestamp(2000);
+    client.complete_quest(&player, &chain_id, &1);
+}
     env.ledger().set_timestamp(1000);
 
     let (client, admin) = setup_contract(&env);
