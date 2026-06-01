@@ -99,6 +99,8 @@ pub enum DataKey {
     ChainCompletions(u32),        // u32 - total completions for chain
     RewardPool(u32),              // i128 - reward pool for chain (if using token rewards)
     PendingRewards(Address, u32), // i128 - pending rewards for player in chain
+    QuestRatings(u32), // Vec<u32> - ratings for a specific quest
+    PlayerRatedQuest(Address, u32), // bool - tracks if a player has rated a specific quest
     Manager(Address),             // bool - manager role assignment
     Moderator(Address),           // bool - moderator role assignment
 }
@@ -653,6 +655,125 @@ impl QuestChainContract {
             .persistent()
             .get(&DataKey::RewardPool(chain_id))
             .unwrap_or(0)
+    }
+
+    // ───────────── QUEST RATINGS ─────────────
+
+    /// Rate a quest that the player has completed
+    ///
+    /// # Arguments
+    /// * `player` - Player address
+    /// * `quest_id` - Quest ID to rate
+    /// * `rating` - Rating value (1-5)
+    pub fn rate_quest(env: Env, player: Address, quest_id: u32, rating: u32) {
+        player.require_auth();
+
+        // Validate rating is between 1 and 5
+        if rating < 1 || rating > 5 {
+            panic!("Rating must be between 1 and 5");
+        }
+
+        // Check if player has already rated this quest
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::PlayerRatedQuest(player.clone(), quest_id))
+        {
+            panic!("Already rated this quest");
+        }
+
+        // Check if player has completed this quest in any chain
+        let mut has_completed = false;
+        let chain_counter: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ChainCounter)
+            .unwrap_or(0);
+
+        for chain_id in 1..=chain_counter {
+            if let Some(progress) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, PlayerProgress>(&DataKey::PlayerProgress(player.clone(), chain_id))
+            {
+                if progress.completed_quests.contains(&quest_id) {
+                    has_completed = true;
+                    break;
+                }
+            }
+        }
+
+        if !has_completed {
+            panic!("Must complete quest before rating");
+        }
+
+        // Add rating to quest ratings
+        let mut ratings: Vec<u32> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::QuestRatings(quest_id))
+            .unwrap_or(Vec::new(&env));
+        ratings.push_back(rating);
+        env.storage()
+            .persistent()
+            .set(&DataKey::QuestRatings(quest_id), &ratings);
+
+        // Mark player as having rated this quest
+        env.storage()
+            .persistent()
+            .set(&DataKey::PlayerRatedQuest(player.clone(), quest_id), &true);
+
+        env.events()
+            .publish((QUEST_RATED, player.clone()), (quest_id, rating));
+    }
+
+    /// Get the average rating for a quest
+    ///
+    /// # Arguments
+    /// * `quest_id` - Quest ID
+    ///
+    /// # Returns
+    /// Average rating (0 if no ratings)
+    pub fn get_average_rating(env: Env, quest_id: u32) -> u32 {
+        let ratings: Vec<u32> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::QuestRatings(quest_id))
+            .unwrap_or(Vec::new(&env));
+
+        if ratings.is_empty() {
+            return 0;
+        }
+
+        let mut sum: u32 = 0;
+        for rating in ratings.iter() {
+            sum += rating;
+        }
+
+        sum / ratings.len()
+    }
+
+    /// Get all ratings for a quest
+    ///
+    /// # Arguments
+    /// * `quest_id` - Quest ID
+    pub fn get_quest_ratings(env: Env, quest_id: u32) -> Vec<u32> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::QuestRatings(quest_id))
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Check if a player has rated a specific quest
+    ///
+    /// # Arguments
+    /// * `player` - Player address
+    /// * `quest_id` - Quest ID
+    pub fn has_player_rated_quest(env: Env, player: Address, quest_id: u32) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::PlayerRatedQuest(player, quest_id))
+            .unwrap_or(false)
     }
 
     // ───────────── REWARD DISTRIBUTION ─────────────
