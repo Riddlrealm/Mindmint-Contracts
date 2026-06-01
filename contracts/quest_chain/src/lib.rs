@@ -31,7 +31,7 @@ pub struct Quest {
     pub checkpoint: bool,        // Whether this quest saves progress
     pub branches: Vec<u32>, // Alternative quest IDs (for branching paths)
     pub checkpoint: bool, // Whether this quest saves progress
-    pub expires_at: Option<u64>, // Optional expiry timestamp; None = no deadline
+    pub expiry_timestamp: Option<u64>, // Optional expiry timestamp; None = no deadline
 }
 
 #[contracttype]
@@ -360,12 +360,12 @@ impl QuestChainContract {
         let quest = quest.unwrap();
 
         // Enforce quest expiry deadline
-        if let Some(expires_at) = quest.expires_at {
+        if let Some(expiry_timestamp) = quest.expiry_timestamp {
             let current_time = env.ledger().timestamp();
-            if current_time >= expires_at {
+            if current_time >= expiry_timestamp {
                 env.events().publish(
                     (QUEST_EXPIRED, player.clone()),
-                    (chain_id, quest_id, expires_at),
+                    (chain_id, quest_id, expiry_timestamp),
                 );
                 panic!("Quest: expired");
             }
@@ -886,6 +886,39 @@ impl QuestChainContract {
         let mut config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
         config.reward_token = reward_token;
         env.storage().persistent().set(&DataKey::Config, &config);
+    }
+
+    /// Cancel all expired quests in a chain
+    pub fn cancel_expired_quests(env: Env, admin: Address, chain_id: u32) {
+        admin.require_auth();
+        Self::assert_owner(&env, &admin);
+
+        let mut chain: QuestChain = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Chain(chain_id))
+            .unwrap();
+
+        let current_time = env.ledger().timestamp();
+        let mut modified = false;
+        let mut new_quests = Vec::new(&env);
+
+        for quest in chain.quests.iter() {
+            let mut updated_quest = quest.clone();
+            if let Some(expiry_timestamp) = quest.expiry_timestamp {
+                if current_time >= expiry_timestamp && quest.status != QuestStatus::Completed && quest.status != QuestStatus::Locked {
+                    updated_quest.status = QuestStatus::Locked;
+                    modified = true;
+                    env.events().publish((QUEST_EXPIRED, admin.clone()), (chain_id, quest.id, expiry_timestamp));
+                }
+            }
+            new_quests.push_back(updated_quest);
+        }
+
+        if modified {
+            chain.quests = new_quests;
+            env.storage().persistent().set(&DataKey::Chain(chain_id), &chain);
+        }
     }
 
     /// Fund reward pool for a chain (owner only)
