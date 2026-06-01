@@ -111,7 +111,7 @@ fn test_initialization() {
     let (client, admin) = setup_contract(&env);
 
     let config = client.get_config();
-    assert_eq!(config.admin, admin);
+    assert_eq!(config.owner, admin);
     assert_eq!(config.max_chains, DEFAULT_MAX_CHAINS);
     assert_eq!(config.min_quests_per_chain, DEFAULT_MIN_QUESTS);
     assert_eq!(config.max_quests_per_chain, DEFAULT_MAX_QUESTS);
@@ -757,7 +757,7 @@ fn test_admin_functions() {
 }
 
 #[test]
-#[should_panic(expected = "Admin only")]
+#[should_panic(expected = "Owner only")]
 fn test_unauthorized_admin_action() {
     let env = Env::default();
     env.mock_all_auths();
@@ -766,6 +766,98 @@ fn test_unauthorized_admin_action() {
     let non_admin = Address::generate(&env);
 
     client.update_config(&non_admin, &Some(500u32), &None, &None);
+}
+
+#[test]
+fn test_owner_can_assign_and_revoke_manager() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, owner) = setup_contract(&env);
+    let manager = Address::generate(&env);
+    let quests = create_test_quests(&env);
+
+    assert!(!client.is_manager(&manager));
+    client.assign_manager(&owner, &manager);
+    assert!(client.is_manager(&manager));
+
+    let chain_id = client.create_chain(
+        &manager,
+        &Symbol::new(&env, "Managed"),
+        &Symbol::new(&env, "Created by manager"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    client.set_chain_active(&manager, &chain_id, &false);
+    assert!(!client.get_chain(&chain_id).active);
+
+    client.revoke_manager(&owner, &manager);
+    assert!(!client.is_manager(&manager));
+}
+
+#[test]
+#[should_panic(expected = "Owner only")]
+fn test_only_owner_can_assign_manager() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _owner) = setup_contract(&env);
+    let non_owner = Address::generate(&env);
+    let manager = Address::generate(&env);
+
+    client.assign_manager(&non_owner, &manager);
+}
+
+#[test]
+#[should_panic(expected = "Manager only")]
+fn test_revoked_manager_cannot_create_chain() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, owner) = setup_contract(&env);
+    let manager = Address::generate(&env);
+    let quests = create_test_quests(&env);
+
+    client.assign_manager(&owner, &manager);
+    client.revoke_manager(&owner, &manager);
+
+    client.create_chain(
+        &manager,
+        &Symbol::new(&env, "Revoked"),
+        &Symbol::new(&env, "Should fail"),
+        &quests,
+        &None,
+        &None,
+    );
+}
+
+#[test]
+fn test_moderator_can_manage_but_not_create_chain() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let (client, owner) = setup_contract(&env);
+    let moderator = Address::generate(&env);
+    let quests = create_test_quests(&env);
+
+    let chain_id = client.create_chain(
+        &owner,
+        &Symbol::new(&env, "Moderated"),
+        &Symbol::new(&env, "Managed by moderator"),
+        &quests,
+        &None,
+        &None,
+    );
+
+    client.assign_moderator(&owner, &moderator);
+    assert!(client.is_moderator(&moderator));
+
+    client.set_chain_active(&moderator, &chain_id, &false);
+    assert!(!client.get_chain(&chain_id).active);
 }
 
 #[test]

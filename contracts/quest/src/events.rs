@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use soroban_sdk::{Address, Env};
 
 pub fn quest_created(
@@ -40,4 +42,16 @@ pub fn quest_cancelled(
         ("quest_cancelled", quest_id),
         (),
     );
+}
+
+pub fn contract_initialized(env: &Env, admin: Address) {
+    env.events().publish(("initialized",), admin);
+}
+
+pub fn contract_paused(env: &Env, by: Address) {
+    env.events().publish(("paused",), by);
+}
+
+pub fn contract_unpaused(env: &Env, by: Address) {
+    env.events().publish(("unpaused",), by);
 }
