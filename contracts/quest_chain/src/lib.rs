@@ -27,6 +27,8 @@ pub struct Quest {
     pub reward: i128,
     pub status: QuestStatus,
     pub prerequisites: Vec<u32>, // Quest IDs that must be completed first
+    pub branches: Vec<u32>,      // Alternative quest IDs (for branching paths)
+    pub checkpoint: bool,        // Whether this quest saves progress
     pub branches: Vec<u32>, // Alternative quest IDs (for branching paths)
     pub checkpoint: bool, // Whether this quest saves progress
     pub expires_at: Option<u64>, // Optional expiry timestamp; None = no deadline
@@ -42,7 +44,7 @@ pub struct QuestChain {
     pub quests: Vec<Quest>,
     pub total_reward: i128,
     pub start_time: Option<u64>, // None = no time limit
-    pub end_time: Option<u64>, // None = no time limit
+    pub end_time: Option<u64>,   // None = no time limit
     pub created_at: u64,
     pub active: bool,
 }
@@ -52,8 +54,8 @@ pub struct QuestChain {
 pub struct PlayerProgress {
     pub player: Address,
     pub chain_id: u32,
-    pub completed_quests: Vec<u32>, // Quest IDs completed
-    pub current_quest: Option<u32>, // Currently active quest ID
+    pub completed_quests: Vec<u32>,    // Quest IDs completed
+    pub current_quest: Option<u32>,    // Currently active quest ID
     pub checkpoint_quest: Option<u32>, // Last checkpoint quest ID
     pub start_time: u64,
     pub completion_time: Option<u64>, // None if not completed
@@ -74,7 +76,7 @@ pub struct CompletionRecord {
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct ChainConfig {
-    pub admin: Address,
+    pub owner: Address,
     pub reward_token: Option<Address>, // Optional reward token for distributing rewards
     pub max_chains: u32,
     pub min_quests_per_chain: u32,
@@ -89,14 +91,16 @@ pub struct ChainConfig {
 
 #[contracttype]
 pub enum DataKey {
-    Config, // ChainConfig
-    ChainCounter, // u32
-    Chain(u32), // QuestChain
+    Config,                       // ChainConfig
+    ChainCounter,                 // u32
+    Chain(u32),                   // QuestChain
     PlayerProgress(Address, u32), // PlayerProgress - (player, chain_id)
-    CompletionLeaderboard(u32), // Vec<CompletionRecord> - sorted by duration (fastest first)
-    ChainCompletions(u32), // u32 - total completions for chain
-    RewardPool(u32), // i128 - reward pool for chain (if using token rewards)
+    CompletionLeaderboard(u32),   // Vec<CompletionRecord> - sorted by duration (fastest first)
+    ChainCompletions(u32),        // u32 - total completions for chain
+    RewardPool(u32),              // i128 - reward pool for chain (if using token rewards)
     PendingRewards(Address, u32), // i128 - pending rewards for player in chain
+    Manager(Address),             // bool - manager role assignment
+    Moderator(Address),           // bool - moderator role assignment
 }
 
 //
@@ -143,17 +147,17 @@ impl QuestChainContract {
     /// Initialize the quest chain contract
     ///
     /// # Arguments
-    /// * `admin` - Contract administrator
+    /// * `owner` - Contract owner
     /// * `reward_token` - Optional reward token address for distributing rewards
-    pub fn initialize(env: Env, admin: Address, reward_token: Option<Address>) {
-        admin.require_auth();
+    pub fn initialize(env: Env, owner: Address, reward_token: Option<Address>) {
+        owner.require_auth();
 
         if env.storage().persistent().has(&DataKey::Config) {
             panic!("Already initialized");
         }
 
         let config = ChainConfig {
-            admin,
+            owner,
             reward_token,
             max_chains: DEFAULT_MAX_CHAINS,
             min_quests_per_chain: DEFAULT_MIN_QUESTS,
@@ -161,7 +165,9 @@ impl QuestChainContract {
         };
 
         env.storage().persistent().set(&DataKey::Config, &config);
-        env.storage().persistent().set(&DataKey::ChainCounter, &0u32);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ChainCounter, &0u32);
     }
 
     // ───────────── CHAIN CREATION ─────────────
@@ -169,7 +175,7 @@ impl QuestChainContract {
     /// Create a new quest chain
     ///
     /// # Arguments
-    /// * `admin` - Chain creator (must be admin)
+    /// * `admin` - Chain creator (must be owner or manager)
     /// * `title` - Chain title
     /// * `description` - Chain description
     /// * `quests` - Vector of quests in the chain
@@ -185,7 +191,7 @@ impl QuestChainContract {
         end_time: Option<u64>,
     ) -> u32 {
         admin.require_auth();
-        Self::assert_admin(&env, &admin);
+        Self::assert_owner_or_manager(&env, &admin);
 
         let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
 
@@ -230,8 +236,12 @@ impl QuestChainContract {
             active: true,
         };
 
-        env.storage().persistent().set(&DataKey::ChainCounter, &counter);
-        env.storage().persistent().set(&DataKey::Chain(counter), &chain);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ChainCounter, &counter);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Chain(counter), &chain);
         env.storage()
             .persistent()
             .set(&DataKey::ChainCompletions(counter), &0u32);
@@ -371,7 +381,7 @@ impl QuestChainContract {
         let prerequisites_met = Self::are_prerequisites_met(&progress, &quest.prerequisites);
         let branch_unlocked = Self::is_quest_unlocked_by_branch(&progress, &quest.branches);
         let is_current = progress.current_quest == Some(quest_id);
-        
+
         if !prerequisites_met && !branch_unlocked && !is_current {
             panic!("Quest not unlocked");
         }
@@ -389,9 +399,10 @@ impl QuestChainContract {
                 .persistent()
                 .get(&DataKey::PendingRewards(player.clone(), chain_id))
                 .unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&DataKey::PendingRewards(player.clone(), chain_id), &(current_pending + quest.reward));
+            env.storage().persistent().set(
+                &DataKey::PendingRewards(player.clone(), chain_id),
+                &(current_pending + quest.reward),
+            );
         }
 
         // Save checkpoint if this quest is a checkpoint
@@ -431,9 +442,10 @@ impl QuestChainContract {
             );
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::PlayerProgress(player.clone(), chain_id), &progress);
+        env.storage().persistent().set(
+            &DataKey::PlayerProgress(player.clone(), chain_id),
+            &progress,
+        );
 
         env.events().publish(
             (QUEST_COMPLETED, player.clone(), chain_id),
@@ -515,11 +527,15 @@ impl QuestChainContract {
                 .persistent()
                 .get(&DataKey::PendingRewards(player.clone(), chain_id))
                 .unwrap_or(0);
-            env.storage()
-                .persistent()
-                .set(&DataKey::PendingRewards(player.clone(), chain_id), &(current_pending - reward_lost));
+            env.storage().persistent().set(
+                &DataKey::PendingRewards(player.clone(), chain_id),
+                &(current_pending - reward_lost),
+            );
         }
 
+        env.storage().persistent().set(
+            &DataKey::PlayerProgress(player.clone(), chain_id),
+            &progress,
         env.storage()
             .persistent()
             .set(&DataKey::PlayerProgress(player.clone(), chain_id), &progress);
@@ -528,6 +544,9 @@ impl QuestChainContract {
             (CHAIN_RESET, player.clone(), chain_id),
             (checkpoint_id,),
         );
+
+        env.events()
+            .publish((CHAIN_RESET, player.clone()), (chain_id, checkpoint_id));
     }
 
     /// Reset entire chain progress for a player
@@ -561,6 +580,8 @@ impl QuestChainContract {
                 .remove(&DataKey::PendingRewards(player.clone(), chain_id));
         }
 
+        env.events()
+            .publish((CHAIN_RESET, player.clone()), (chain_id, 0u32));
         env.events().publish((CHAIN_RESET, player.clone(), chain_id), (0u32,));
     }
 
@@ -593,7 +614,9 @@ impl QuestChainContract {
             .get(&DataKey::CompletionLeaderboard(chain_id))
             .unwrap_or(Vec::new(&env));
 
-        let actual_limit = limit.min(MAX_LEADERBOARD_ENTRIES).min(leaderboard.len() as u32);
+        let actual_limit = limit
+            .min(MAX_LEADERBOARD_ENTRIES)
+            .min(leaderboard.len() as u32);
         let mut result = Vec::new(&env);
 
         for i in 0..actual_limit {
@@ -691,7 +714,7 @@ impl QuestChainContract {
 
     // ───────────── ADMIN FUNCTIONS ─────────────
 
-    /// Update chain configuration (admin only)
+    /// Update chain configuration (owner only)
     pub fn update_config(
         env: Env,
         admin: Address,
@@ -700,10 +723,9 @@ impl QuestChainContract {
         max_quests: Option<u32>,
     ) {
         admin.require_auth();
-        Self::assert_admin(&env, &admin);
+        Self::assert_owner(&env, &admin);
 
-        let mut config: ChainConfig =
-            env.storage().persistent().get(&DataKey::Config).unwrap();
+        let mut config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
 
         if let Some(max) = max_chains {
             config.max_chains = max;
@@ -718,10 +740,10 @@ impl QuestChainContract {
         env.storage().persistent().set(&DataKey::Config, &config);
     }
 
-    /// Activate or deactivate a chain (admin only)
+    /// Activate or deactivate a chain (owner, manager, or moderator only)
     pub fn set_chain_active(env: Env, admin: Address, chain_id: u32, active: bool) {
         admin.require_auth();
-        Self::assert_admin(&env, &admin);
+        Self::assert_owner_manager_or_moderator(&env, &admin);
 
         let mut chain: QuestChain = env
             .storage()
@@ -730,21 +752,22 @@ impl QuestChainContract {
             .unwrap();
 
         chain.active = active;
-        env.storage().persistent().set(&DataKey::Chain(chain_id), &chain);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Chain(chain_id), &chain);
     }
 
-    /// Set reward token for the contract (admin only)
+    /// Set reward token for the contract (owner only)
     pub fn set_reward_token(env: Env, admin: Address, reward_token: Option<Address>) {
         admin.require_auth();
-        Self::assert_admin(&env, &admin);
+        Self::assert_owner(&env, &admin);
 
-        let mut config: ChainConfig =
-            env.storage().persistent().get(&DataKey::Config).unwrap();
+        let mut config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
         config.reward_token = reward_token;
         env.storage().persistent().set(&DataKey::Config, &config);
     }
 
-    /// Fund reward pool for a chain (admin only)
+    /// Fund reward pool for a chain (owner only)
     /// Admin must first approve the contract to spend tokens
     ///
     /// # Arguments
@@ -753,7 +776,7 @@ impl QuestChainContract {
     /// * `amount` - Amount of tokens to add to reward pool
     pub fn fund_reward_pool(env: Env, admin: Address, chain_id: u32, amount: i128) {
         admin.require_auth();
-        Self::assert_admin(&env, &admin);
+        Self::assert_owner(&env, &admin);
 
         if amount <= 0 {
             panic!("Amount must be positive");
@@ -785,13 +808,109 @@ impl QuestChainContract {
         );
     }
 
+    /// Assign manager role to an address (owner only)
+    pub fn assign_manager(env: Env, owner: Address, manager: Address) {
+        owner.require_auth();
+        Self::assert_owner(&env, &owner);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Manager(manager.clone()), &true);
+
+        env.events()
+            .publish((symbol_short!("mgr_add"), owner), manager);
+    }
+
+    /// Revoke manager role from an address (owner only)
+    pub fn revoke_manager(env: Env, owner: Address, manager: Address) {
+        owner.require_auth();
+        Self::assert_owner(&env, &owner);
+
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Manager(manager.clone()));
+
+        env.events()
+            .publish((symbol_short!("mgr_rm"), owner), manager);
+    }
+
+    /// Assign moderator role to an address (owner only)
+    pub fn assign_moderator(env: Env, owner: Address, moderator: Address) {
+        owner.require_auth();
+        Self::assert_owner(&env, &owner);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Moderator(moderator.clone()), &true);
+
+        env.events()
+            .publish((symbol_short!("mod_add"), owner), moderator);
+    }
+
+    /// Revoke moderator role from an address (owner only)
+    pub fn revoke_moderator(env: Env, owner: Address, moderator: Address) {
+        owner.require_auth();
+        Self::assert_owner(&env, &owner);
+
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Moderator(moderator.clone()));
+
+        env.events()
+            .publish((symbol_short!("mod_rm"), owner), moderator);
+    }
+
+    /// Check whether an address has manager privileges
+    pub fn is_manager(env: Env, user: Address) -> bool {
+        Self::is_owner(&env, &user) || Self::has_manager_role(&env, &user)
+    }
+
+    /// Check whether an address has moderator privileges
+    pub fn is_moderator(env: Env, user: Address) -> bool {
+        Self::has_moderator_role(&env, &user)
+    }
+
     // ───────────── INTERNAL HELPERS ─────────────
 
-    fn assert_admin(env: &Env, user: &Address) {
+    fn assert_owner(env: &Env, user: &Address) {
         let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        if config.admin != *user {
-            panic!("Admin only");
+        if config.owner != *user {
+            panic!("Owner only");
         }
+    }
+
+    fn assert_owner_or_manager(env: &Env, user: &Address) {
+        if !Self::is_owner(env, user) && !Self::has_manager_role(env, user) {
+            panic!("Manager only");
+        }
+    }
+
+    fn assert_owner_manager_or_moderator(env: &Env, user: &Address) {
+        if !Self::is_owner(env, user)
+            && !Self::has_manager_role(env, user)
+            && !Self::has_moderator_role(env, user)
+        {
+            panic!("Manager or moderator only");
+        }
+    }
+
+    fn is_owner(env: &Env, user: &Address) -> bool {
+        let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
+        config.owner == *user
+    }
+
+    fn has_manager_role(env: &Env, user: &Address) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Manager(user.clone()))
+            .unwrap_or(false)
+    }
+
+    fn has_moderator_role(env: &Env, user: &Address) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Moderator(user.clone()))
+            .unwrap_or(false)
     }
 
     fn validate_quest_chain(env: &Env, quests: &Vec<Quest>) {
@@ -874,7 +993,11 @@ impl QuestChainContract {
         false
     }
 
-    fn get_next_quest(chain: &QuestChain, progress: &PlayerProgress, completed_id: u32) -> Option<u32> {
+    fn get_next_quest(
+        chain: &QuestChain,
+        progress: &PlayerProgress,
+        completed_id: u32,
+    ) -> Option<u32> {
         let completed_quest = Self::get_quest_by_id(chain, completed_id);
         if completed_quest.is_none() {
             return None;
@@ -896,7 +1019,8 @@ impl QuestChainContract {
             {
                 // Check if prerequisites are met or if it's unlocked by branch
                 let prereqs_met = Self::are_prerequisites_met(progress, &other_quest.prerequisites);
-                let branch_unlocked = Self::is_quest_unlocked_by_branch(progress, &other_quest.branches);
+                let branch_unlocked =
+                    Self::is_quest_unlocked_by_branch(progress, &other_quest.branches);
                 if prereqs_met || branch_unlocked {
                     return Some(other_quest.id);
                 }
