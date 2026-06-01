@@ -20,17 +20,31 @@ pub enum QuestStatus {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TokenType {
+    Native,
+    ERC20,
+    ERC721,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Reward {
+    pub token_type: TokenType,
+    pub token_address: Option<Address>,
+    pub amount: i128, // Also used for tokenId in ERC721
+}
+
+#[contracttype]
 #[derive(Clone, Debug)]
 pub struct Quest {
     pub id: u32,
     pub puzzle_id: u32,
-    pub reward: i128,
+    pub rewards: Vec<Reward>,
     pub status: QuestStatus,
     pub prerequisites: Vec<u32>, // Quest IDs that must be completed first
     pub branches: Vec<u32>,      // Alternative quest IDs (for branching paths)
     pub checkpoint: bool,        // Whether this quest saves progress
-    pub branches: Vec<u32>, // Alternative quest IDs (for branching paths)
-    pub checkpoint: bool, // Whether this quest saves progress
     pub expires_at: Option<u64>, // Optional expiry timestamp; None = no deadline
 }
 
@@ -42,7 +56,6 @@ pub struct QuestChain {
     pub title: Symbol,
     pub description: Symbol,
     pub quests: Vec<Quest>,
-    pub total_reward: i128,
     pub start_time: Option<u64>, // None = no time limit
     pub end_time: Option<u64>,   // None = no time limit
     pub created_at: u64,
@@ -59,7 +72,6 @@ pub struct PlayerProgress {
     pub checkpoint_quest: Option<u32>, // Last checkpoint quest ID
     pub start_time: u64,
     pub completion_time: Option<u64>, // None if not completed
-    pub total_reward_earned: i128,
     pub path_taken: Vec<u32>, // Sequence of quest IDs completed (for branching)
 }
 
@@ -77,7 +89,6 @@ pub struct CompletionRecord {
 #[derive(Clone, Debug)]
 pub struct ChainConfig {
     pub owner: Address,
-    pub reward_token: Option<Address>, // Optional reward token for distributing rewards
     pub max_chains: u32,
     pub min_quests_per_chain: u32,
     pub max_quests_per_chain: u32,
@@ -97,8 +108,8 @@ pub enum DataKey {
     PlayerProgress(Address, u32), // PlayerProgress - (player, chain_id)
     CompletionLeaderboard(u32),   // Vec<CompletionRecord> - sorted by duration (fastest first)
     ChainCompletions(u32),        // u32 - total completions for chain
-    RewardPool(u32),              // i128 - reward pool for chain (if using token rewards)
-    PendingRewards(Address, u32), // i128 - pending rewards for player in chain
+    RewardPool(u32, TokenType, Option<Address>),              // i128 - reward pool for chain (if using token rewards)
+    PendingRewards(Address, u32), // Vec<Reward> - pending rewards for player in chain
     QuestRatings(u32), // Vec<u32> - ratings for a specific quest
     PlayerRatedQuest(Address, u32), // bool - tracks if a player has rated a specific quest
     Manager(Address),             // bool - manager role assignment
@@ -150,8 +161,7 @@ impl QuestChainContract {
     ///
     /// # Arguments
     /// * `owner` - Contract owner
-    /// * `reward_token` - Optional reward token address for distributing rewards
-    pub fn initialize(env: Env, owner: Address, reward_token: Option<Address>) {
+    pub fn initialize(env: Env, owner: Address) {
         owner.require_auth();
 
         if env.storage().persistent().has(&DataKey::Config) {
@@ -160,7 +170,6 @@ impl QuestChainContract {
 
         let config = ChainConfig {
             owner,
-            reward_token,
             max_chains: DEFAULT_MAX_CHAINS,
             min_quests_per_chain: DEFAULT_MIN_QUESTS,
             max_quests_per_chain: DEFAULT_MAX_QUESTS,
@@ -207,12 +216,6 @@ impl QuestChainContract {
         // Validate quest structure
         Self::validate_quest_chain(&env, &quests);
 
-        // Calculate total reward
-        let mut total_reward = 0i128;
-        for quest in quests.iter() {
-            total_reward += quest.reward;
-        }
-
         // Generate chain ID
         let mut counter: u32 = env
             .storage()
@@ -231,7 +234,6 @@ impl QuestChainContract {
             title: title.clone(),
             description: description.clone(),
             quests: quests.clone(),
-            total_reward,
             start_time,
             end_time,
             created_at: env.ledger().timestamp(),
@@ -313,7 +315,6 @@ impl QuestChainContract {
             checkpoint_quest: None,
             start_time: current_time,
             completion_time: None,
-            total_reward_earned: 0i128,
             path_taken: Vec::new(&env),
         };
 
@@ -391,21 +392,21 @@ impl QuestChainContract {
         // Mark quest as completed
         progress.completed_quests.push_back(quest_id);
         progress.path_taken.push_back(quest_id);
-        progress.total_reward_earned += quest.reward;
+        
+        let mut pending_rewards: Vec<Reward> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PendingRewards(player.clone(), chain_id))
+            .unwrap_or_else(|| Vec::new(&env));
 
-        // Track pending rewards if reward token is configured
-        let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        if config.reward_token.is_some() {
-            let current_pending: i128 = env
-                .storage()
-                .persistent()
-                .get(&DataKey::PendingRewards(player.clone(), chain_id))
-                .unwrap_or(0);
-            env.storage().persistent().set(
-                &DataKey::PendingRewards(player.clone(), chain_id),
-                &(current_pending + quest.reward),
-            );
+        for reward in quest.rewards.iter() {
+            pending_rewards.push_back(reward);
         }
+
+        env.storage().persistent().set(
+            &DataKey::PendingRewards(player.clone(), chain_id),
+            &pending_rewards,
+        );
 
         // Save checkpoint if this quest is a checkpoint
         if quest.checkpoint {
@@ -440,7 +441,7 @@ impl QuestChainContract {
 
             env.events().publish(
                 (CHAIN_COMPLETED, player.clone(), chain_id),
-                (duration, progress.total_reward_earned),
+                (duration,),
             );
         }
 
@@ -518,22 +519,21 @@ impl QuestChainContract {
 
         progress.completed_quests = new_completed;
         progress.path_taken = new_path;
-        progress.total_reward_earned -= reward_lost;
         progress.current_quest = Self::get_next_quest(&chain, &progress, checkpoint_id);
 
-        // Update pending rewards if reward token is configured
-        let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        if config.reward_token.is_some() {
-            let current_pending: i128 = env
-                .storage()
-                .persistent()
-                .get(&DataKey::PendingRewards(player.clone(), chain_id))
-                .unwrap_or(0);
-            env.storage().persistent().set(
-                &DataKey::PendingRewards(player.clone(), chain_id),
-                &(current_pending - reward_lost),
-            );
+        // Update pending rewards - recalculting for simplicity
+        let mut updated_pending = Vec::new(&env);
+        for qid in progress.completed_quests.iter() {
+            if let Some(q) = Self::get_quest_by_id(&chain, qid) {
+                for r in q.rewards.iter() {
+                    updated_pending.push_back(r);
+                }
+            }
         }
+        env.storage().persistent().set(
+            &DataKey::PendingRewards(player.clone(), chain_id),
+            &updated_pending,
+        );
 
         env.storage().persistent().set(
             &DataKey::PlayerProgress(player.clone(), chain_id),
@@ -783,52 +783,67 @@ impl QuestChainContract {
     /// # Arguments
     /// * `player` - Player address
     /// * `chain_id` - Chain ID
-    pub fn claim_rewards(env: Env, player: Address, chain_id: u32) -> i128 {
+    pub fn claim_rewards(env: Env, player: Address, chain_id: u32) {
         player.require_auth();
 
-        let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let reward_token = match config.reward_token {
-            Some(token) => token,
-            None => panic!("Reward token not configured"),
-        };
-
-        let pending: i128 = env
+        let pending: Vec<Reward> = env
             .storage()
             .persistent()
             .get(&DataKey::PendingRewards(player.clone(), chain_id))
-            .unwrap_or(0);
+            .unwrap_or_else(|| Vec::new(&env));
 
-        if pending <= 0 {
+        if pending.is_empty() {
             panic!("No pending rewards");
         }
 
-        // Check reward pool has enough
-        let pool: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::RewardPool(chain_id))
-            .unwrap_or(0);
+        for reward in pending.iter() {
+            let pool_key = DataKey::RewardPool(chain_id, reward.token_type.clone(), reward.token_address.clone());
+            let pool_balance: i128 = env.storage().persistent().get(&pool_key).unwrap_or(0);
 
-        if pool < pending {
-            panic!("Insufficient reward pool");
+            if pool_balance < reward.amount {
+                panic!("Insufficient reward pool for token");
+            }
+
+            match reward.token_type {
+                TokenType::Native => {
+                    let token_client = token::Client::new(&env, &env.current_contract_address()); // Placeholder for native if needed, but usually it's a specific SAC address
+                    // In Soroban, Native XLM has a specific address. If token_address is provided, use it.
+                    if let Some(addr) = reward.token_address {
+                        let client = token::Client::new(&env, &addr);
+                        client.transfer(&env.current_contract_address(), &player, &reward.amount);
+                    } else {
+                        panic!("Native token address required");
+                    }
+                }
+                TokenType::ERC20 => {
+                    let addr = reward.token_address.expect("ERC20 address required");
+                    let client = token::Client::new(&env, &addr);
+                    client.transfer(&env.current_contract_address(), &player, &reward.amount);
+                }
+                TokenType::ERC721 => {
+                    let addr = reward.token_address.expect("ERC721 address required");
+                    // Assuming ERC721 also uses 'transfer' with tokenId as amount
+                    // or we need a different interface.
+                    env.invoke_contract::<()>(
+                        &addr,
+                        &Symbol::new(&env, "transfer"),
+                        soroban_sdk::vec![&env, env.current_contract_address().into_val(&env), player.clone().into_val(&env), reward.amount.into_val(&env)]
+                    );
+                }
+            }
+
+            env.storage().persistent().set(&pool_key, &(pool_balance - reward.amount));
         }
 
-        // Transfer rewards
-        let token_client = token::Client::new(&env, &reward_token);
-        token_client.transfer(&env.current_contract_address(), &player, &pending);
-
-        // Update pool and pending rewards
-        env.storage()
-            .persistent()
-            .set(&DataKey::RewardPool(chain_id), &(pool - pending));
         env.storage()
             .persistent()
             .remove(&DataKey::PendingRewards(player.clone(), chain_id));
 
         env.events().publish(
             (REWARD_CLAIMED, player.clone(), chain_id),
-            (pending,),
+            (),
         );
+    }
 
         pending
     }
@@ -878,24 +893,16 @@ impl QuestChainContract {
             .set(&DataKey::Chain(chain_id), &chain);
     }
 
-    /// Set reward token for the contract (owner only)
-    pub fn set_reward_token(env: Env, admin: Address, reward_token: Option<Address>) {
-        admin.require_auth();
-        Self::assert_owner(&env, &admin);
-
-        let mut config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        config.reward_token = reward_token;
-        env.storage().persistent().set(&DataKey::Config, &config);
-    }
-
     /// Fund reward pool for a chain (owner only)
     /// Admin must first approve the contract to spend tokens
     ///
     /// # Arguments
     /// * `admin` - Admin address
     /// * `chain_id` - Chain ID
+    /// * `token_address` - Token address to fund
+    /// * `token_type` - Type of token
     /// * `amount` - Amount of tokens to add to reward pool
-    pub fn fund_reward_pool(env: Env, admin: Address, chain_id: u32, amount: i128) {
+    pub fn fund_reward_pool(env: Env, admin: Address, chain_id: u32, token_address: Address, token_type: TokenType, amount: i128) {
         admin.require_auth();
         Self::assert_owner(&env, &admin);
 
@@ -903,29 +910,35 @@ impl QuestChainContract {
             panic!("Amount must be positive");
         }
 
-        let config: ChainConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let reward_token = match config.reward_token {
-            Some(token) => token,
-            None => panic!("Reward token not configured"),
-        };
-
-        // Transfer tokens from admin to contract
-        let token_client = token::Client::new(&env, &reward_token);
-        token_client.transfer(&admin, &env.current_contract_address(), &amount);
+        match token_type {
+            TokenType::Native | TokenType::ERC20 => {
+                let token_client = token::Client::new(&env, &token_address);
+                token_client.transfer(&admin, &env.current_contract_address(), &amount);
+            },
+            TokenType::ERC721 => {
+                // For ERC721, amount is the tokenId
+                env.invoke_contract::<()>(
+                    &token_address,
+                    &Symbol::new(&env, "transfer"),
+                    soroban_sdk::vec![&env, admin.clone().into_val(&env), env.current_contract_address().into_val(&env), amount.into_val(&env)]
+                );
+            }
+        }
 
         // Update reward pool
+        let pool_key = DataKey::RewardPool(chain_id, token_type, Some(token_address.clone()));
         let current_pool: i128 = env
             .storage()
             .persistent()
-            .get(&DataKey::RewardPool(chain_id))
+            .get(&pool_key)
             .unwrap_or(0);
         env.storage()
             .persistent()
-            .set(&DataKey::RewardPool(chain_id), &(current_pool + amount));
+            .set(&pool_key, &(current_pool + amount));
 
         env.events().publish(
             (POOL_FUNDED, admin, chain_id),
-            (amount, current_pool + amount),
+            (amount, token_address),
         );
     }
 

@@ -40,7 +40,7 @@ fn create_quest_stores_tags_on_chain() {
         &s(&env, "Slay the dragon"),
         &s(&env, "Defeat the ancient dragon"),
         &tags,
-        &1000_i128,
+        &Vec::new(&env),
     );
 
     let quest = client.get_quest(&quest_id);
@@ -63,7 +63,7 @@ fn get_quests_by_tag_returns_only_matching_quests() {
         &s(&env, "Goblin Hunt"),
         &s(&env, "Hunt down 10 goblins"),
         &vec![&env, s(&env, "combat")],
-        &100_i128,
+        &Vec::new(&env),
     );
 
     // Quest B: crafting
@@ -72,7 +72,7 @@ fn get_quests_by_tag_returns_only_matching_quests() {
         &s(&env, "Forge a Sword"),
         &s(&env, "Craft a steel sword"),
         &vec![&env, s(&env, "crafting")],
-        &50_i128,
+        &Vec::new(&env),
     );
 
     // Quest C: combat + exploration
@@ -81,7 +81,7 @@ fn get_quests_by_tag_returns_only_matching_quests() {
         &s(&env, "Dungeon Dive"),
         &s(&env, "Clear a dungeon"),
         &vec![&env, s(&env, "combat"), s(&env, "exploration")],
-        &200_i128,
+        &Vec::new(&env),
     );
 
     let combat_quests = client.get_quests_by_tag(&s(&env, "combat"));
@@ -108,7 +108,7 @@ fn get_quests_by_tag_returns_empty_for_unknown_tag() {
         &s(&env, "Quest"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &1_i128,
+        &Vec::new(&env),
     );
 
     let result = client.get_quests_by_tag(&s(&env, "fishing"));
@@ -125,7 +125,7 @@ fn create_quest_with_no_tags_is_allowed() {
         &s(&env, "Untagged"),
         &s(&env, "no tags"),
         &Vec::<String>::new(&env),
-        &0_i128,
+        &Vec::new(&env),
     );
 
     let quest = client.get_quest(&id);
@@ -148,7 +148,7 @@ fn get_quest_tags_returns_assigned_tags() {
         &s(&env, "Arena Match"),
         &s(&env, "Win a ranked match"),
         &tags,
-        &500_i128,
+        &Vec::new(&env),
     );
 
     let returned = client.get_quest_tags(&id);
@@ -165,14 +165,14 @@ fn get_quest_ids_by_tag_lists_ids_in_creation_order() {
         &s(&env, "Q1"),
         &s(&env, "d"),
         &vec![&env, s(&env, "social")],
-        &1_i128,
+        &Vec::new(&env),
     );
     let id2 = client.create_quest(
         &creator,
         &s(&env, "Q2"),
         &s(&env, "d"),
         &vec![&env, s(&env, "social")],
-        &1_i128,
+        &Vec::new(&env),
     );
 
     let ids = client.get_quest_ids_by_tag(&s(&env, "social"));
@@ -192,7 +192,7 @@ fn create_quest_rejects_empty_title() {
         &s(&env, ""),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &0_i128,
+        &Vec::new(&env),
     );
 }
 
@@ -207,7 +207,7 @@ fn create_quest_rejects_empty_tag() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "")],
-        &0_i128,
+        &Vec::new(&env),
     );
 }
 
@@ -229,7 +229,7 @@ fn create_quest_rejects_too_many_tags() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &tags,
-        &0_i128,
+        &Vec::new(&env),
     );
 }
 
@@ -251,7 +251,7 @@ fn create_quest_emits_event() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &0_i128,
+        &Vec::new(&env),
     );
 
     // The contract publishes a `quest_created` event on creation.
@@ -334,7 +334,7 @@ fn create_quest_blocked_while_paused() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &0_i128,
+        &Vec::new(&env),
     );
 }
 
@@ -350,7 +350,7 @@ fn create_quest_works_again_after_unpause() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &0_i128,
+        &Vec::new(&env),
     );
     let q = client.get_quest(&id);
     assert_eq!(q.id, id);
@@ -366,7 +366,7 @@ fn read_only_getters_work_while_paused() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat"), s(&env, "exploration")],
-        &10_i128,
+        &Vec::new(&env),
     );
 
     client.pause(&admin);
