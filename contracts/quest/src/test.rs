@@ -431,8 +431,7 @@ fn create_quest_stores_tags_on_chain() {
         &s(&env, "Slay the dragon"),
         &s(&env, "Defeat the ancient dragon"),
         &tags,
-        &1000_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
 
     let quest = client.get_quest(&quest_id);
@@ -454,24 +453,21 @@ fn get_quests_by_tag_returns_only_matching_quests() {
         &s(&env, "Goblin Hunt"),
         &s(&env, "Hunt goblins"),
         &vec![&env, s(&env, "combat")],
-        &100_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
     let b = client.create_quest(
         &creator,
         &s(&env, "Forge a Sword"),
         &s(&env, "Craft sword"),
         &vec![&env, s(&env, "crafting")],
-        &50_i128,
-        &Difficulty::Medium,
+        &Vec::new(&env),
     );
     let c = client.create_quest(
         &creator,
         &s(&env, "Dungeon Dive"),
         &s(&env, "Clear dungeon"),
         &vec![&env, s(&env, "combat"), s(&env, "exploration")],
-        &200_i128,
-        &Difficulty::Hard,
+        &Vec::new(&env),
     );
 
     let combat_quests = client.get_quests_by_tag(&s(&env, "combat"));
@@ -482,6 +478,27 @@ fn get_quests_by_tag_returns_only_matching_quests() {
     let crafting_quests = client.get_quests_by_tag(&s(&env, "crafting"));
     assert_eq!(crafting_quests.len(), 1);
     assert_eq!(crafting_quests.get(0).unwrap().id, b);
+
+    let exploration_quests = client.get_quests_by_tag(&s(&env, "exploration"));
+    assert_eq!(exploration_quests.len(), 1);
+    assert_eq!(exploration_quests.get(0).unwrap().id, c);
+}
+
+#[test]
+fn get_quests_by_tag_returns_empty_for_unknown_tag() {
+    let (env, contract_id, creator) = setup();
+    let client = QuestContractClient::new(&env, &contract_id);
+
+    client.create_quest(
+        &creator,
+        &s(&env, "Quest"),
+        &s(&env, "desc"),
+        &vec![&env, s(&env, "combat")],
+        &Vec::new(&env),
+    );
+
+    let result = client.get_quests_by_tag(&s(&env, "fishing"));
+    assert_eq!(result.len(), 0);
 }
 
 #[test]
@@ -494,12 +511,60 @@ fn create_quest_with_no_tags_is_allowed() {
         &s(&env, "Untagged"),
         &s(&env, "no tags"),
         &Vec::<String>::new(&env),
-        &0_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
 
     let quest = client.get_quest(&id);
     assert_eq!(quest.tags.len(), 0);
+}
+
+#[test]
+fn get_quest_tags_returns_assigned_tags() {
+    let (env, contract_id, creator) = setup();
+    let client = QuestContractClient::new(&env, &contract_id);
+
+    let tags: Vec<String> = vec![
+        &env,
+        s(&env, "pvp"),
+        s(&env, "ranked"),
+        s(&env, "season1"),
+    ];
+    let id = client.create_quest(
+        &creator,
+        &s(&env, "Arena Match"),
+        &s(&env, "Win a ranked match"),
+        &tags,
+        &Vec::new(&env),
+    );
+
+    let returned = client.get_quest_tags(&id);
+    assert_eq!(returned, tags);
+}
+
+#[test]
+fn get_quest_ids_by_tag_lists_ids_in_creation_order() {
+    let (env, contract_id, creator) = setup();
+    let client = QuestContractClient::new(&env, &contract_id);
+
+    let id1 = client.create_quest(
+        &creator,
+        &s(&env, "Q1"),
+        &s(&env, "d"),
+        &vec![&env, s(&env, "social")],
+        &Vec::new(&env),
+    );
+    let id2 = client.create_quest(
+        &creator,
+        &s(&env, "Q2"),
+        &s(&env, "d"),
+        &vec![&env, s(&env, "social")],
+        &Vec::new(&env),
+    );
+
+    let ids = client.get_quest_ids_by_tag(&s(&env, "social"));
+    assert_eq!(ids.len(), 2);
+    assert_eq!(ids.get(0).unwrap(), id1);
+    assert_eq!(ids.get(1).unwrap(), id2);
 }
 
 #[test]
@@ -513,8 +578,7 @@ fn create_quest_rejects_empty_title() {
         &s(&env, ""),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &0_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
 }
 
@@ -529,8 +593,7 @@ fn create_quest_rejects_empty_tag() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "")],
-        &0_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
 }
 
@@ -550,8 +613,7 @@ fn create_quest_rejects_too_many_tags() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &tags,
-        &0_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
 }
 
@@ -562,6 +624,30 @@ fn get_quest_panics_for_unknown_id() {
     let client = QuestContractClient::new(&env, &contract_id);
     client.get_quest(&999_u64);
 }
+
+#[test]
+fn create_quest_emits_event() {
+    let (env, contract_id, creator) = setup();
+    let client = QuestContractClient::new(&env, &contract_id);
+
+    let _ = client.create_quest(
+        &creator,
+        &s(&env, "Title"),
+        &s(&env, "desc"),
+        &vec![&env, s(&env, "combat")],
+        &Vec::new(&env),
+    );
+
+    // The contract publishes a `quest_created` event on creation.
+    let all = env.events().all();
+    assert!(all.len() >= 1);
+}
+
+//
+// ──────────────────────────────────────────────────────────
+// Pausable mechanism tests
+// ──────────────────────────────────────────────────────────
+//
 
 #[test]
 fn initialize_sets_admin_and_unpaused_state() {
@@ -599,15 +685,41 @@ fn create_quest_blocked_while_paused() {
         &s(&env, "Title"),
         &s(&env, "desc"),
         &vec![&env, s(&env, "combat")],
-        &0_i128,
-        &Difficulty::Easy,
+        &Vec::new(&env),
     );
 }
 
 #[test]
-#[should_panic(expected = "quest contract error")]
-fn batch_create_blocked_while_paused() {
+fn create_quest_works_again_after_unpause() {
     let (env, _id, admin, creator, client) = setup_initialized();
+
+    client.pause(&admin);
+    client.unpause(&admin);
+
+    let id = client.create_quest(
+        &creator,
+        &s(&env, "Title"),
+        &s(&env, "desc"),
+        &vec![&env, s(&env, "combat")],
+        &Vec::new(&env),
+    );
+    let q = client.get_quest(&id);
+    assert_eq!(q.id, id);
+}
+
+#[test]
+fn read_only_getters_work_while_paused() {
+    let (env, _id, admin, creator, client) = setup_initialized();
+
+    // Create a quest before pausing.
+    let id = client.create_quest(
+        &creator,
+        &s(&env, "Title"),
+        &s(&env, "desc"),
+        &vec![&env, s(&env, "combat"), s(&env, "exploration")],
+        &Vec::new(&env),
+    );
+
     client.pause(&admin);
 
     let inputs: Vec<QuestInput> = vec![

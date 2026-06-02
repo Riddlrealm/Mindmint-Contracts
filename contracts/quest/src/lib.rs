@@ -61,6 +61,22 @@ impl Difficulty {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TokenType {
+    Native,
+    ERC20,
+    ERC721,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Reward {
+    pub token_type: TokenType,
+    pub token_address: Option<Address>,
+    pub amount: i128, // Also used for tokenId in ERC721
+}
+
+#[contracttype]
 #[derive(Clone, Debug)]
 pub struct Quest {
     pub id: u64,
@@ -69,10 +85,7 @@ pub struct Quest {
     pub description: String,
     /// Categories/tags assigned to the quest at creation time.
     pub tags: Vec<String>,
-    /// Base reward before difficulty multiplier is applied.
-    pub reward: i128,
-    /// Difficulty tier — immutable after creation.
-    pub difficulty: Difficulty,
+    pub rewards: Vec<Reward>,
     pub status: QuestStatus,
     pub created_at: u64,
 }
@@ -210,8 +223,7 @@ impl QuestContract {
         title: String,
         description: String,
         tags: Vec<String>,
-        reward: i128,
-        difficulty: Difficulty,
+        rewards: Vec<Reward>,
     ) -> u64 {
         require_not_paused(&env);
         creator.require_auth();
@@ -237,8 +249,7 @@ impl QuestContract {
             title,
             description,
             tags: tags.clone(),
-            reward,
-            difficulty,
+            rewards,
             status: QuestStatus::Active,
             created_at: env.ledger().timestamp(),
         };
