@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-  "contracts/subscription", 
+  "contracts/subscription",
   "contracts/achievement_collection",
   "contracts/achievement_nft",
   "contracts/fractional_nft",
@@ -84,7 +84,8 @@ members = [
   "contracts/event_ticket",
   "contracts/progressive_jackpot",
   "contracts/rbac",
-    "contracts/proxy",
+  "contracts/proxy",
+  "contracts/dynamic_metadata",
 ]
 
 [workspace.dependencies]
