@@ -86,6 +86,7 @@ members = [
     "contracts/zk_proof",
     "contracts/multisig_escrow",
     "contracts/proxy",
+    "contracts/timelock_vault",
     "contracts/governance_token",
     "contracts/event_logging",
 ]
