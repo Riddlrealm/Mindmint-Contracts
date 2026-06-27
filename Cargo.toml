@@ -83,9 +83,13 @@ members = [
   "contracts/oracle_price_feed",
   "contracts/event_ticket",
   "contracts/progressive_jackpot",
-  "contracts/rbac",
   "contracts/proxy",
-  "contracts/dynamic_metadata",
+  "contracts/dynamic_metadata",    "contracts/rbac",
+    "contracts/zk_proof",
+    "contracts/multisig_escrow",
+    "contracts/timelock_vault",
+    "contracts/governance_token",
+    "contracts/event_logging",
 ]
 
 [workspace.dependencies]
