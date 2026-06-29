@@ -81,8 +81,10 @@ members = [
   "contracts/payment_splitter",
   "contracts/puzzle_pool_staking",
   "contracts/oracle_price_feed",
+  "contracts/oracle_integration",
   "contracts/event_ticket",
   "contracts/progressive_jackpot",
+  "contracts/rbac",
   "contracts/proxy",
   "contracts/dynamic_metadata",
   "contracts/insurance_pool",
@@ -92,7 +94,8 @@ members = [
     "contracts/timelock_vault",
     "contracts/governance_token",
     "contracts/event_logging",
-]
+    "contracts/revenue_share",
+]  
 
 [workspace.dependencies]
 soroban-sdk = { version = "21.0.0" }
