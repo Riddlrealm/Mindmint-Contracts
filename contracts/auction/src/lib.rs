@@ -633,6 +633,30 @@ impl AuctionContract {
     pub fn get_auction(env: Env, auction_id: u64) -> Option<AuctionInfo> {
         env.storage().instance().get(&DataKey::Auction(auction_id))
     }
+    
+    /// Get all bids for an auction
+    pub fn get_auction_bids(env: Env, auction_id: u64) -> Option<Vec<Bid>> {
+        env.storage().instance().get(&DataKey::AuctionBids(auction_id))
+    }
+    
+    /// Get sealed bids for a sealed-bid auction (only callable after reveal period ends)
+    pub fn get_sealed_bids(env: Env, auction_id: u64) -> Option<Vec<SealedBid>> {
+        let auction: AuctionInfo = env.storage()
+            .instance()
+            .get(&DataKey::Auction(auction_id))?;
+            
+        let current_time = env.ledger().timestamp();
+        if auction.auction_type == AuctionType::SealedBid && current_time > auction.settings.reveal_end_time {
+            env.storage().instance().get(&DataKey::SealedBids(auction_id))
+        } else {
+            None
+        }
+    }
+    
+    /// Get analytics for an auction
+    pub fn get_auction_analytics(env: Env, auction_id: u64) -> Option<AuctionAnalytics> {
+        env.storage().instance().get(&DataKey::AuctionAnalytics(auction_id))
+    }
 }
 
 #[cfg(test)]
