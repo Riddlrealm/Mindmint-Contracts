@@ -25,10 +25,11 @@ fn panic_with_error(env: &Env, err: AuctionError) -> ! {
 
 // 1. DATA STRUCTURES
 #[contracttype]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum AuctionType {
     English = 1,
     Dutch = 2,
+    SealedBid = 3,
 }
 
 // NEW: Grouping settings to avoid the 10-parameter limit
