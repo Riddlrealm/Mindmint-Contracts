@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-  "contracts/subscription",
+members = ["contracts/subscription",
   "contracts/achievement_collection",
   "contracts/achievement_nft",
   "contracts/fractional_nft",
@@ -88,16 +87,16 @@ members = [
   "contracts/proxy",
   "contracts/dynamic_metadata",
   "contracts/insurance_pool",
-  "contracts/rbac",
-    "contracts/zk_proof",
-    "contracts/multisig_escrow",
-    "contracts/timelock_vault",
-    "contracts/governance_token",
-    "contracts/event_logging",
-    "contracts/revenue_share",
-    "contracts/cross_contract",
-    "contracts/royalty_distribution",
+  "contracts/zk_proof",
+  "contracts/multisig_escrow",
+  "contracts/timelock_vault",
+  "contracts/governance_token",
+  "contracts/event_logging",
+  "contracts/revenue_share",
+  "contracts/cross_contract",
+  "contracts/royalty_distribution",
 ]
+
 
 [workspace.dependencies]
 soroban-sdk = { version = "21.0.0" }
