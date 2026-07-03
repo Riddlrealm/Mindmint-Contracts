@@ -1,0 +1,20 @@
+name: Question
+description: Ask a question about using the project.
+title: "[question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For questions about usage, configuration, or how something works.
+        For security issues, follow SECURITY.md; for bugs, use the bug report template.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (optional)
