@@ -1,0 +1,9 @@
+# typos-cli configuration: https://github.com/crate-ci/typos
+
+[default.extend-identifiers]
+# False positives — identifiers our codebase legitimately uses.
+
+[default.extend-words]
+# Words that are correct despite looking like typos.
+soroban = "soroban"
+noqa = "noqa"
