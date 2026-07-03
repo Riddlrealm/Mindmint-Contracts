@@ -1,6 +1,6 @@
 # Charity & Public Goods Donation Contract
 
-Transparent donation contract with quadratic funding mechanism for Quest Service.
+Transparent donation contract with quadratic funding mechanism for Mindmint.
 
 ## Features
 

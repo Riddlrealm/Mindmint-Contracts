@@ -1,6 +1,6 @@
 # Prediction Market Contract
 
-A decentralized prediction market smart contract for Quest Service that allows players to bet on puzzle completion outcomes, tournament winners, and game events.
+A decentralized prediction market smart contract for Mindmint that allows players to bet on puzzle completion outcomes, tournament winners, and game events.
 
 ## Features
 
@@ -228,7 +228,7 @@ cargo test --package prediction-market
 4. **Admin Controls**: Critical operations (resolution, disputes) restricted to admin
 5. **Anti-Gaming**: Partial cashout fee prevents manipulation
 
-## Integration with Quest Service
+## Integration with Mindmint
 
 This contract integrates with:
 - **Tournament Contract**: Bet on tournament outcomes

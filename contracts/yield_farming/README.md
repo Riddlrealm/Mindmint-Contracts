@@ -1,6 +1,6 @@
 # Yield Farming Contract
 
-A DeFi yield farming contract for Quest Service that allows players to stake tokens or NFTs to earn passive rewards over time.
+A DeFi yield farming contract for Mindmint that allows players to stake tokens or NFTs to earn passive rewards over time.
 
 ## Features
 
@@ -204,7 +204,7 @@ soroban contract invoke \
 4. **Admin Controls**: Only admin can create pools to prevent malicious configurations
 5. **Time-Based Rewards**: Rewards calculated based on actual time elapsed
 
-## Integration with Quest Service
+## Integration with Mindmint
 
 This contract integrates with:
 - **Reward Token Contract**: For distributing yield rewards

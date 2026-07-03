@@ -145,7 +145,7 @@ cargo build --package prediction-market --target wasm32-unknown-unknown --releas
 
 ## 🔗 Integration Points
 
-### Quest Service Ecosystem
+### Mindmint Ecosystem
 - **Tournament Contract**: Bet on tournament outcomes
 - **Puzzle Verification**: Predict completion times
 - **Leaderboard**: Bet on ranking changes

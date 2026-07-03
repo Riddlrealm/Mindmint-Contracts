@@ -1,6 +1,6 @@
-# Quest Service - Smart Contracts
+# Mindmint - Smart Contracts
 
-Soroban smart contracts powering Quest Service, a logic puzzle game on the Stellar blockchain.
+Soroban smart contracts powering Mindmint, a logic puzzle game on the Stellar blockchain.
 
 ## 🔐 Contracts Overview
 
@@ -87,7 +87,7 @@ cargo test -- --nocapture
 ## 📁 Project Structure
 
 ```
-quest-service-contracts/
+mindmint-contracts/
 ├── contracts/
 │   ├── achievement_nft/     # NFT achievement contract
 │   ├── reward_token/        # Token reward contract
@@ -130,5 +130,5 @@ This project is licensed under the **MIT License**.
 
 ## 🔗 Related Repositories
 
-* [Quest Service Backend](https://github.com/MindFlowInteractive/quest-service)
-* [Quest Service Frontend](https://github.com/yourusername/quest-service-frontend)
+* [Mindmint Backend](https://github.com/MindFlowInteractive/mindmint)
+* [Mindmint Frontend](https://github.com/yourusername/mindmint-frontend)

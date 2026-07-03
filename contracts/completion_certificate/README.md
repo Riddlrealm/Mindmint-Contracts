@@ -1,6 +1,6 @@
 # Completion Certificate NFT Contract
 
-**Issue #115 — Quest Service Smart Contracts**  
+**Issue #115 — Mindmint Smart Contracts**  
 `contracts/completion_certificate` | Soroban · Rust · Stellar Testnet
 
 ---
@@ -160,7 +160,7 @@ Follow these steps to verify a complete, successful implementation:
 
 ```bash
 git clone <repo-url>
-cd quest-service-contracts
+cd mindmint-contracts
 ```
 
 ### Step 2 — Build the Contract
