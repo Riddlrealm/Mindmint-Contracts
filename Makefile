@@ -1,4 +1,4 @@
-.PHONY: build test clean deploy-testnet optimize
+.PHONY: build test clean optimize check fmt
 
 build:
 	soroban contract build
@@ -13,16 +13,12 @@ clean:
 optimize:
 	soroban contract optimize --wasm target/wasm32-unknown-unknown/release/*.wasm
 
-deploy-testnet:
-	@echo "Deploying puzzle factory to testnet..."
-	soroban contract deploy \
-		--wasm target/wasm32v1-none/release/puzzle_factory.wasm \
-		--source deployer \
-		--network testnet
-
 check:
-	cargo check
-	cargo clippy
+	cargo check --workspace --all-targets
+	cargo clippy --workspace --all-targets -- -D warnings
 
 fmt:
-	cargo fmt
+	cargo fmt --all
+	cargo fmt --all -- --check
+
+# See docs/DEPLOYMENT.md for full deployment instructions.
