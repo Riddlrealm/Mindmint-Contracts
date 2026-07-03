@@ -99,7 +99,7 @@ members = ["contracts/subscription",
 
 
 [workspace.dependencies]
-soroban-sdk = { version = "21.0.0" }
+soroban-sdk = { version = "26.1.0" }
 
 [workspace.lints.rust]
 # unsafe_code intentionally NOT enforced: Soroban SDK / FFI shims require unsafe
