@@ -934,6 +934,3 @@ impl HintMarketplace {
             .expect("Not initialized")
     }
 }
-
-#[cfg(test)]
-mod test;

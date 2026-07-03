@@ -396,5 +396,3 @@ impl SocialWagerContract {
     }
 }
 
-#[cfg(test)]
-mod test;

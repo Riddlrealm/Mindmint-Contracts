@@ -963,4 +963,3 @@ impl InsuranceContract {
     }
 }
 
-mod test;

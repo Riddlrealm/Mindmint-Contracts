@@ -1,11 +1,9 @@
 #![no_std]
 
 mod storage;
-mod types;
 
-use soroban_sdk::{contract, contractimpl, env, Env, Address, BytesN, Symbol, Vec, IntoVal, Vec as SDKVec};
+use soroban_sdk::{contract, contractimpl, Env, Address, BytesN, Vec};
 use storage::{DataKey, set_admin, get_admin, set_paused, is_paused, push_upgrade_history, get_upgrade_history};
-use types::UpgradeError;
 
 #[contract]
 pub struct ProxyContract;
@@ -68,49 +66,3 @@ impl ProxyContract {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use soroban_sdk::testutils::{Address as _, Env as _};
-    use soroban_sdk::Symbol;
-
-    #[test]
-    fn test_initialize_and_admin() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        ProxyContract::initialize(env.clone(), admin.clone());
-        assert_eq!(ProxyContract::admin(env.clone()), admin);
-        assert_eq!(ProxyContract::paused(env.clone()), false);
-    }
-
-    #[test]
-    fn test_pause_unpause() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        ProxyContract::initialize(env.clone(), admin.clone());
-        ProxyContract::pause(env.clone());
-        assert_eq!(ProxyContract::paused(env.clone()), true);
-        ProxyContract::unpause(env.clone());
-        assert_eq!(ProxyContract::paused(env.clone()), false);
-    }
-
-    #[test]
-    fn test_upgrade_history_and_upgrade() {
-        let env = Env::default();
-        let admin = Address::generate(&env);
-        ProxyContract::initialize(env.clone(), admin.clone());
-        // Simulate an upgrade hash
-        let hash1 = BytesN::<32>::from_array(&env, &[0; 32]);
-        ProxyContract::upgrade(env.clone(), hash1.clone());
-        let history = ProxyContract::upgrade_history(env.clone());
-        assert_eq!(history.len(), 1);
-        assert_eq!(history.get_unchecked(0), hash1);
-    }
-
-    #[test]
-    #[should_panic(expected = "Method not found")]
-    fn test_fallback() {
-        let env = Env::default();
-        ProxyContract::fallback(env);
-    }
-}

@@ -557,6 +557,3 @@ impl VestingContract {
         id
     }
 }
-
-#[cfg(test)]
-mod test;

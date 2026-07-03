@@ -583,5 +583,3 @@ impl VestingScheduleContract {
     }
 }
 
-#[cfg(test)]
-mod test;

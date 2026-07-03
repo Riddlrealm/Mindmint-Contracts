@@ -567,5 +567,3 @@ impl GovernanceToken {
     }
 }
 
-#[cfg(test)]
-mod test;

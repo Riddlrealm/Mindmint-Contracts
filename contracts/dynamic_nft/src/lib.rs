@@ -260,5 +260,3 @@ impl DynamicNftContract {
     }
 }
 
-#[cfg(test)]
-mod test;

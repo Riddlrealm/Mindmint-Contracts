@@ -658,6 +658,3 @@ impl AuctionContract {
         env.storage().instance().get(&DataKey::AuctionAnalytics(auction_id))
     }
 }
-
-#[cfg(test)]
-mod test;

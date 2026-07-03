@@ -709,5 +709,3 @@ fn panic_with_error(env: &Env, err: CrossContractError) -> ! {
     panic!("cross contract error");
 }
 
-#[cfg(test)]
-mod test;

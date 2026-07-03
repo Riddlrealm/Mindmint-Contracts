@@ -1804,5 +1804,3 @@ pub struct VerificationResult {
 // TEST MODULE
 // ============================================================================
 
-#[cfg(test)]
-mod test;

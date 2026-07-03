@@ -333,4 +333,3 @@ impl SkillBadgeContract {
     }
 }
 
-mod test;

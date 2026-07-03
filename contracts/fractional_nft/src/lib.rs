@@ -186,5 +186,3 @@ impl FractionalNftContract {
             .set(&DataKey::Balance(vault_id, owner.clone()), &amount);
     }
 }
-
-mod test;

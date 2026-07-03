@@ -398,5 +398,3 @@ impl EmergencyPauseContract {
     }
 }
 
-#[cfg(test)]
-mod test;

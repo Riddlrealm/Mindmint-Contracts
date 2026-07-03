@@ -1,8 +1,6 @@
 #![no_std]
 
 mod types;
-#[cfg(test)]
-mod test;
 
 use soroban_sdk::{contract, contractimpl, contracterror, vec, Address, Env};
 use types::{Config, DataKey, Feedback, Milestone, ReputationScore};

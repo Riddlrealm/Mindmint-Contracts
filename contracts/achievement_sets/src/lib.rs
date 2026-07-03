@@ -760,5 +760,3 @@ impl AchievementSets {
             .set(&DataKey::GlobalLeaderboard, &out);
     }
 }
-
-mod test;

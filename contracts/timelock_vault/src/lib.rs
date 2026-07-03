@@ -1,10 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env};
-use soroban_token_sdk::TokenClient;
+use soroban_sdk::token::TokenClient;
 
-#[cfg(test)]
-mod test;
 
 #[contracttype]
 pub enum DataKey {

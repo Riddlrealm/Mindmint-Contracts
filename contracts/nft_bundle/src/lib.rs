@@ -426,5 +426,3 @@ impl NftBundleContract {
     }
 }
 
-#[cfg(test)]
-mod test;

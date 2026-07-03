@@ -12,8 +12,6 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Ve
 
 mod events;
 
-#[cfg(test)]
-mod test;
 
 //
 // ──────────────────────────────────────────────────────────

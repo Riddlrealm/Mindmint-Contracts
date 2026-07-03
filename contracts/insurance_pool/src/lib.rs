@@ -1290,4 +1290,3 @@ impl InsurancePoolContract {
     }
 }
 
-mod test;

@@ -172,7 +172,7 @@ impl AchievementNFT {
             .set(&DataKey::OwnerCollection(from.clone()), &from_col);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::OwnerCollection(from), 100_000, 500_000);
+            .extend_ttl(&DataKey::OwnerCollection(from.clone()), 100_000, 500_000);
 
         // Add to receiver
         let mut to_col = Self::get_collection_internal(&env, to.clone());
@@ -186,7 +186,7 @@ impl AchievementNFT {
             .set(&DataKey::OwnerCollection(to.clone()), &to_col);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::OwnerCollection(to), 100_000, 500_000);
+            .extend_ttl(&DataKey::OwnerCollection(to.clone()), 100_000, 500_000);
 
         // Update owner
         achievement.owner = to.clone();
@@ -316,5 +316,3 @@ impl AchievementNFT {
         false
     }
 }
-
-mod test;

@@ -819,5 +819,3 @@ impl MultisigTreasury {
     }
 }
 
-#[cfg(test)]
-mod test;

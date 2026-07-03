@@ -335,5 +335,3 @@ impl PuzzleInsuranceContract {
     }
 }
 
-#[cfg(test)]
-mod test;

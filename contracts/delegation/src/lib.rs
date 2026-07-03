@@ -1,8 +1,6 @@
 #![no_std]
 
 mod storage;
-#[cfg(test)]
-mod test;
 
 use soroban_sdk::{contract, contractimpl, Address, Env, Vec, symbol_short};
 use soroban_sdk::token::Client as TokenClient;

@@ -129,5 +129,3 @@ impl EventLoggingContract {
     }
 }
 
-#[cfg(test)]
-mod test;

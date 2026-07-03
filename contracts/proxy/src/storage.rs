@@ -1,5 +1,6 @@
-use soroban_sdk::{Env, Address, BytesN, Symbol, Vec, Storage, storage::StorageInstance, storage::InstanceStorage, storage::InstanceStorageBuilder, storage::Instance, storage::Instance::instance, storage::Instance::new, storage::Instance::read, storage::Instance::write, storage::Storage, storage::Storage::instance};
+use soroban_sdk::{contracttype, Env, Address, BytesN, Vec};
 
+#[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
     Admin,

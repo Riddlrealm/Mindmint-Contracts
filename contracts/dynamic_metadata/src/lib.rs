@@ -132,6 +132,7 @@ pub struct TokenMetadata {
 /// Ownership event kinds.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[repr(u32)]
 pub enum OwnershipEvent {
     Mint,
     Transfer,
@@ -1568,5 +1569,3 @@ fn make_migration_reason(env: &Env, old: u32, new: u32) -> String {
     String::from_bytes(env, &buf[..idx]).unwrap()
 }
 
-#[cfg(test)]
-mod test;

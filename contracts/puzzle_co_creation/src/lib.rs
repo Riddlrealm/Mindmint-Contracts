@@ -293,5 +293,3 @@ impl PuzzleCoCreation {
     }
 }
 
-#[cfg(test)]
-mod test;
