@@ -136,3 +136,7 @@ This project is licensed under the **MIT License**.
 ## Acknowledgements
 
 Built with the Stellar / Soroban stack. Special thanks to the contributor community.
+
+## Build & Test
+
+Run `cargo build --workspace --all-targets` to type-check the workspace and `cargo test --workspace` to run the test suite. See `docs/TESTING.md` for more.
