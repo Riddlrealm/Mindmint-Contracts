@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,5 +22,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-      - name: Check
+      - name: Cargo check
         run: cargo check --workspace --all-targets
+      - name: Cargo test (compile only)
+        # Compiles the test binaries without running them; ensures tests still build.
+        run: cargo test --workspace --no-run
