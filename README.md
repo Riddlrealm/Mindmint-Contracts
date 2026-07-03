@@ -132,3 +132,7 @@ This project is licensed under the **MIT License**.
 
 * [Mindmint Backend](https://github.com/MindFlowInteractive/mindmint)
 * [Mindmint Frontend](https://github.com/yourusername/mindmint-frontend)
+
+## Acknowledgements
+
+Built with the Stellar / Soroban stack. Special thanks to the contributor community.
