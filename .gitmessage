@@ -1,0 +1,7 @@
+# <type>: <subject> (max 50 chars)
+#
+# <body> — wrap at 72 chars. Explain *what* and *why*, not *how*.
+#
+# <footer> — reference issues, breaking changes, etc.
+#
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
