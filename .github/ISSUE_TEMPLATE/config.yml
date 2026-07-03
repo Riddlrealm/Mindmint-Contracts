@@ -1,0 +1,9 @@
+# Tells users what to open and links them to other resources.
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/Riddlrealm/Mindmint-Contracts/tree/main/docs
+    about: Detailed guides live under docs/.
+  - name: Discussions
+    url: https://github.com/Riddlrealm/Mindmint-Contracts/discussions
+    about: For open-ended Q&A and design discussions.
