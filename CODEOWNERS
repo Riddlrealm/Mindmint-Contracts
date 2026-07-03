@@ -1,0 +1,9 @@
+# Default reviewers for the project.
+
+/contracts/   @mindmint-maintainers
+/docs/        @mindmint-maintainers
+/scripts/     @mindmint-maintainers
+/.github/     @mindmint-maintainers
+/Cargo.toml   @mindmint-maintainers
+/Makefile     @mindmint-maintainers
+/README.md    @mindmint-maintainers
