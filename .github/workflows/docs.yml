@@ -20,7 +20,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build rustdoc
         run: cargo doc --workspace --no-deps
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rustdoc
           path: target/doc
