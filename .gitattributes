@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+# Source files
+*.rs      text eol=lf
+*.toml    text eol=lf
+*.md      text eol=lf
+
+# Binary artifacts
+*.wasm    binary
+*.png     binary
+*.jpg     binary
+*.ico     binary
+*.gz      binary
