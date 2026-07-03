@@ -97,10 +97,16 @@ members = [
     "contracts/revenue_share",
     "contracts/cross_contract",
     "contracts/royalty_distribution",
-]  
+]
 
 [workspace.dependencies]
 soroban-sdk = { version = "21.0.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+missing_debug_implementations = "warn"
 
 [profile.release]
 opt-level = "z"
