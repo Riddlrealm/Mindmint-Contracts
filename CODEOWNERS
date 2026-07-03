@@ -1,9 +1,12 @@
 # Default reviewers for the project.
 
-/contracts/   @mindmint-maintainers
-/docs/        @mindmint-maintainers
-/scripts/     @mindmint-maintainers
-/.github/     @mindmint-maintainers
-/Cargo.toml   @mindmint-maintainers
-/Makefile     @mindmint-maintainers
-/README.md    @mindmint-maintainers
+/contracts/   @Riddlrealm # 
+/docs/        @Riddlrealm # 
+/scripts/     @Riddlrealm # 
+/.github/     @Riddlrealm # 
+/Cargo.toml   @Riddlrealm # 
+/Makefile     @Riddlrealm # 
+/README.md    @Riddlrealm # 
+
+# NOTE: Replace the @Riddlrealm placeholder above with the real maintainer
+# handle once CODEOWNERS ownership is configured in repo settings.
