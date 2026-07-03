@@ -1,5 +1,3 @@
 # GitHub Sponsors funding configuration
+# Until a real funding source is configured, leave this file empty.
 # Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
-
-# Replace the placeholder handles below with the real maintainer fundings.
-github: [placeholder]
