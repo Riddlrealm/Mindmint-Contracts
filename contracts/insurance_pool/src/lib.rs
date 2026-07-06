@@ -568,12 +568,12 @@ impl InsurancePoolContract {
         }
 
         // Validate description length
-        if description.len() as u32 > MAX_DESCRIPTION_LENGTH {
+        if description.len() > MAX_DESCRIPTION_LENGTH {
             panic!("Description too long");
         }
 
         // Validate evidence hash length
-        if evidence_hash.len() as u32 > MAX_EVIDENCE_HASH_LENGTH {
+        if evidence_hash.len() > MAX_EVIDENCE_HASH_LENGTH {
             panic!("Evidence hash too long");
         }
 
