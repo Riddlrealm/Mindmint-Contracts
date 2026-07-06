@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec, IntoVal, Symbol};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, Address, Env, IntoVal, String, Symbol, Vec,
+};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -114,7 +116,9 @@ impl RewardToken {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
 
-        env.storage().instance().set(&DataKey::BurnController, &controller);
+        env.storage()
+            .instance()
+            .set(&DataKey::BurnController, &controller);
     }
 
     /// Get the burn controller address
@@ -200,8 +204,12 @@ impl RewardToken {
         let mut burn_amount = 0i128;
 
         if let Some(controller_addr) = Self::burn_controller(env.clone()) {
-            let config: BurnConfigLocal = env.invoke_contract(&controller_addr, &Symbol::new(&env, "get_config"), soroban_sdk::vec![&env]);
-            
+            let config: BurnConfigLocal = env.invoke_contract(
+                &controller_addr,
+                &Symbol::new(&env, "get_config"),
+                soroban_sdk::vec![&env],
+            );
+
             if config.enabled && config.burn_rate > 0 {
                 burn_amount = (amount * config.burn_rate as i128) / 10000;
                 net_amount = amount - burn_amount;
@@ -220,15 +228,26 @@ impl RewardToken {
 
         if burn_amount > 0 {
             // Reduce total supply
-            let total_supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-            env.storage().instance().set(&DataKey::TotalSupply, &(total_supply - burn_amount));
+            let total_supply: i128 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalSupply)
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&DataKey::TotalSupply, &(total_supply - burn_amount));
 
             // Record burn in controller
             if let Some(controller_addr) = Self::burn_controller(env.clone()) {
                 env.invoke_contract::<()>(
-                    &controller_addr, 
-                    &Symbol::new(&env, "record_burn"), 
-                    soroban_sdk::vec![&env, burn_amount.into_val(&env), from.into_val(&env), soroban_sdk::symbol_short!("fee").into_val(&env)]
+                    &controller_addr,
+                    &Symbol::new(&env, "record_burn"),
+                    soroban_sdk::vec![
+                        &env,
+                        burn_amount.into_val(&env),
+                        from.into_val(&env),
+                        soroban_sdk::symbol_short!("fee").into_val(&env)
+                    ],
                 );
             }
         }
@@ -248,13 +267,7 @@ impl RewardToken {
     }
 
     /// Transfer tokens from one address to another using allowance
-    pub fn transfer_from(
-        env: Env,
-        spender: Address,
-        from: Address,
-        to: Address,
-        amount: i128,
-    ) {
+    pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
 
         if amount <= 0 {
@@ -282,8 +295,12 @@ impl RewardToken {
         let mut burn_amount = 0i128;
 
         if let Some(controller_addr) = Self::burn_controller(env.clone()) {
-            let config: BurnConfigLocal = env.invoke_contract(&controller_addr, &Symbol::new(&env, "get_config"), soroban_sdk::vec![&env]);
-            
+            let config: BurnConfigLocal = env.invoke_contract(
+                &controller_addr,
+                &Symbol::new(&env, "get_config"),
+                soroban_sdk::vec![&env],
+            );
+
             if config.enabled && config.burn_rate > 0 {
                 burn_amount = (amount * config.burn_rate as i128) / 10000;
                 net_amount = amount - burn_amount;
@@ -295,33 +312,40 @@ impl RewardToken {
             .set(&DataKey::Balance(to), &(to_balance + net_amount));
 
         // Update allowance
-        env.storage()
-            .instance()
-            .set(&DataKey::Allowance(from.clone(), spender), &(allowance - amount));
+        env.storage().instance().set(
+            &DataKey::Allowance(from.clone(), spender),
+            &(allowance - amount),
+        );
 
         if burn_amount > 0 {
             // Reduce total supply
-            let total_supply: i128 = env.storage().instance().get(&DataKey::TotalSupply).unwrap_or(0);
-            env.storage().instance().set(&DataKey::TotalSupply, &(total_supply - burn_amount));
+            let total_supply: i128 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalSupply)
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&DataKey::TotalSupply, &(total_supply - burn_amount));
 
             // Record burn in controller
             if let Some(controller_addr) = Self::burn_controller(env.clone()) {
                 env.invoke_contract::<()>(
-                    &controller_addr, 
-                    &Symbol::new(&env, "record_burn"), 
-                    soroban_sdk::vec![&env, burn_amount.into_val(&env), from.into_val(&env), soroban_sdk::symbol_short!("fee").into_val(&env)]
+                    &controller_addr,
+                    &Symbol::new(&env, "record_burn"),
+                    soroban_sdk::vec![
+                        &env,
+                        burn_amount.into_val(&env),
+                        from.into_val(&env),
+                        soroban_sdk::symbol_short!("fee").into_val(&env)
+                    ],
                 );
             }
         }
     }
 
     /// Spend tokens for in-game unlocks (burn tokens)
-    pub fn spend_for_unlock(
-        env: Env,
-        spender: Address,
-        amount: i128,
-        _unlock_type: String,
-    ) {
+    pub fn spend_for_unlock(env: Env, spender: Address, amount: i128, _unlock_type: String) {
         spender.require_auth();
 
         if amount <= 0 {
@@ -351,9 +375,14 @@ impl RewardToken {
         // Record burn (as unlock)
         if let Some(controller_addr) = Self::burn_controller(env.clone()) {
             env.invoke_contract::<()>(
-                &controller_addr, 
-                &Symbol::new(&env, "record_burn"), 
-                soroban_sdk::vec![&env, amount.into_val(&env), spender.into_val(&env), Symbol::new(&env, "unlock").into_val(&env)]
+                &controller_addr,
+                &Symbol::new(&env, "record_burn"),
+                soroban_sdk::vec![
+                    &env,
+                    amount.into_val(&env),
+                    spender.into_val(&env),
+                    Symbol::new(&env, "unlock").into_val(&env)
+                ],
             );
         }
     }
@@ -387,9 +416,14 @@ impl RewardToken {
         // Record voluntary burn
         if let Some(controller_addr) = Self::burn_controller(env.clone()) {
             env.invoke_contract::<()>(
-                &controller_addr, 
-                &Symbol::new(&env, "record_burn"), 
-                soroban_sdk::vec![&env, amount.into_val(&env), from.into_val(&env), soroban_sdk::symbol_short!("vol").into_val(&env)]
+                &controller_addr,
+                &Symbol::new(&env, "record_burn"),
+                soroban_sdk::vec![
+                    &env,
+                    amount.into_val(&env),
+                    from.into_val(&env),
+                    soroban_sdk::symbol_short!("vol").into_val(&env)
+                ],
             );
         }
     }
@@ -442,7 +476,13 @@ mod test {
                 enabled: true,
             }
         }
-        pub fn record_burn(_env: Env, _amount: i128, _source: Address, _reason: soroban_sdk::Symbol) {}
+        pub fn record_burn(
+            _env: Env,
+            _amount: i128,
+            _source: Address,
+            _reason: soroban_sdk::Symbol,
+        ) {
+        }
     }
 
     #[test]
@@ -604,7 +644,12 @@ mod test {
         let user1 = Address::generate(&env);
         let user2 = Address::generate(&env);
 
-        client.initialize(&admin, &String::from_str(&env, "Reward"), &String::from_str(&env, "RWD"), &6);
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Reward"),
+            &String::from_str(&env, "RWD"),
+            &6,
+        );
         env.mock_all_auths();
         client.mint(&admin, &user1, &1000);
 

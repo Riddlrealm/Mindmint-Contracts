@@ -171,7 +171,9 @@ impl PlayerSponsorshipContract {
             &milestone.reward_amount,
         );
 
-        env.storage().persistent().set(&DataKey::Deal(deal_id), &deal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Deal(deal_id), &deal);
 
         env.events().publish(
             (Symbol::new(&env, "MilestoneClaimed"),),
@@ -205,7 +207,9 @@ impl PlayerSponsorshipContract {
         }
 
         deal.cancelled = true;
-        env.storage().persistent().set(&DataKey::Deal(deal_id), &deal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Deal(deal_id), &deal);
     }
 
     pub fn get_deal(env: Env, deal_id: u32) -> Option<SponsorshipDeal> {
@@ -221,7 +225,11 @@ impl PlayerSponsorshipContract {
 
         let mut active: Vec<u32> = Vec::new(&env);
         for id in ids.iter() {
-            if let Some(deal) = env.storage().persistent().get::<DataKey, SponsorshipDeal>(&DataKey::Deal(id)) {
+            if let Some(deal) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, SponsorshipDeal>(&DataKey::Deal(id))
+            {
                 if !deal.cancelled && deal.released < deal.total_amount {
                     active.push_back(id);
                 }
@@ -241,11 +249,7 @@ impl PlayerSponsorshipContract {
                 let count: u32 = env.invoke_contract(
                     &proof,
                     &Symbol::new(env, "get_activity_count"),
-                    soroban_sdk::vec![
-                        env,
-                        player.clone().into_val(env),
-                        0u32.into_val(env),
-                    ],
+                    soroban_sdk::vec![env, player.clone().into_val(env), 0u32.into_val(env),],
                 );
                 count >= *threshold
             }

@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, token,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env};
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -62,7 +60,11 @@ impl BountyContract {
             panic!("Amount must be positive");
         }
 
-        let mut count: u32 = env.storage().instance().get(&DataKey::BountyCount).unwrap_or(0);
+        let mut count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::BountyCount)
+            .unwrap_or(0);
         count += 1;
 
         let expiration = env.ledger().timestamp() + duration;
@@ -82,7 +84,9 @@ impl BountyContract {
         let token_client = token::Client::new(&env, &token_address);
         token_client.transfer(&creator, &env.current_contract_address(), &amount);
 
-        env.storage().instance().set(&DataKey::Bounty(count), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(count), &bounty);
         env.storage().instance().set(&DataKey::BountyCount, &count);
 
         env.events().publish(
@@ -96,7 +100,8 @@ impl BountyContract {
     pub fn accept_bounty(env: Env, solver: Address, bounty_id: u32) {
         solver.require_auth();
 
-        let mut bounty = self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
+        let mut bounty =
+            self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
 
         if bounty.status != BountyStatus::Open {
             panic!("Bounty is not open");
@@ -109,7 +114,9 @@ impl BountyContract {
         bounty.solver = Some(solver.clone());
         bounty.status = BountyStatus::Accepted;
 
-        env.storage().instance().set(&DataKey::Bounty(bounty_id), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(bounty_id), &bounty);
 
         env.events().publish(
             (symbol_short!("bounty"), symbol_short!("accepted")),
@@ -120,7 +127,8 @@ impl BountyContract {
     pub fn submit_solution(env: Env, solver: Address, bounty_id: u32) {
         solver.require_auth();
 
-        let mut bounty = self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
+        let mut bounty =
+            self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
 
         if bounty.status != BountyStatus::Accepted {
             panic!("Bounty not accepted");
@@ -136,7 +144,9 @@ impl BountyContract {
 
         bounty.status = BountyStatus::Submitted;
 
-        env.storage().instance().set(&DataKey::Bounty(bounty_id), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(bounty_id), &bounty);
 
         env.events().publish(
             (symbol_short!("bounty"), symbol_short!("submitted")),
@@ -147,7 +157,8 @@ impl BountyContract {
     pub fn approve_submission(env: Env, creator: Address, bounty_id: u32) {
         creator.require_auth();
 
-        let mut bounty = self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
+        let mut bounty =
+            self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
 
         if bounty.creator != creator {
             panic!("Not the creator");
@@ -165,7 +176,9 @@ impl BountyContract {
 
         bounty.status = BountyStatus::Completed;
 
-        env.storage().instance().set(&DataKey::Bounty(bounty_id), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(bounty_id), &bounty);
 
         env.events().publish(
             (symbol_short!("bounty"), symbol_short!("completed")),
@@ -176,7 +189,8 @@ impl BountyContract {
     pub fn cancel_bounty(env: Env, creator: Address, bounty_id: u32) {
         creator.require_auth();
 
-        let mut bounty = self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
+        let mut bounty =
+            self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
 
         if bounty.creator != creator {
             panic!("Not the creator");
@@ -184,7 +198,9 @@ impl BountyContract {
 
         let can_cancel = match bounty.status {
             BountyStatus::Open => true,
-            BountyStatus::Accepted | BountyStatus::Submitted => env.ledger().timestamp() > bounty.expiration,
+            BountyStatus::Accepted | BountyStatus::Submitted => {
+                env.ledger().timestamp() > bounty.expiration
+            }
             _ => false,
         };
 
@@ -198,7 +214,9 @@ impl BountyContract {
 
         bounty.status = BountyStatus::Cancelled;
 
-        env.storage().instance().set(&DataKey::Bounty(bounty_id), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(bounty_id), &bounty);
 
         env.events().publish(
             (symbol_short!("bounty"), symbol_short!("cancelled")),
@@ -209,7 +227,8 @@ impl BountyContract {
     pub fn dispute_bounty(env: Env, caller: Address, bounty_id: u32) {
         caller.require_auth();
 
-        let mut bounty = self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
+        let mut bounty =
+            self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
 
         if caller != bounty.creator && Some(caller.clone()) != bounty.solver {
             panic!("Only creator or solver can dispute");
@@ -221,7 +240,9 @@ impl BountyContract {
 
         bounty.status = BountyStatus::Disputed;
 
-        env.storage().instance().set(&DataKey::Bounty(bounty_id), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(bounty_id), &bounty);
 
         env.events().publish(
             (symbol_short!("bounty"), symbol_short!("disputed")),
@@ -232,12 +253,17 @@ impl BountyContract {
     pub fn resolve_dispute(env: Env, admin: Address, bounty_id: u32, solver_payout: i128) {
         admin.require_auth();
 
-        let admin_stored: Address = env.storage().instance().get(&DataKey::Admin).expect("No admin set");
+        let admin_stored: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("No admin set");
         if admin != admin_stored {
             panic!("Only admin can resolve disputes");
         }
 
-        let mut bounty = self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
+        let mut bounty =
+            self::BountyContract::get_bounty(env.clone(), bounty_id).expect("Bounty not found");
 
         if bounty.status != BountyStatus::Disputed {
             panic!("Bounty is not in dispute");
@@ -256,12 +282,18 @@ impl BountyContract {
         }
 
         if creator_payout > 0 {
-            token_client.transfer(&env.current_contract_address(), &bounty.creator, &creator_payout);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &bounty.creator,
+                &creator_payout,
+            );
         }
 
         bounty.status = BountyStatus::Completed; // Or create a generic 'Resolved' status
 
-        env.storage().instance().set(&DataKey::Bounty(bounty_id), &bounty);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bounty(bounty_id), &bounty);
 
         env.events().publish(
             (symbol_short!("bounty"), symbol_short!("resolved")),
@@ -272,7 +304,7 @@ impl BountyContract {
     pub fn get_active_bounties(env: Env, offset: u32, limit: u32) -> soroban_sdk::Vec<Bounty> {
         let count = Self::get_bounty_count(env.clone());
         let mut bounties = soroban_sdk::Vec::new(&env);
-        
+
         if offset > count {
             return bounties;
         }
@@ -280,7 +312,10 @@ impl BountyContract {
         let end = (offset + limit).min(count + 1);
         for i in (offset + 1)..end {
             if let Some(bounty) = Self::get_bounty(env.clone(), i) {
-                if bounty.status == BountyStatus::Open || bounty.status == BountyStatus::Accepted || bounty.status == BountyStatus::Submitted {
+                if bounty.status == BountyStatus::Open
+                    || bounty.status == BountyStatus::Accepted
+                    || bounty.status == BountyStatus::Submitted
+                {
                     bounties.push_back(bounty);
                 }
             }
@@ -293,7 +328,10 @@ impl BountyContract {
     }
 
     pub fn get_bounty_count(env: Env) -> u32 {
-        env.storage().instance().get(&DataKey::BountyCount).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::BountyCount)
+            .unwrap_or(0)
     }
 }
 

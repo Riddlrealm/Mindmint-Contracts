@@ -1,5 +1,5 @@
-use soroban_sdk::{Address, Env, Val, Vec};
 use crate::types::*;
+use soroban_sdk::{Address, Env, Val, Vec};
 
 // ──────────────────────────────────────────────
 // Admin / metadata helpers
@@ -57,10 +57,9 @@ pub fn get_allowance(env: &Env, owner: &Address, spender: &Address) -> i128 {
 }
 
 pub fn set_allowance(env: &Env, owner: &Address, spender: &Address, amount: i128) {
-    env.storage().persistent().set(
-        &DataKey::Allowance(owner.clone(), spender.clone()),
-        &amount,
-    );
+    env.storage()
+        .persistent()
+        .set(&DataKey::Allowance(owner.clone(), spender.clone()), &amount);
 }
 
 // ──────────────────────────────────────────────
@@ -158,9 +157,7 @@ pub fn increment_proposal_count(env: &Env) -> u64 {
 }
 
 pub fn get_proposal(env: &Env, id: u64) -> Option<Proposal> {
-    env.storage()
-        .persistent()
-        .get(&DataKey::Proposal(id))
+    env.storage().persistent().get(&DataKey::Proposal(id))
 }
 
 pub fn set_proposal(env: &Env, proposal: &Proposal) {
@@ -170,9 +167,7 @@ pub fn set_proposal(env: &Env, proposal: &Proposal) {
 }
 
 pub fn get_proposal_args(env: &Env, id: u64) -> Option<Vec<Val>> {
-    env.storage()
-        .persistent()
-        .get(&DataKey::ProposalArgs(id))
+    env.storage().persistent().get(&DataKey::ProposalArgs(id))
 }
 
 pub fn set_proposal_args(env: &Env, id: u64, args: &Vec<Val>) {

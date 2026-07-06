@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, String, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String, Symbol, Vec};
 
 /// Represents a trait listing for sale
 #[contracttype]
@@ -25,11 +23,11 @@ pub enum DataKey {
     Admin,
     Config,
     ListingCounter,
-    Listing(u32),                           // (listing_id)
-    SellerListings(Address),               // seller's active listing IDs
-    TraitTypeListings(String),             // all listings for a trait type
-    NFTTraits(u32, String),                // (nft_id, trait_key) -> trait_value for validation
-    HasTrait(u32, String),                 // (nft_id, trait_key) -> bool
+    Listing(u32),              // (listing_id)
+    SellerListings(Address),   // seller's active listing IDs
+    TraitTypeListings(String), // all listings for a trait type
+    NFTTraits(u32, String),    // (nft_id, trait_key) -> trait_value for validation
+    HasTrait(u32, String),     // (nft_id, trait_key) -> bool
 }
 
 #[contracttype]
@@ -75,7 +73,9 @@ impl NftTraitMarketplaceContract {
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Config, &config);
-        env.storage().instance().set(&DataKey::ListingCounter, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::ListingCounter, &0u32);
     }
 
     /// Get admin
@@ -145,12 +145,10 @@ impl NftTraitMarketplaceContract {
             .set(&DataKey::HasTrait(source_nft_id, trait_key.clone()), &true);
 
         // Store trait value for later
-        env.storage()
-            .persistent()
-            .set(
-                &DataKey::NFTTraits(source_nft_id, trait_key.clone()),
-                &trait_value.clone(),
-            );
+        env.storage().persistent().set(
+            &DataKey::NFTTraits(source_nft_id, trait_key.clone()),
+            &trait_value.clone(),
+        );
 
         // Get next listing ID
         let counter: u32 = env
@@ -189,13 +187,17 @@ impl NftTraitMarketplaceContract {
         // Add to trait type listings
         let mut trait_listings = Self::get_trait_type_listings(&env, &trait_key);
         trait_listings.push_back(listing_id);
-        env.storage()
-            .instance()
-            .set(&DataKey::TraitTypeListings(trait_key.clone()), &trait_listings);
+        env.storage().instance().set(
+            &DataKey::TraitTypeListings(trait_key.clone()),
+            &trait_listings,
+        );
 
         // Emit TraitListed event
         env.events().publish(
-            (Symbol::new(&env, "nft_trait"), Symbol::new(&env, "trait_listed")),
+            (
+                Symbol::new(&env, "nft_trait"),
+                Symbol::new(&env, "trait_listed"),
+            ),
             (listing_id, seller, source_nft_id, trait_key, price),
         );
 
@@ -204,12 +206,7 @@ impl NftTraitMarketplaceContract {
 
     /// Buy a trait from a listing
     /// Buyer owns destination NFT; destination doesn't already have this trait
-    pub fn buy_trait(
-        env: Env,
-        listing_id: u32,
-        buyer: Address,
-        destination_nft_id: u32,
-    ) {
+    pub fn buy_trait(env: Env, listing_id: u32, buyer: Address, destination_nft_id: u32) {
         buyer.require_auth();
 
         // Get listing
@@ -225,11 +222,10 @@ impl NftTraitMarketplaceContract {
         }
 
         // Validate destination NFT doesn't already have this trait
-        if env
-            .storage()
-            .persistent()
-            .has(&DataKey::HasTrait(destination_nft_id, listing.trait_key.clone()))
-        {
+        if env.storage().persistent().has(&DataKey::HasTrait(
+            destination_nft_id,
+            listing.trait_key.clone(),
+        )) {
             panic!("destination nft already has this trait");
         }
 
@@ -251,14 +247,16 @@ impl NftTraitMarketplaceContract {
         }
 
         // Mark trait as removed from source NFT
-        env.storage()
-            .persistent()
-            .remove(&DataKey::HasTrait(listing.source_nft_id, listing.trait_key.clone()));
+        env.storage().persistent().remove(&DataKey::HasTrait(
+            listing.source_nft_id,
+            listing.trait_key.clone(),
+        ));
 
         // Mark trait as present on destination NFT
-        env.storage()
-            .persistent()
-            .set(&DataKey::HasTrait(destination_nft_id, listing.trait_key.clone()), &true);
+        env.storage().persistent().set(
+            &DataKey::HasTrait(destination_nft_id, listing.trait_key.clone()),
+            &true,
+        );
 
         // Store trait value on destination NFT
         env.storage().persistent().set(
@@ -274,7 +272,10 @@ impl NftTraitMarketplaceContract {
 
         // Emit TraitSold event
         env.events().publish(
-            (Symbol::new(&env, "nft_trait"), Symbol::new(&env, "trait_sold")),
+            (
+                Symbol::new(&env, "nft_trait"),
+                Symbol::new(&env, "trait_sold"),
+            ),
             (
                 listing_id,
                 buyer.clone(),
@@ -309,9 +310,10 @@ impl NftTraitMarketplaceContract {
         }
 
         // Mark trait as no longer listed
-        env.storage()
-            .persistent()
-            .remove(&DataKey::HasTrait(listing.source_nft_id, listing.trait_key.clone()));
+        env.storage().persistent().remove(&DataKey::HasTrait(
+            listing.source_nft_id,
+            listing.trait_key.clone(),
+        ));
 
         // Update listing status
         listing.status = 2; // cancelled
@@ -335,16 +337,17 @@ impl NftTraitMarketplaceContract {
 
         // Emit ListingCancelled event
         env.events().publish(
-            (Symbol::new(&env, "nft_trait"), Symbol::new(&env, "listing_cancelled")),
+            (
+                Symbol::new(&env, "nft_trait"),
+                Symbol::new(&env, "listing_cancelled"),
+            ),
             (listing_id, seller, listing.source_nft_id, listing.trait_key),
         );
     }
 
     /// Get listing details
     pub fn get_listing(env: Env, listing_id: u32) -> Option<TraitListing> {
-        env.storage()
-            .instance()
-            .get(&DataKey::Listing(listing_id))
+        env.storage().instance().get(&DataKey::Listing(listing_id))
     }
 
     /// Check if an NFT has a specific trait
@@ -370,7 +373,11 @@ impl NftTraitMarketplaceContract {
         let mut i = 0;
         while i < listing_ids.len() {
             let listing_id = listing_ids.get(i).unwrap();
-            if let Some(listing) = env.storage().instance().get(&DataKey::Listing(listing_id)) {
+            if let Some(listing) = env
+                .storage()
+                .instance()
+                .get::<_, TraitListing>(&DataKey::Listing(listing_id))
+            {
                 if listing.status == 0 {
                     // Only include active listings
                     active_listings.push_back(listing);
@@ -390,7 +397,11 @@ impl NftTraitMarketplaceContract {
         let mut i = 0;
         while i < listing_ids.len() {
             let listing_id = listing_ids.get(i).unwrap();
-            if let Some(listing) = env.storage().instance().get(&DataKey::Listing(listing_id)) {
+            if let Some(listing) = env
+                .storage()
+                .instance()
+                .get::<_, TraitListing>(&DataKey::Listing(listing_id))
+            {
                 if listing.status == 0 {
                     active_listings.push_back(listing);
                 }
@@ -436,7 +447,10 @@ impl NftTraitMarketplaceContract {
         env.storage().instance().set(&DataKey::Config, &config);
 
         env.events().publish(
-            (Symbol::new(&env, "nft_trait"), Symbol::new(&env, "fee_updated")),
+            (
+                Symbol::new(&env, "nft_trait"),
+                Symbol::new(&env, "fee_updated"),
+            ),
             new_fee_bps,
         );
     }
@@ -452,13 +466,15 @@ impl NftTraitMarketplaceContract {
             .get(&DataKey::Config)
             .expect("config not set");
 
-        config.fee_collector = new_collector;
+        config.fee_collector = new_collector.clone();
         env.storage().instance().set(&DataKey::Config, &config);
 
         env.events().publish(
-            (Symbol::new(&env, "nft_trait"), Symbol::new(&env, "collector_updated")),
+            (
+                Symbol::new(&env, "nft_trait"),
+                Symbol::new(&env, "collector_updated"),
+            ),
             new_collector,
         );
     }
 }
-

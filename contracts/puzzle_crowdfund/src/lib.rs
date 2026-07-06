@@ -95,7 +95,7 @@ pub struct CampaignSummary {
     pub backer_count: u32,
     pub contribution_count: u32,
     pub goal_reached: bool,
-    pub next_stretch_goal: Option<StretchGoal>,
+    pub next_stretch_goal: Vec<StretchGoal>,
 }
 
 #[contracttype]
@@ -120,9 +120,12 @@ impl PuzzleCrowdfund {
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
-        env.storage().instance().set(&DataKey::NextCampaignId, &1u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextCampaignId, &1u64);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_campaign(
         env: Env,
         creator: Address,
@@ -147,7 +150,11 @@ impl PuzzleCrowdfund {
         let milestones = Self::build_milestones(&env, &milestone_inputs, max_target);
         let stretch_goals = Self::build_stretch_goals(&env, &stretch_goal_inputs, goal_amount);
 
-        let campaign_id: u64 = env.storage().instance().get(&DataKey::NextCampaignId).unwrap();
+        let campaign_id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextCampaignId)
+            .unwrap();
         env.storage()
             .instance()
             .set(&DataKey::NextCampaignId, &(campaign_id + 1));
@@ -198,7 +205,8 @@ impl PuzzleCrowdfund {
         if env.ledger().timestamp() > campaign.deadline {
             panic!("campaign deadline passed");
         }
-        if campaign.status == CampaignStatus::Failed || campaign.status == CampaignStatus::Completed {
+        if campaign.status == CampaignStatus::Failed || campaign.status == CampaignStatus::Completed
+        {
             panic!("campaign not accepting contributions");
         }
 
@@ -263,7 +271,12 @@ impl PuzzleCrowdfund {
         );
     }
 
-    pub fn claim_milestone(env: Env, campaign_id: u64, creator: Address, milestone_id: u32) -> i128 {
+    pub fn claim_milestone(
+        env: Env,
+        campaign_id: u64,
+        creator: Address,
+        milestone_id: u32,
+    ) -> i128 {
         creator.require_auth();
         Self::require_initialized(&env);
 
@@ -327,7 +340,11 @@ impl PuzzleCrowdfund {
         if contribution <= 0 {
             panic!("no contribution to refund");
         }
-        if campaign.refunded_backers.get(backer.clone()).unwrap_or(false) {
+        if campaign
+            .refunded_backers
+            .get(backer.clone())
+            .unwrap_or(false)
+        {
             panic!("refund already claimed");
         }
 
@@ -357,7 +374,20 @@ impl PuzzleCrowdfund {
     }
 
     pub fn get_campaign_summary(env: Env, campaign_id: u64) -> CampaignSummary {
-        let campaign = Self::get_campaign(env, campaign_id);
+        // `Self::get_campaign` consumes env by value; use _or_panic(&env) so we
+        // can still take &env below to build the next_stretch_goal vec.
+        let campaign = Self::get_campaign_or_panic(&env, campaign_id);
+        // Encode the (at most one) next unreached stretch goal as a 0- or
+        // 1-element vec. Soroban SDK 21's #[contracttype] derive does not
+        // implement TryFromVal/IntoVal for `Option<#contracttype>`, so the
+        // vec is the wire-compatible stand-in.
+        let next_stretch_goal: Vec<StretchGoal> = {
+            let mut v: Vec<StretchGoal> = Vec::new(&env);
+            if let Some(g) = Self::next_stretch_goal(&campaign) {
+                v.push_back(g);
+            }
+            v
+        };
         CampaignSummary {
             id: campaign.id,
             creator: campaign.creator.clone(),
@@ -366,12 +396,14 @@ impl PuzzleCrowdfund {
             amount_raised: campaign.amount_raised,
             amount_claimed: campaign.amount_claimed,
             refunded_amount: campaign.refunded_amount,
-            available_balance: campaign.amount_raised - campaign.amount_claimed - campaign.refunded_amount,
+            available_balance: campaign.amount_raised
+                - campaign.amount_claimed
+                - campaign.refunded_amount,
             status: campaign.status,
             backer_count: campaign.backers.len(),
             contribution_count: campaign.contribution_history.len(),
             goal_reached: campaign.amount_raised >= campaign.goal_amount,
-            next_stretch_goal: Self::next_stretch_goal(&campaign),
+            next_stretch_goal,
         }
     }
 
@@ -409,7 +441,11 @@ impl PuzzleCrowdfund {
 
     pub fn get_campaign_count(env: Env) -> u64 {
         Self::require_initialized(&env);
-        let next_id: u64 = env.storage().instance().get(&DataKey::NextCampaignId).unwrap();
+        let next_id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextCampaignId)
+            .unwrap();
         next_id - 1
     }
 
@@ -443,7 +479,11 @@ impl PuzzleCrowdfund {
             .set(&DataKey::Campaign(campaign.id), campaign);
     }
 
-    fn build_milestones(env: &Env, inputs: &Vec<MilestoneInput>, max_target: i128) -> Vec<Milestone> {
+    fn build_milestones(
+        env: &Env,
+        inputs: &Vec<MilestoneInput>,
+        max_target: i128,
+    ) -> Vec<Milestone> {
         let mut milestones = Vec::new(env);
         let mut total = 0i128;
 
@@ -470,7 +510,11 @@ impl PuzzleCrowdfund {
         milestones
     }
 
-    fn build_stretch_goals(env: &Env, inputs: &Vec<StretchGoalInput>, goal_amount: i128) -> Vec<StretchGoal> {
+    fn build_stretch_goals(
+        env: &Env,
+        inputs: &Vec<StretchGoalInput>,
+        goal_amount: i128,
+    ) -> Vec<StretchGoal> {
         let mut stretch_goals = Vec::new(env);
         let mut previous_target = goal_amount;
 
@@ -493,7 +537,10 @@ impl PuzzleCrowdfund {
         stretch_goals
     }
 
-    fn max_target_from_inputs(goal_amount: i128, stretch_goal_inputs: &Vec<StretchGoalInput>) -> i128 {
+    fn max_target_from_inputs(
+        goal_amount: i128,
+        stretch_goal_inputs: &Vec<StretchGoalInput>,
+    ) -> i128 {
         let mut max_target = goal_amount;
         for index in 0..stretch_goal_inputs.len() {
             let input = stretch_goal_inputs.get(index).unwrap();
@@ -582,4 +629,3 @@ impl PuzzleCrowdfund {
         campaign.status = CampaignStatus::Active;
     }
 }
-

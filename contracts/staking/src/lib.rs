@@ -25,11 +25,11 @@ pub enum StakingTier {
 
 #[contracttype]
 pub enum DataKey {
-    Config,                    // StakingConfig
-    StakerInfo(Address),       // StakerInfo
-    StakersList,               // Vec<Address>
-    TotalStaked,               // i128
-    RewardPool,                // i128
+    Config,              // StakingConfig
+    StakerInfo(Address), // StakerInfo
+    StakersList,         // Vec<Address>
+    TotalStaked,         // i128
+    RewardPool,          // i128
 }
 
 //
@@ -116,20 +116,22 @@ impl StakingContract {
             staking_token,
             reward_token,
             base_apy,
-            bronze_bonus: 100,       // +1% APY for Bronze
-            silver_bonus: 250,       // +2.5% APY for Silver
-            gold_bonus: 500,         // +5% APY for Gold
-            bronze_threshold: 1_000_000_000,     // 1,000 tokens (assuming 6 decimals)
-            silver_threshold: 10_000_000_000,    // 10,000 tokens
-            gold_threshold: 100_000_000_000,     // 100,000 tokens
+            bronze_bonus: 100,                // +1% APY for Bronze
+            silver_bonus: 250,                // +2.5% APY for Silver
+            gold_bonus: 500,                  // +5% APY for Gold
+            bronze_threshold: 1_000_000_000,  // 1,000 tokens (assuming 6 decimals)
+            silver_threshold: 10_000_000_000, // 10,000 tokens
+            gold_threshold: 100_000_000_000,  // 100,000 tokens
             min_lock_period,
-            early_unstake_penalty: 1_000,  // 10% penalty
-            emergency_penalty: 2_000,      // 20% penalty
+            early_unstake_penalty: 1_000, // 10% penalty
+            emergency_penalty: 2_000,     // 20% penalty
             paused: false,
         };
 
         env.storage().persistent().set(&DataKey::Config, &config);
-        env.storage().persistent().set(&DataKey::TotalStaked, &0i128);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalStaked, &0i128);
         env.storage().persistent().set(&DataKey::RewardPool, &0i128);
     }
 
@@ -217,8 +219,14 @@ impl StakingContract {
 
         reward_client.transfer(&admin, &env.current_contract_address(), &amount);
 
-        let current_pool: i128 = env.storage().persistent().get(&DataKey::RewardPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::RewardPool, &(current_pool + amount));
+        let current_pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::RewardPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RewardPool, &(current_pool + amount));
     }
 
     // ───────────── STAKING FUNCTIONS ─────────────
@@ -239,8 +247,8 @@ impl StakingContract {
         staking_client.transfer(&staker, &env.current_contract_address(), &amount);
 
         // Get or create staker info
-        let mut staker_info = Self::get_staker_info(env.clone(), staker.clone())
-            .unwrap_or(StakerInfo {
+        let mut staker_info =
+            Self::get_staker_info(env.clone(), staker.clone()).unwrap_or(StakerInfo {
                 staked_amount: 0,
                 stake_timestamp: env.ledger().timestamp(),
                 last_reward_claim: env.ledger().timestamp(),
@@ -260,14 +268,22 @@ impl StakingContract {
         staker_info.last_reward_claim = env.ledger().timestamp();
         staker_info.tier = Self::calculate_tier(staker_info.staked_amount, &config);
 
-        env.storage().persistent().set(&DataKey::StakerInfo(staker.clone()), &staker_info);
+        env.storage()
+            .persistent()
+            .set(&DataKey::StakerInfo(staker.clone()), &staker_info);
 
         // Update stakers list
         Self::add_to_stakers_list(&env, staker);
 
         // Update total staked
-        let total_staked: i128 = env.storage().persistent().get(&DataKey::TotalStaked).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalStaked, &(total_staked + amount));
+        let total_staked: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalStaked)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalStaked, &(total_staked + amount));
     }
 
     /// Unstake tokens (with early unstake penalty if applicable)
@@ -280,7 +296,9 @@ impl StakingContract {
         }
 
         let config: StakingConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let mut staker_info: StakerInfo = env.storage().persistent()
+        let mut staker_info: StakerInfo = env
+            .storage()
+            .persistent()
             .get(&DataKey::StakerInfo(staker.clone()))
             .expect("Not staked");
 
@@ -307,15 +325,23 @@ impl StakingContract {
         staker_info.last_reward_claim = env.ledger().timestamp();
         staker_info.tier = Self::calculate_tier(staker_info.staked_amount, &config);
 
-        env.storage().persistent().set(&DataKey::StakerInfo(staker.clone()), &staker_info);
+        env.storage()
+            .persistent()
+            .set(&DataKey::StakerInfo(staker.clone()), &staker_info);
 
         // Transfer tokens back to staker
         let staking_client = token::Client::new(&env, &config.staking_token);
         staking_client.transfer(&env.current_contract_address(), &staker, &amount_to_return);
 
         // Update total staked
-        let total_staked: i128 = env.storage().persistent().get(&DataKey::TotalStaked).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalStaked, &(total_staked - amount));
+        let total_staked: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalStaked)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalStaked, &(total_staked - amount));
 
         // Remove from stakers list if fully unstaked
         if staker_info.staked_amount == 0 {
@@ -329,7 +355,9 @@ impl StakingContract {
         Self::assert_not_paused(&env);
 
         let config: StakingConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let mut staker_info: StakerInfo = env.storage().persistent()
+        let mut staker_info: StakerInfo = env
+            .storage()
+            .persistent()
             .get(&DataKey::StakerInfo(staker.clone()))
             .expect("Not staked");
 
@@ -342,7 +370,11 @@ impl StakingContract {
         }
 
         // Check reward pool has enough
-        let reward_pool: i128 = env.storage().persistent().get(&DataKey::RewardPool).unwrap_or(0);
+        let reward_pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::RewardPool)
+            .unwrap_or(0);
         if reward_pool < total_rewards {
             panic!("Insufficient reward pool");
         }
@@ -350,10 +382,14 @@ impl StakingContract {
         // Update staker info
         staker_info.accumulated_rewards = 0;
         staker_info.last_reward_claim = env.ledger().timestamp();
-        env.storage().persistent().set(&DataKey::StakerInfo(staker.clone()), &staker_info);
+        env.storage()
+            .persistent()
+            .set(&DataKey::StakerInfo(staker.clone()), &staker_info);
 
         // Update reward pool
-        env.storage().persistent().set(&DataKey::RewardPool, &(reward_pool - total_rewards));
+        env.storage()
+            .persistent()
+            .set(&DataKey::RewardPool, &(reward_pool - total_rewards));
 
         // Transfer rewards
         let reward_client = token::Client::new(&env, &config.reward_token);
@@ -367,7 +403,9 @@ impl StakingContract {
         staker.require_auth();
 
         let config: StakingConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let staker_info: StakerInfo = env.storage().persistent()
+        let staker_info: StakerInfo = env
+            .storage()
+            .persistent()
             .get(&DataKey::StakerInfo(staker.clone()))
             .expect("Not staked");
 
@@ -375,7 +413,8 @@ impl StakingContract {
             panic!("Nothing to withdraw");
         }
 
-        let penalty_amount = (staker_info.staked_amount * config.emergency_penalty as i128) / BASIS_POINTS as i128;
+        let penalty_amount =
+            (staker_info.staked_amount * config.emergency_penalty as i128) / BASIS_POINTS as i128;
         let amount_to_return = staker_info.staked_amount - penalty_amount;
 
         // Clear staker info
@@ -386,15 +425,24 @@ impl StakingContract {
             accumulated_rewards: 0,
             tier: StakingTier::None,
         };
-        env.storage().persistent().set(&DataKey::StakerInfo(staker.clone()), &empty_info);
+        env.storage()
+            .persistent()
+            .set(&DataKey::StakerInfo(staker.clone()), &empty_info);
 
         // Transfer tokens back to staker
         let staking_client = token::Client::new(&env, &config.staking_token);
         staking_client.transfer(&env.current_contract_address(), &staker, &amount_to_return);
 
         // Update total staked
-        let total_staked: i128 = env.storage().persistent().get(&DataKey::TotalStaked).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalStaked, &(total_staked - staker_info.staked_amount));
+        let total_staked: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalStaked)
+            .unwrap_or(0);
+        env.storage().persistent().set(
+            &DataKey::TotalStaked,
+            &(total_staked - staker_info.staked_amount),
+        );
 
         // Remove from stakers list
         Self::remove_from_stakers_list(&env, staker);
@@ -423,12 +471,18 @@ impl StakingContract {
 
     /// Get total staked amount
     pub fn get_total_staked(env: Env) -> i128 {
-        env.storage().persistent().get(&DataKey::TotalStaked).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalStaked)
+            .unwrap_or(0)
     }
 
     /// Get reward pool balance
     pub fn get_reward_pool(env: Env) -> i128 {
-        env.storage().persistent().get(&DataKey::RewardPool).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::RewardPool)
+            .unwrap_or(0)
     }
 
     /// Get staking configuration
@@ -472,12 +526,19 @@ impl StakingContract {
 
     /// Get all stakers
     pub fn get_all_stakers(env: Env) -> Vec<Address> {
-        env.storage().persistent().get(&DataKey::StakersList).unwrap_or(Vec::new(&env))
+        env.storage()
+            .persistent()
+            .get(&DataKey::StakersList)
+            .unwrap_or(Vec::new(&env))
     }
 
     // ───────────── INTERNAL HELPERS ─────────────
 
-    fn calculate_pending_rewards(env: &Env, staker_info: &StakerInfo, config: &StakingConfig) -> i128 {
+    fn calculate_pending_rewards(
+        env: &Env,
+        staker_info: &StakerInfo,
+        config: &StakingConfig,
+    ) -> i128 {
         if staker_info.staked_amount <= 0 {
             return 0;
         }
@@ -523,18 +584,24 @@ impl StakingContract {
     }
 
     fn add_to_stakers_list(env: &Env, staker: Address) {
-        let mut stakers: Vec<Address> = env.storage().persistent()
+        let mut stakers: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&DataKey::StakersList)
             .unwrap_or(Vec::new(env));
 
         if !stakers.contains(&staker) {
             stakers.push_back(staker);
-            env.storage().persistent().set(&DataKey::StakersList, &stakers);
+            env.storage()
+                .persistent()
+                .set(&DataKey::StakersList, &stakers);
         }
     }
 
     fn remove_from_stakers_list(env: &Env, staker: Address) {
-        let stakers: Vec<Address> = env.storage().persistent()
+        let stakers: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&DataKey::StakersList)
             .unwrap_or(Vec::new(env));
 
@@ -545,7 +612,9 @@ impl StakingContract {
             }
         }
 
-        env.storage().persistent().set(&DataKey::StakersList, &new_stakers);
+        env.storage()
+            .persistent()
+            .set(&DataKey::StakersList, &new_stakers);
     }
 
     fn assert_admin(env: &Env, user: &Address) {

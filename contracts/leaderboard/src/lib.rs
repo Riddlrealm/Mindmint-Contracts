@@ -24,13 +24,13 @@ pub enum TimePeriod {
 
 #[contracttype]
 pub enum DataKey {
-    Config,                                    // LeaderboardConfig
-    PlayerScore(Address, TimePeriod, u64),     // PlayerScore - (player, period, period_id)
-    TopScores(TimePeriod, u64),                // Vec<PlayerScore> - sorted top scores for period
-    PlayerAllTimeScore(Address),               // i128 - cumulative all-time score
-    TotalPlayers,                              // u32
-    HighScore(TimePeriod),                     // i128 - record high score per period type
-    Verifier(Address),                         // bool - authorized score verifiers
+    Config,                                // LeaderboardConfig
+    PlayerScore(Address, TimePeriod, u64), // PlayerScore - (player, period, period_id)
+    TopScores(TimePeriod, u64),            // Vec<PlayerScore> - sorted top scores for period
+    PlayerAllTimeScore(Address),           // i128 - cumulative all-time score
+    TotalPlayers,                          // u32
+    HighScore(TimePeriod),                 // i128 - record high score per period type
+    Verifier(Address),                     // bool - authorized score verifiers
 }
 
 //
@@ -43,8 +43,8 @@ pub enum DataKey {
 #[derive(Clone, Debug)]
 pub struct LeaderboardConfig {
     pub admin: Address,
-    pub max_top_entries: u32,      // Maximum entries in top-N list (gas optimization)
-    pub daily_period_length: u64,  // Seconds (86400 for 24 hours)
+    pub max_top_entries: u32, // Maximum entries in top-N list (gas optimization)
+    pub daily_period_length: u64, // Seconds (86400 for 24 hours)
     pub weekly_period_length: u64, // Seconds (604800 for 7 days)
     pub paused: bool,
 }
@@ -65,8 +65,8 @@ pub struct PlayerScore {
 // ──────────────────────────────────────────────────────────
 //
 
-const DEFAULT_DAILY_PERIOD: u64 = 86_400;     // 24 hours
-const DEFAULT_WEEKLY_PERIOD: u64 = 604_800;   // 7 days
+const DEFAULT_DAILY_PERIOD: u64 = 86_400; // 24 hours
+const DEFAULT_WEEKLY_PERIOD: u64 = 604_800; // 7 days
 const DEFAULT_MAX_TOP_ENTRIES: u32 = 100;
 
 //
@@ -120,7 +120,9 @@ impl LeaderboardContract {
         };
 
         env.storage().persistent().set(&DataKey::Config, &config);
-        env.storage().persistent().set(&DataKey::TotalPlayers, &0u32);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalPlayers, &0u32);
     }
 
     // ───────────── ADMIN FUNCTIONS ─────────────
@@ -215,9 +217,33 @@ impl LeaderboardContract {
         let all_time_period_id = 0u64; // All-time uses 0 as period ID
 
         // Update scores for each time period
-        Self::update_period_score(&env, &config, &player, score, TimePeriod::Daily, daily_period_id, current_time);
-        Self::update_period_score(&env, &config, &player, score, TimePeriod::Weekly, weekly_period_id, current_time);
-        Self::update_period_score(&env, &config, &player, score, TimePeriod::AllTime, all_time_period_id, current_time);
+        Self::update_period_score(
+            &env,
+            &config,
+            &player,
+            score,
+            TimePeriod::Daily,
+            daily_period_id,
+            current_time,
+        );
+        Self::update_period_score(
+            &env,
+            &config,
+            &player,
+            score,
+            TimePeriod::Weekly,
+            weekly_period_id,
+            current_time,
+        );
+        Self::update_period_score(
+            &env,
+            &config,
+            &player,
+            score,
+            TimePeriod::AllTime,
+            all_time_period_id,
+            current_time,
+        );
 
         // Update cumulative all-time score
         let current_all_time: i128 = env
@@ -225,10 +251,10 @@ impl LeaderboardContract {
             .persistent()
             .get(&DataKey::PlayerAllTimeScore(player.clone()))
             .unwrap_or(0);
-        
+
         let is_new_player = current_all_time == 0;
         let new_all_time = current_all_time + score;
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::PlayerAllTimeScore(player.clone()), &new_all_time);
@@ -407,7 +433,11 @@ impl LeaderboardContract {
 
     // ───────────── INTERNAL HELPERS ─────────────
 
-    fn get_current_period_id(config: &LeaderboardConfig, period: TimePeriod, current_time: u64) -> u64 {
+    fn get_current_period_id(
+        config: &LeaderboardConfig,
+        period: TimePeriod,
+        current_time: u64,
+    ) -> u64 {
         match period {
             TimePeriod::Daily => current_time / config.daily_period_length,
             TimePeriod::Weekly => current_time / config.weekly_period_length,
@@ -489,7 +519,7 @@ impl LeaderboardContract {
         let mut new_list: Vec<PlayerScore> = Vec::new(env);
         let mut old_rank: u32 = 0;
         let mut index: u32 = 1;
-        
+
         for existing in top_scores.iter() {
             if existing.player != player_score.player {
                 new_list.push_back(existing);

@@ -1,9 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    Env, Address, Vec, Bytes,
-};
+use soroban_sdk::{Address, Bytes, Env, Vec, contract, contractimpl, contracttype};
 
 #[contracttype]
 #[derive(Clone, PartialEq)]
@@ -54,7 +51,11 @@ pub fn start_round(env: Env, ticket_price: i128, duration: u64) {
     let owner: Address = env.storage().instance().get(&DataKey::Owner).unwrap();
     owner.require_auth();
 
-    let mut round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
+    let mut round_id: u32 = env
+        .storage()
+        .instance()
+        .get(&DataKey::CurrentRound)
+        .unwrap();
     round_id += 1;
 
     let now = env.ledger().timestamp();
@@ -70,17 +71,30 @@ pub fn start_round(env: Env, ticket_price: i128, duration: u64) {
         claimed: false,
     };
 
-    env.storage().persistent().set(&DataKey::Round(round_id), &round);
-    env.storage().persistent().set(&DataKey::Players(round_id), &Vec::<Address>::new(&env));
-    env.storage().instance().set(&DataKey::CurrentRound, &round_id);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Round(round_id), &round);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Players(round_id), &Vec::<Address>::new(&env));
+    env.storage()
+        .instance()
+        .set(&DataKey::CurrentRound, &round_id);
 }
 
 pub fn buy_ticket(env: Env, user: Address) {
     user.require_auth();
 
-    let round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
-    let mut round: LotteryRound =
-        env.storage().persistent().get(&DataKey::Round(round_id)).unwrap();
+    let round_id: u32 = env
+        .storage()
+        .instance()
+        .get(&DataKey::CurrentRound)
+        .unwrap();
+    let mut round: LotteryRound = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Round(round_id))
+        .unwrap();
 
     if round.status != RoundStatus::Open {
         panic!("Round not open");
@@ -92,26 +106,42 @@ pub fn buy_ticket(env: Env, user: Address) {
     client.transfer(&user, &env.current_contract_address(), &round.ticket_price);
     round.prize_pool += round.ticket_price;
 
-    let mut players: Vec<Address> =
-        env.storage().persistent().get(&DataKey::Players(round_id)).unwrap();
+    let mut players: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Players(round_id))
+        .unwrap();
 
     players.push_back(user);
 
-    env.storage().persistent().set(&DataKey::Players(round_id), &players);
-    env.storage().persistent().set(&DataKey::Round(round_id), &round);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Players(round_id), &players);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Round(round_id), &round);
 }
 
 fn generate_random(env: &Env) -> u64 {
     let seed = env.ledger().sequence();
-    let hash = env.crypto().sha256(&Bytes::from_array(env, &seed.to_be_bytes()));
+    let hash = env
+        .crypto()
+        .sha256(&Bytes::from_array(env, &seed.to_be_bytes()));
     let bytes = hash.to_array();
     u64::from_be_bytes(bytes[..8].try_into().unwrap())
 }
 
 pub fn draw_winner(env: Env) {
-    let round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
-    let mut round: LotteryRound =
-        env.storage().persistent().get(&DataKey::Round(round_id)).unwrap();
+    let round_id: u32 = env
+        .storage()
+        .instance()
+        .get(&DataKey::CurrentRound)
+        .unwrap();
+    let mut round: LotteryRound = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Round(round_id))
+        .unwrap();
 
     if round.status != RoundStatus::Open {
         panic!("Winner already drawn");
@@ -121,8 +151,11 @@ pub fn draw_winner(env: Env) {
         panic!("Round still active");
     }
 
-    let players: Vec<Address> =
-        env.storage().persistent().get(&DataKey::Players(round_id)).unwrap();
+    let players: Vec<Address> = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Players(round_id))
+        .unwrap();
 
     if players.len() == 0 {
         panic!("No players");
@@ -134,14 +167,19 @@ pub fn draw_winner(env: Env) {
     round.winner = Some(players.get(index).unwrap());
     round.status = RoundStatus::Completed;
 
-    env.storage().persistent().set(&DataKey::Round(round_id), &round);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Round(round_id), &round);
 }
 
 pub fn claim_prize(env: Env, user: Address, round_id: u32) {
     user.require_auth();
 
-    let mut round: LotteryRound =
-        env.storage().persistent().get(&DataKey::Round(round_id)).unwrap();
+    let mut round: LotteryRound = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Round(round_id))
+        .unwrap();
 
     if round.status != RoundStatus::Completed {
         panic!("Round not completed");
@@ -164,19 +202,30 @@ pub fn claim_prize(env: Env, user: Address, round_id: u32) {
 
     client.transfer(&env.current_contract_address(), &user, &amount);
 
-    env.storage().persistent().set(&DataKey::Round(round_id), &round);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Round(round_id), &round);
 }
 
 pub fn cancel_round(env: Env) {
     let owner: Address = env.storage().instance().get(&DataKey::Owner).unwrap();
     owner.require_auth();
 
-    let round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
-    let mut round: LotteryRound =
-        env.storage().persistent().get(&DataKey::Round(round_id)).unwrap();
+    let round_id: u32 = env
+        .storage()
+        .instance()
+        .get(&DataKey::CurrentRound)
+        .unwrap();
+    let mut round: LotteryRound = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Round(round_id))
+        .unwrap();
 
     round.status = RoundStatus::Cancelled;
-    env.storage().persistent().set(&DataKey::Round(round_id), &round);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Round(round_id), &round);
 }
 
 pub fn refund(env: Env, round_id: u32, user: Address) {
@@ -191,13 +240,12 @@ pub fn refund(env: Env, round_id: u32, user: Address) {
     let token: Address = env.storage().instance().get(&DataKey::Token).unwrap();
     let client = soroban_sdk::token::Client::new(&env, &token);
 
-    client.transfer(
-        &env.current_contract_address(),
-        &user,
-        &round.ticket_price,
-    );
+    client.transfer(&env.current_contract_address(), &user, &round.ticket_price);
 }
 
 pub fn get_round(env: Env, round_id: u32) -> LotteryRound {
-    env.storage().persistent().get(&DataKey::Round(round_id)).unwrap()
+    env.storage()
+        .persistent()
+        .get(&DataKey::Round(round_id))
+        .unwrap()
 }

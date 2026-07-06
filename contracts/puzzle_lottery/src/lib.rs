@@ -1,9 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token,
-    Address, Bytes, Env, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Bytes, Env, Vec};
 
 #[cfg(test)]
 mod test;
@@ -118,7 +115,11 @@ impl PuzzleLotteryContract {
 
         let now = env.ledger().timestamp();
         let duration = schedule_duration_sec(schedule_type);
-        let mut round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
+        let mut round_id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CurrentRound)
+            .unwrap();
         round_id += 1;
 
         let round = LotteryRound {
@@ -139,10 +140,13 @@ impl PuzzleLotteryContract {
         env.storage()
             .persistent()
             .set(&DataKey::Round(round_id), &round);
+        env.storage().persistent().set(
+            &DataKey::Players(round_id),
+            &Vec::<PlayerTickets>::new(&env),
+        );
         env.storage()
-            .persistent()
-            .set(&DataKey::Players(round_id), &Vec::<PlayerTickets>::new(&env));
-        env.storage().instance().set(&DataKey::CurrentRound, &round_id);
+            .instance()
+            .set(&DataKey::CurrentRound, &round_id);
         round_id
     }
 
@@ -180,7 +184,11 @@ impl PuzzleLotteryContract {
 
         let now = env.ledger().timestamp();
         let duration = schedule_duration_sec(schedule_type);
-        let mut round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
+        let mut round_id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CurrentRound)
+            .unwrap();
         round_id += 1;
 
         let round = LotteryRound {
@@ -201,10 +209,13 @@ impl PuzzleLotteryContract {
         env.storage()
             .persistent()
             .set(&DataKey::Round(round_id), &round);
+        env.storage().persistent().set(
+            &DataKey::Players(round_id),
+            &Vec::<PlayerTickets>::new(&env),
+        );
         env.storage()
-            .persistent()
-            .set(&DataKey::Players(round_id), &Vec::<PlayerTickets>::new(&env));
-        env.storage().instance().set(&DataKey::CurrentRound, &round_id);
+            .instance()
+            .set(&DataKey::CurrentRound, &round_id);
         round_id
     }
 
@@ -214,7 +225,11 @@ impl PuzzleLotteryContract {
             panic!("Count must be positive");
         }
 
-        let round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
+        let round_id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CurrentRound)
+            .unwrap();
         let mut round: LotteryRound = env
             .storage()
             .persistent()
@@ -285,7 +300,11 @@ impl PuzzleLotteryContract {
     }
 
     pub fn draw_winner(env: Env) {
-        let round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
+        let round_id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CurrentRound)
+            .unwrap();
         let mut round: LotteryRound = env
             .storage()
             .persistent()
@@ -435,7 +454,11 @@ impl PuzzleLotteryContract {
             panic!("Unauthorized");
         }
 
-        let round_id: u32 = env.storage().instance().get(&DataKey::CurrentRound).unwrap();
+        let round_id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::CurrentRound)
+            .unwrap();
         let mut round: LotteryRound = env
             .storage()
             .persistent()
@@ -487,7 +510,10 @@ impl PuzzleLotteryContract {
     }
 
     pub fn get_current_round_id(env: Env) -> u32 {
-        env.storage().instance().get(&DataKey::CurrentRound).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::CurrentRound)
+            .unwrap()
     }
 
     pub fn get_players(env: Env, round_id: u32) -> Vec<PlayerTickets> {

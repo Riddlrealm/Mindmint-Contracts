@@ -55,7 +55,7 @@ fn test_bounty_lifecycle() {
     client.approve_submission(&creator, &bounty_id);
     let bounty = client.get_bounty(&bounty_id).unwrap();
     assert_eq!(bounty.status, BountyStatus::Completed);
-    
+
     // Check payouts
     assert_eq!(token_client.balance(&solver), 500);
     assert_eq!(token_client.balance(&client.address), 0);
@@ -72,7 +72,7 @@ fn test_cancel_bounty() {
     token_asset_client.mint(&creator, &1000);
 
     let bounty_id = client.create_bounty(&creator, &token_client.address, &500, &None, &3600);
-    
+
     // Cancel while open
     client.cancel_bounty(&creator, &bounty_id);
     let bounty = client.get_bounty(&bounty_id).unwrap();
@@ -119,7 +119,7 @@ fn test_dispute_resolution() {
 
     // Resolve: 300 to solver, 200 to creator
     client.resolve_dispute(&admin, &bounty_id, &300);
-    
+
     assert_eq!(token_client.balance(&solver), 300);
     assert_eq!(token_client.balance(&creator), 500 + 200); // initial 500 left + 200 refund
 }

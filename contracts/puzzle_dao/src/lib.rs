@@ -1,12 +1,12 @@
-#![no_std]
+#![no_std]#![allow(clippy::empty_line_after_outer_attr)] 
 
 mod storage;
 pub mod types;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec, Symbol, Val, Map};
-use soroban_sdk::token::Client as TokenClient;
 use crate::storage::*;
 use crate::types::*;
+use soroban_sdk::token::Client as TokenClient;
+use soroban_sdk::{contract, contractimpl, Address, Env, Map, String, Symbol, Val, Vec};
 
 #[contract]
 pub struct PuzzleDaoContract;
@@ -14,6 +14,7 @@ pub struct PuzzleDaoContract;
 #[contractimpl]
 impl PuzzleDaoContract {
     /// Initialize the Puzzle DAO contract
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         env: Env,
         token_address: Address,
@@ -28,7 +29,7 @@ impl PuzzleDaoContract {
         if env.storage().instance().has(&DataKey::Config) {
             panic!("Already initialized");
         }
-        
+
         if quorum_percentage > 100 || emergency_quorum_percentage > 100 {
             panic!("Invalid quorum percentage");
         }
@@ -57,7 +58,7 @@ impl PuzzleDaoContract {
     /// Join the DAO as a member
     pub fn join_dao(env: Env, member: Address, stake_amount: i128) {
         member.require_auth();
-        
+
         if get_member(&env, &member).is_some() {
             panic!("Already a member");
         }
@@ -68,7 +69,7 @@ impl PuzzleDaoContract {
 
         let config = get_config(&env);
         let token = TokenClient::new(&env, &config.token_address);
-        
+
         // Transfer stake tokens to this contract
         token.transfer(&member, &env.current_contract_address(), &stake_amount);
 
@@ -94,7 +95,7 @@ impl PuzzleDaoContract {
 
         set_member(&env, &new_member);
         increment_member_count(&env);
-        
+
         // Set token balance and voting power
         set_token_balance(&env, &member, stake_amount);
         set_voting_power(&env, &member, stake_amount);
@@ -103,23 +104,23 @@ impl PuzzleDaoContract {
     /// Upgrade membership tier by staking additional tokens
     pub fn upgrade_membership(env: Env, member: Address, additional_stake: i128) {
         member.require_auth();
-        
+
         if additional_stake <= 0 {
             panic!("Invalid stake amount");
         }
 
         let mut member_info = get_member(&env, &member).expect("Not a member");
         let current_balance = get_token_balance(&env, &member);
-        
+
         let config = get_config(&env);
         let token = TokenClient::new(&env, &config.token_address);
-        
+
         // Transfer additional tokens
         token.transfer(&member, &env.current_contract_address(), &additional_stake);
-        
+
         let new_balance = current_balance + additional_stake;
         set_token_balance(&env, &member, new_balance);
-        
+
         // Determine new tier
         let thresholds = get_membership_thresholds(&env);
         let new_tier = if new_balance >= thresholds.get(MembershipTier::Council).unwrap() {
@@ -131,10 +132,10 @@ impl PuzzleDaoContract {
         } else {
             MembershipTier::Basic
         };
-        
+
         member_info.tier = new_tier;
         set_member(&env, &member_info);
-        
+
         // Update voting power
         set_voting_power(&env, &member, new_balance);
     }
@@ -142,27 +143,35 @@ impl PuzzleDaoContract {
     /// Leave the DAO and unstake tokens
     pub fn leave_dao(env: Env, member: Address) {
         member.require_auth();
-        
+
         let _member_info = get_member(&env, &member).expect("Not a member");
         let balance = get_token_balance(&env, &member);
-        
+
         // Remove voting power
         let delegatee = get_delegate(&env, &member).unwrap_or(member.clone());
         let current_power = get_voting_power(&env, &delegatee);
         set_voting_power(&env, &delegatee, current_power - balance);
-        
+
         // Clear delegation
-        env.storage().persistent().remove(&DataKey::Delegation(member.clone()));
-        
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Delegation(member.clone()));
+
         // Transfer tokens back
         let config = get_config(&env);
         let token = TokenClient::new(&env, &config.token_address);
         token.transfer(&env.current_contract_address(), &member, &balance);
-        
+
         // Clear member data
-        env.storage().persistent().remove(&DataKey::TokenBalance(member.clone()));
-        env.storage().persistent().remove(&DataKey::VotingPower(member.clone()));
-        env.storage().persistent().remove(&DataKey::Member(member.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::TokenBalance(member.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::VotingPower(member.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Member(member.clone()));
     }
 
     /// Delegate voting power to another address
@@ -175,7 +184,7 @@ impl PuzzleDaoContract {
         }
 
         let balance = get_token_balance(&env, &delegator);
-        
+
         if balance > 0 {
             // Remove power from old delegate
             let old_power = get_voting_power(&env, &current_delegate);
@@ -323,17 +332,17 @@ impl PuzzleDaoContract {
         if current_time <= proposal.end_time {
             panic!("Voting period not ended");
         }
-        
+
         if proposal.status == ProposalStatus::Executed {
             panic!("Already executed");
         }
-        
+
         if proposal.status == ProposalStatus::Canceled {
             panic!("Proposal canceled");
         }
 
         let total_votes = proposal.for_votes + proposal.against_votes + proposal.abstain_votes;
-        
+
         // Check Quorum
         if total_votes < proposal.quorum {
             proposal.status = ProposalStatus::Defeated;
@@ -383,23 +392,23 @@ impl PuzzleDaoContract {
     }
 
     /// Treasury management functions
-    
+
     /// Allocate funds from treasury
     pub fn allocate_treasury_funds(env: Env, amount: i128, recipient: Address) {
         let config = get_config(&env);
         let mut treasury_info = get_treasury_info(&env);
-        
+
         if amount <= 0 {
             panic!("Invalid amount");
         }
-        
+
         if treasury_info.allocated_funds + amount > treasury_info.total_balance {
             panic!("Insufficient treasury funds");
         }
-        
+
         let token = TokenClient::new(&env, &config.token_address);
         token.transfer(&config.treasury_address, &recipient, &amount);
-        
+
         treasury_info.allocated_funds += amount;
         set_treasury_info(&env, &treasury_info);
     }
@@ -409,7 +418,7 @@ impl PuzzleDaoContract {
         // This should only be callable through a successful governance proposal
         set_membership_thresholds(&env, &thresholds);
     }
-    
+
     // Read-only helpers
     pub fn get_proposal_info(env: Env, proposal_id: u64) -> Proposal {
         get_proposal(&env, proposal_id).expect("Proposal not found")
@@ -418,7 +427,7 @@ impl PuzzleDaoContract {
     pub fn get_user_voting_power(env: Env, user: Address) -> i128 {
         get_voting_power(&env, &user)
     }
-    
+
     pub fn get_user_deposited_balance(env: Env, user: Address) -> i128 {
         get_token_balance(&env, &user)
     }

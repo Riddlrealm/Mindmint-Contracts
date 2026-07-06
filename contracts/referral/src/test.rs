@@ -2,9 +2,9 @@
 
 use super::*;
 use soroban_sdk::{
+    Address, Env, String,
     testutils::{Address as _, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
-    Address, Env, String,
 };
 
 fn create_token_contract<'a>(e: &'a Env, admin: &Address) -> (Address, TokenClient<'a>) {
@@ -19,21 +19,21 @@ fn create_referral_contract(e: &Env) -> Address {
 
 fn setup_contract(e: &Env) -> (Address, Address, Address, TokenClient) {
     e.mock_all_auths();
-    
+
     let admin = Address::generate(e);
     let token_admin = Address::generate(e);
     let (token_address, token_client) = create_token_contract(e, &token_admin);
     let referral_contract = create_referral_contract(e);
-    
+
     let token_admin_client = StellarAssetClient::new(e, &token_address);
 
     let client = ReferralContractClient::new(e, &referral_contract);
     client.initialize(
         &admin,
         &token_address,
-        &1000,  // referrer reward
-        &500,   // referee reward
-        &10,    // max referrals per user
+        &1000, // referrer reward
+        &500,  // referee reward
+        &10,   // max referrals per user
     );
 
     // Mint tokens to referral contract for rewards
@@ -46,20 +46,14 @@ fn setup_contract(e: &Env) -> (Address, Address, Address, TokenClient) {
 fn test_initialize() {
     let e = Env::default();
     e.mock_all_auths();
-    
+
     let admin = Address::generate(&e);
     let token_admin = Address::generate(&e);
     let (token_address, _) = create_token_contract(&e, &token_admin);
     let referral_contract = create_referral_contract(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    client.initialize(
-        &admin,
-        &token_address,
-        &1000,
-        &500,
-        &10,
-    );
+    client.initialize(&admin, &token_address, &1000, &500, &10);
 
     let config = client.get_config();
     assert_eq!(config.referrer_reward, 1000);
@@ -76,7 +70,7 @@ fn test_initialize() {
 fn test_initialize_twice_should_fail() {
     let e = Env::default();
     e.mock_all_auths();
-    
+
     let admin = Address::generate(&e);
     let token_admin = Address::generate(&e);
     let (token_address, _) = create_token_contract(&e, &token_admin);
@@ -97,7 +91,7 @@ fn test_generate_referral_code() {
     let code = client.generate_referral_code(&user);
 
     assert!(!code.is_empty());
-    
+
     // Verify code can be retrieved
     let retrieved_code = client.get_referral_code(&user);
     assert_eq!(retrieved_code, Some(code.clone()));
@@ -126,7 +120,7 @@ fn test_generate_referral_code_twice_should_fail() {
 fn test_register_with_referral_code() {
     let e = Env::default();
     let (referral_contract, token_address, _, token_client) = setup_contract(&e);
-    
+
     let referrer = Address::generate(&e);
     let referee = Address::generate(&e);
 
@@ -170,7 +164,7 @@ fn test_register_with_invalid_code_should_fail() {
 
     let client = ReferralContractClient::new(&e, &referral_contract);
     let invalid_code = String::from_str(&e, "INVALID");
-    
+
     client.register_with_referral_code(&referee, &invalid_code);
 }
 
@@ -183,7 +177,7 @@ fn test_self_referral_should_fail() {
 
     let client = ReferralContractClient::new(&e, &referral_contract);
     let code = client.generate_referral_code(&user);
-    
+
     // Try to refer yourself
     client.register_with_referral_code(&user, &code);
 }
@@ -193,7 +187,7 @@ fn test_self_referral_should_fail() {
 fn test_duplicate_registration_should_fail() {
     let e = Env::default();
     let (referral_contract, _, _, _) = setup_contract(&e);
-    
+
     let referrer1 = Address::generate(&e);
     let referrer2 = Address::generate(&e);
     let referee = Address::generate(&e);
@@ -214,7 +208,7 @@ fn test_duplicate_registration_should_fail() {
 fn test_referral_limit() {
     let e = Env::default();
     let (referral_contract, _, _, _) = setup_contract(&e);
-    
+
     let referrer = Address::generate(&e);
     let client = ReferralContractClient::new(&e, &referral_contract);
     let code = client.generate_referral_code(&referrer);
@@ -235,7 +229,7 @@ fn test_referral_limit() {
 fn test_multiple_referrals() {
     let e = Env::default();
     let (referral_contract, _, _, _) = setup_contract(&e);
-    
+
     let referrer = Address::generate(&e);
     let client = ReferralContractClient::new(&e, &referral_contract);
     let code = client.generate_referral_code(&referrer);
@@ -249,7 +243,7 @@ fn test_multiple_referrals() {
     client.register_with_referral_code(&referee3, &code);
 
     assert_eq!(client.get_referral_count(&referrer), 3);
-    
+
     let referrals = client.get_referrals(&referrer);
     assert_eq!(referrals.len(), 3);
 }
@@ -258,11 +252,11 @@ fn test_multiple_referrals() {
 fn test_statistics_tracking() {
     let e = Env::default();
     let (referral_contract, _, _, _) = setup_contract(&e);
-    
+
     let referrer1 = Address::generate(&e);
     let referrer2 = Address::generate(&e);
     let client = ReferralContractClient::new(&e, &referral_contract);
-    
+
     let code1 = client.generate_referral_code(&referrer1);
     let code2 = client.generate_referral_code(&referrer2);
 
@@ -300,13 +294,13 @@ fn test_update_config() {
     let (referral_contract, _, admin, _) = setup_contract(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    
+
     // Update config
     client.update_config(
         &admin,
-        &Some(2000),  // new referrer reward
-        &Some(1000),  // new referee reward
-        &Some(20),    // new max referrals
+        &Some(2000), // new referrer reward
+        &Some(1000), // new referee reward
+        &Some(20),   // new max referrals
     );
 
     let config = client.get_config();
@@ -332,7 +326,7 @@ fn test_unique_referral_codes() {
     let (referral_contract, _, _, _) = setup_contract(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    
+
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
@@ -358,7 +352,7 @@ fn test_referral_chain() {
     let (referral_contract, _, _, _) = setup_contract(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    
+
     // Create a referral chain: A refers B, B refers C
     let user_a = Address::generate(&e);
     let user_b = Address::generate(&e);

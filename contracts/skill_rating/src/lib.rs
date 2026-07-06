@@ -46,21 +46,21 @@ pub struct HistoryEntry {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     pub admin: Address,
-    pub base_rating: i32,            // e.g. 1000
-    pub k_factor: i32,               // e.g. 32
-    pub decay_period_s: u64,         // e.g. 7d
-    pub decay_rate_ppm: u32,         // parts-per-million per period (e.g. 5000 = 0.5%)
-    pub season_length_s: u64,        // e.g. 90d
-    pub season_reset_drop: i32,      // reduce rating by fixed amount at season reset, floor at base
-    pub history_limit: u32,          // store up to N entries per player
-    pub difficulty_scale_ppm: u32,   // scales K by difficulty in ppm (1000000 = 1x per difficulty unit)
+    pub base_rating: i32,          // e.g. 1000
+    pub k_factor: i32,             // e.g. 32
+    pub decay_period_s: u64,       // e.g. 7d
+    pub decay_rate_ppm: u32,       // parts-per-million per period (e.g. 5000 = 0.5%)
+    pub season_length_s: u64,      // e.g. 90d
+    pub season_reset_drop: i32,    // reduce rating by fixed amount at season reset, floor at base
+    pub history_limit: u32,        // store up to N entries per player
+    pub difficulty_scale_ppm: u32, // scales K by difficulty in ppm (1000000 = 1x per difficulty unit)
 }
 
 #[contracttype]
 pub enum DataKey {
     Config,
-    Player(Address),          // PlayerRating
-    History(Address),         // Vec<HistoryEntry>
+    Player(Address),  // PlayerRating
+    History(Address), // Vec<HistoryEntry>
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -163,8 +163,7 @@ impl SkillRating {
         // ELO delta = K * diff_scale * (res - exp)
         let k = cfg.k_factor as i64;
         // difficulty factor: 1 + difficulty * difficulty_scale_ppm/1e6
-        let diff_scale_ppm = 1_000_000i64
-            + (difficulty as i64) * (cfg.difficulty_scale_ppm as i64);
+        let diff_scale_ppm = 1_000_000i64 + (difficulty as i64) * (cfg.difficulty_scale_ppm as i64);
         let res_minus_exp_perm = (result_permill as i64) - (expected_permill as i64); // -1000..1000
         let delta_i64 = k * diff_scale_ppm * res_minus_exp_perm / 1_000_000 / 1000;
         let delta = delta_i64 as i32;
@@ -249,7 +248,10 @@ impl SkillRating {
 
     pub fn get_current_season_id(env: Env) -> Result<u64, Error> {
         let cfg = Self::cfg(&env)?;
-        Ok(Self::season_id_for(env.ledger().timestamp(), cfg.season_length_s))
+        Ok(Self::season_id_for(
+            env.ledger().timestamp(),
+            cfg.season_length_s,
+        ))
     }
 
     // ────────────────────────────────
@@ -266,7 +268,10 @@ impl SkillRating {
     fn get_or_init_rating(env: &Env, player: &Address) -> Result<PlayerRating, Error> {
         let cfg = Self::cfg(env)?;
         let season_id = Self::season_id_for(env.ledger().timestamp(), cfg.season_length_s);
-        let pr: Option<PlayerRating> = env.storage().persistent().get(&DataKey::Player(player.clone()));
+        let pr: Option<PlayerRating> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Player(player.clone()));
         Ok(pr.unwrap_or(PlayerRating {
             rating: cfg.base_rating,
             last_update_ts: env.ledger().timestamp(),
@@ -275,11 +280,7 @@ impl SkillRating {
     }
 
     fn season_id_for(now: u64, season_len: u64) -> u64 {
-        if season_len == 0 {
-            0
-        } else {
-            now / season_len
-        }
+        now.checked_div(season_len).unwrap_or(0)
     }
 
     fn maybe_apply_season_reset(env: &Env, cfg: &Config, player: &Address, pr: &mut PlayerRating) {
@@ -294,7 +295,8 @@ impl SkillRating {
             pr.season_id = current_season;
             pr.last_update_ts = env.ledger().timestamp();
 
-            env.events().publish((EVT_SEASON, player.clone()), (current_season, new_rating));
+            env.events()
+                .publish((EVT_SEASON, player.clone()), (current_season, new_rating));
         }
     }
 
@@ -350,8 +352,8 @@ impl SkillRating {
         };
 
         let bands = 5i32;
-        let span = (ceil - floor) as i32;
-        let pos = (rating - floor as i32).clamp(0, span);
+        let span = ceil - floor;
+        let pos = (rating - floor).clamp(0, span);
         let mut division = bands - (pos * bands / span.max(1)); // 5..1 (higher rating -> lower division number)
         if division < 1 {
             division = 1;
@@ -367,7 +369,10 @@ impl SkillRating {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env};
+    use soroban_sdk::{
+        testutils::{Address as _, Ledger},
+        Address, Env,
+    };
 
     fn setup(env: &Env) -> (SkillRatingClient<'_>, Address) {
         env.mock_all_auths();
@@ -489,7 +494,12 @@ mod test {
         let player = Address::generate(&env);
         env.ledger().set_timestamp(0);
         for i in 0..5 {
-            let _ = client.adjust_after_puzzle(&player, &1u32, &if i%2==0 {1000} else {0}, &500);
+            let _ = client.adjust_after_puzzle(
+                &player,
+                &1u32,
+                &if i % 2 == 0 { 1000 } else { 0 },
+                &500,
+            );
             env.ledger().with_mut(|li| li.timestamp += 1);
         }
         let hist = client.get_history(&player);

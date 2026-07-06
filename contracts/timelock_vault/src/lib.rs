@@ -1,8 +1,7 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env};
 use soroban_sdk::token::TokenClient;
-
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env};
 
 #[contracttype]
 pub enum DataKey {
@@ -97,13 +96,21 @@ impl TimeLockVault {
         token_client.transfer(&env.current_contract_address(), &beneficiary, &amount);
 
         env.events().publish(
-            (symbol_short!("withdraw"), beneficiary.clone(), token.clone()),
+            (
+                symbol_short!("withdraw"),
+                beneficiary.clone(),
+                token.clone(),
+            ),
             amount,
         );
     }
 
     pub fn set_condition(env: Env, beneficiary: Address, token: Address, met: bool) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("not initialized");
         admin.require_auth();
 
         let vault_key = DataKey::Vault(beneficiary.clone(), token.clone());
@@ -117,13 +124,21 @@ impl TimeLockVault {
         env.storage().persistent().set(&vault_key, &status);
 
         env.events().publish(
-            (symbol_short!("condition"), beneficiary.clone(), token.clone()),
+            (
+                symbol_short!("condition"),
+                beneficiary.clone(),
+                token.clone(),
+            ),
             met,
         );
     }
 
     pub fn emergency_unlock(env: Env, beneficiary: Address, token: Address) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("not initialized");
         admin.require_auth();
 
         let vault_key = DataKey::Vault(beneficiary.clone(), token.clone());
@@ -137,13 +152,20 @@ impl TimeLockVault {
         env.storage().persistent().set(&vault_key, &status);
 
         env.events().publish(
-            (symbol_short!("emergency"), beneficiary.clone(), token.clone()),
+            (
+                symbol_short!("emergency"),
+                beneficiary.clone(),
+                token.clone(),
+            ),
             true,
         );
     }
 
     pub fn query_status(env: Env, beneficiary: Address, token: Address) -> VaultStatus {
         let vault_key = DataKey::Vault(beneficiary, token);
-        env.storage().persistent().get(&vault_key).expect("vault not found")
+        env.storage()
+            .persistent()
+            .get(&vault_key)
+            .expect("vault not found")
     }
 }

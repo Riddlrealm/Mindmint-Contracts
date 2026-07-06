@@ -2,13 +2,14 @@
 
 use super::*;
 use soroban_sdk::{
-    testutils::Address as _,
-    token::Client as TokenClient,
-    token::StellarAssetClient,
-    Address, Env, Vec,
+    testutils::Address as _, token::Client as TokenClient, token::StellarAssetClient, Address, Env,
+    Vec,
 };
 
-fn create_token<'a>(env: &Env, admin: &Address) -> (Address, TokenClient<'a>, StellarAssetClient<'a>) {
+fn create_token<'a>(
+    env: &Env,
+    admin: &Address,
+) -> (Address, TokenClient<'a>, StellarAssetClient<'a>) {
     let sac = env.register_stellar_asset_contract_v2(admin.clone());
     let addr = sac.address();
     (
@@ -273,11 +274,11 @@ fn test_distribute_five_tiers_precise() {
     s.client.submit_standings(&id, &players);
     s.client.distribute(&id);
 
-    assert_eq!(s.token_client.balance(&players.get(0).unwrap()), 8000);  // 40%
-    assert_eq!(s.token_client.balance(&players.get(1).unwrap()), 5000);  // 25%
-    assert_eq!(s.token_client.balance(&players.get(2).unwrap()), 3000);  // 15%
-    assert_eq!(s.token_client.balance(&players.get(3).unwrap()), 2400);  // 12%
-    assert_eq!(s.token_client.balance(&players.get(4).unwrap()), 1600);  // 8%
+    assert_eq!(s.token_client.balance(&players.get(0).unwrap()), 8000); // 40%
+    assert_eq!(s.token_client.balance(&players.get(1).unwrap()), 5000); // 25%
+    assert_eq!(s.token_client.balance(&players.get(2).unwrap()), 3000); // 15%
+    assert_eq!(s.token_client.balance(&players.get(3).unwrap()), 2400); // 12%
+    assert_eq!(s.token_client.balance(&players.get(4).unwrap()), 1600); // 8%
 }
 
 #[test]
@@ -422,9 +423,9 @@ fn test_full_lifecycle() {
     s.client.distribute(&id);
 
     // 4. Verify payouts
-    assert_eq!(s.token_client.balance(&first), 30_000);   // 60%
-    assert_eq!(s.token_client.balance(&second), 15_000);   // 30%
-    assert_eq!(s.token_client.balance(&third), 5_000);     // 10%
+    assert_eq!(s.token_client.balance(&first), 30_000); // 60%
+    assert_eq!(s.token_client.balance(&second), 15_000); // 30%
+    assert_eq!(s.token_client.balance(&third), 5_000); // 10%
     assert_eq!(s.token_client.balance(&s.contract_addr), 0);
 
     // 5. Pool is marked as distributed
@@ -459,6 +460,9 @@ fn test_multiple_tournaments() {
     assert_eq!(s.token_client.balance(&s.organiser), 90_000); // 100k - 10k(A) - 20k(B) + 20k(refund)
 
     // Verify independent statuses
-    assert_eq!(s.client.get_pool(&id_a).status, TournamentStatus::Distributed);
+    assert_eq!(
+        s.client.get_pool(&id_a).status,
+        TournamentStatus::Distributed
+    );
     assert_eq!(s.client.get_pool(&id_b).status, TournamentStatus::Cancelled);
 }

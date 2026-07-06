@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, token, Address, Env, Vec, Symbol};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, token, Address, Env, Symbol, Vec,
+};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -55,7 +57,12 @@ impl PaymentSplitter {
     }
 
     /// Create a new payment split configuration
-    pub fn create_split(env: Env, admin: Address, token: Address, recipients: Vec<Recipient>) -> u64 {
+    pub fn create_split(
+        env: Env,
+        admin: Address,
+        token: Address,
+        recipients: Vec<Recipient>,
+    ) -> u64 {
         admin.require_auth();
         Self::require_admin(&env);
 
@@ -70,7 +77,11 @@ impl PaymentSplitter {
         }
 
         // Get next split ID
-        let split_id = env.storage().instance().get::<_, u64>(&DataKey::SplitId).unwrap();
+        let split_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::SplitId)
+            .unwrap();
         let next_split_id = split_id + 1;
 
         // Create split config
@@ -82,8 +93,12 @@ impl PaymentSplitter {
             locked: false,
         };
 
-        env.storage().persistent().set(&DataKey::SplitConfig(split_id), &config);
-        env.storage().instance().set(&DataKey::SplitId, &next_split_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SplitConfig(split_id), &config);
+        env.storage()
+            .instance()
+            .set(&DataKey::SplitId, &next_split_id);
 
         split_id
     }
@@ -92,7 +107,10 @@ impl PaymentSplitter {
     pub fn deposit(env: Env, split_id: u64, from: Address, amount: i128) {
         from.require_auth();
 
-        let mut config = env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        let mut config = env
+            .storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found");
 
         if amount <= 0 {
@@ -105,17 +123,20 @@ impl PaymentSplitter {
 
         // Lock config after first deposit
         config.locked = true;
-        env.storage().persistent().set(&DataKey::SplitConfig(split_id), &config);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SplitConfig(split_id), &config);
 
-        env.events().publish(
-            (Symbol::short("deposit"), split_id),
-            amount,
-        );
+        env.events()
+            .publish((Symbol::short("deposit"), split_id), amount);
     }
 
     /// Release tokens for all recipients in a split
     pub fn release(env: Env, split_id: u64) {
-        let config = env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        let config = env
+            .storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found");
 
         // Calculate total shares
@@ -140,22 +161,34 @@ impl PaymentSplitter {
                 token_client.transfer(&env.current_contract_address(), &recipient.address, &share);
 
                 env.events().publish(
-                    (Symbol::short("release"), split_id, recipient.address.clone()),
+                    (
+                        Symbol::short("release"),
+                        split_id,
+                        recipient.address.clone(),
+                    ),
                     share,
                 );
             }
         }
 
         // Update total released
-        let mut config = env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        let mut config = env
+            .storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found");
         config.total_released = contract_balance;
-        env.storage().persistent().set(&DataKey::SplitConfig(split_id), &config);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SplitConfig(split_id), &config);
     }
 
     /// Release tokens for a specific recipient
     pub fn release_to(env: Env, split_id: u64, recipient_address: Address) {
-        let config = env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        let config = env
+            .storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found");
 
         // Calculate total shares
@@ -194,15 +227,22 @@ impl PaymentSplitter {
         }
 
         // Update total released (note: this is a simplified approach)
-        let mut config = env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        let mut config = env
+            .storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found");
         config.total_released += share;
-        env.storage().persistent().set(&DataKey::SplitConfig(split_id), &config);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SplitConfig(split_id), &config);
     }
 
     /// Get split configuration
     pub fn get_split(env: Env, split_id: u64) -> SplitConfig {
-        env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        env.storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found")
     }
 
@@ -211,7 +251,10 @@ impl PaymentSplitter {
         admin.require_auth();
         Self::require_admin(&env);
 
-        let mut config = env.storage().persistent().get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
+        let mut config = env
+            .storage()
+            .persistent()
+            .get::<_, SplitConfig>(&DataKey::SplitConfig(split_id))
             .expect("Split not found");
 
         if config.locked {
@@ -229,11 +272,17 @@ impl PaymentSplitter {
         }
 
         config.recipients = recipients;
-        env.storage().persistent().set(&DataKey::SplitConfig(split_id), &config);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SplitConfig(split_id), &config);
     }
 
     fn require_admin(env: &Env) {
-        let admin = env.storage().instance().get::<_, Address>(&DataKey::Admin).unwrap();
+        let admin = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::Admin)
+            .unwrap();
         admin.require_auth();
     }
 
@@ -243,4 +292,3 @@ impl PaymentSplitter {
         }
     }
 }
-

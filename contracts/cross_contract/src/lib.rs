@@ -180,9 +180,7 @@ impl CrossContractCommunication {
             default_callback_method: callback_method,
             enabled: true,
         };
-        env.storage()
-            .persistent()
-            .set(&DataKey::Route(key), &route);
+        env.storage().persistent().set(&DataKey::Route(key), &route);
         Ok(())
     }
 
@@ -195,9 +193,7 @@ impl CrossContractCommunication {
         require_admin(&env, &admin)?;
         let mut route = get_route_or_err(&env, &key)?;
         route.enabled = enabled;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Route(key), &route);
+        env.storage().persistent().set(&DataKey::Route(key), &route);
         Ok(())
     }
 
@@ -218,11 +214,8 @@ impl CrossContractCommunication {
             return Err(CrossContractError::RouteDisabled);
         }
 
-        let (resolved_callback_contract, resolved_callback_method) = resolve_callback(
-            &route_cfg,
-            callback_contract,
-            callback_method,
-        )?;
+        let (resolved_callback_contract, resolved_callback_method) =
+            resolve_callback(&route_cfg, callback_contract, callback_method)?;
 
         enforce_rate_limit(&env, &sender)?;
 
@@ -278,7 +271,9 @@ impl CrossContractCommunication {
     }
 
     pub fn get_message(env: Env, message_id: u64) -> Option<Message> {
-        env.storage().persistent().get(&DataKey::Message(message_id))
+        env.storage()
+            .persistent()
+            .get(&DataKey::Message(message_id))
     }
 
     pub fn get_route(env: Env, key: Symbol) -> Option<RouteConfig> {
@@ -308,7 +303,10 @@ impl CrossContractCommunication {
             .get(&DataKey::SenderWindow(sender))
     }
 
-    fn process_atomic(env: Env, mut message: Message) -> Result<ProcessOutcome, CrossContractError> {
+    fn process_atomic(
+        env: Env,
+        mut message: Message,
+    ) -> Result<ProcessOutcome, CrossContractError> {
         let response: Bytes = match env.try_invoke_contract::<Bytes, soroban_sdk::Error>(
             &message.target_contract,
             &message.target_method,
@@ -318,9 +316,10 @@ impl CrossContractCommunication {
             _ => return Err(CrossContractError::TargetInvocationFailed),
         };
 
-        if let (Some(callback_contract), Some(callback_method)) =
-            (message.callback_contract.clone(), message.callback_method.clone())
-        {
+        if let (Some(callback_contract), Some(callback_method)) = (
+            message.callback_contract.clone(),
+            message.callback_method.clone(),
+        ) {
             let accepted = match env.try_invoke_contract::<bool, soroban_sdk::Error>(
                 &callback_contract,
                 &callback_method,
@@ -423,9 +422,10 @@ impl CrossContractCommunication {
             None,
         );
 
-        if let (Some(callback_contract), Some(callback_method)) =
-            (message.callback_contract.clone(), message.callback_method.clone())
-        {
+        if let (Some(callback_contract), Some(callback_method)) = (
+            message.callback_contract.clone(),
+            message.callback_method.clone(),
+        ) {
             match env.try_invoke_contract::<bool, soroban_sdk::Error>(
                 &callback_contract,
                 &callback_method,
@@ -577,7 +577,11 @@ fn resolve_callback(
 }
 
 fn next_message_id(env: &Env) -> u64 {
-    let next: u64 = env.storage().instance().get(&DataKey::NextMessageId).unwrap_or(1);
+    let next: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::NextMessageId)
+        .unwrap_or(1);
     env.storage()
         .instance()
         .set(&DataKey::NextMessageId, &(next + 1));
@@ -585,16 +589,30 @@ fn next_message_id(env: &Env) -> u64 {
 }
 
 fn push_queue(env: &Env, message_id: u64) {
-    let tail: u64 = env.storage().instance().get(&DataKey::QueueTail).unwrap_or(0);
+    let tail: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::QueueTail)
+        .unwrap_or(0);
     env.storage()
         .persistent()
         .set(&DataKey::QueueSlot(tail), &message_id);
-    env.storage().instance().set(&DataKey::QueueTail, &(tail + 1));
+    env.storage()
+        .instance()
+        .set(&DataKey::QueueTail, &(tail + 1));
 }
 
 fn peek_queue(env: &Env) -> Result<u64, CrossContractError> {
-    let head: u64 = env.storage().instance().get(&DataKey::QueueHead).unwrap_or(0);
-    let tail: u64 = env.storage().instance().get(&DataKey::QueueTail).unwrap_or(0);
+    let head: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::QueueHead)
+        .unwrap_or(0);
+    let tail: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::QueueTail)
+        .unwrap_or(0);
     if head >= tail {
         return Err(CrossContractError::QueueEmpty);
     }
@@ -606,7 +624,11 @@ fn peek_queue(env: &Env) -> Result<u64, CrossContractError> {
 }
 
 fn pop_queue(env: &Env, expected_message_id: u64) -> Result<(), CrossContractError> {
-    let head: u64 = env.storage().instance().get(&DataKey::QueueHead).unwrap_or(0);
+    let head: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::QueueHead)
+        .unwrap_or(0);
     let actual: u64 = env
         .storage()
         .persistent()
@@ -618,13 +640,23 @@ fn pop_queue(env: &Env, expected_message_id: u64) -> Result<(), CrossContractErr
     }
 
     env.storage().persistent().remove(&DataKey::QueueSlot(head));
-    env.storage().instance().set(&DataKey::QueueHead, &(head + 1));
+    env.storage()
+        .instance()
+        .set(&DataKey::QueueHead, &(head + 1));
     Ok(())
 }
 
 fn queue_size(env: &Env) -> u64 {
-    let head: u64 = env.storage().instance().get(&DataKey::QueueHead).unwrap_or(0);
-    let tail: u64 = env.storage().instance().get(&DataKey::QueueTail).unwrap_or(0);
+    let head: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::QueueHead)
+        .unwrap_or(0);
+    let tail: u64 = env
+        .storage()
+        .instance()
+        .get(&DataKey::QueueTail)
+        .unwrap_or(0);
     tail.saturating_sub(head)
 }
 
@@ -708,4 +740,3 @@ fn panic_with_error(env: &Env, err: CrossContractError) -> ! {
     env.events().publish((symbol_short!("xerr"),), err as u32);
     panic!("cross contract error");
 }
-

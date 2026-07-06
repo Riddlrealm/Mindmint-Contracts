@@ -1,6 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec, Map, token};
-
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Map, String, Vec};
 
 #[contracttype]
 #[derive(Clone)]
@@ -61,7 +60,9 @@ impl CharityContract {
         env.storage().instance().set(&DataKey::MatchingPool, &0i128);
         env.storage().instance().set(&DataKey::NextCharityId, &1u32);
         env.storage().instance().set(&DataKey::NextReceiptId, &1u32);
-        env.storage().instance().set(&DataKey::Leaderboard, &Vec::<(Address, i128)>::new(&env));
+        env.storage()
+            .instance()
+            .set(&DataKey::Leaderboard, &Vec::<(Address, i128)>::new(&env));
     }
 
     pub fn add_charity(env: Env, admin: Address, name: String, wallet: Address) -> u32 {
@@ -71,7 +72,11 @@ impl CharityContract {
             panic!("Unauthorized");
         }
 
-        let id: u32 = env.storage().instance().get(&DataKey::NextCharityId).unwrap();
+        let id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextCharityId)
+            .unwrap();
         let charity = Charity {
             id,
             name,
@@ -80,10 +85,16 @@ impl CharityContract {
             total_raised: 0,
             contributor_count: 0,
         };
-        
-        env.storage().persistent().set(&DataKey::Charity(id), &charity);
-        env.storage().persistent().set(&DataKey::DonorList(id), &Vec::<Address>::new(&env));
-        env.storage().instance().set(&DataKey::NextCharityId, &(id + 1));
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Charity(id), &charity);
+        env.storage()
+            .persistent()
+            .set(&DataKey::DonorList(id), &Vec::<Address>::new(&env));
+        env.storage()
+            .instance()
+            .set(&DataKey::NextCharityId, &(id + 1));
         id
     }
 
@@ -94,9 +105,15 @@ impl CharityContract {
             panic!("Unauthorized");
         }
 
-        let mut charity: Charity = env.storage().persistent().get(&DataKey::Charity(charity_id)).unwrap();
+        let mut charity: Charity = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Charity(charity_id))
+            .unwrap();
         charity.verified = true;
-        env.storage().persistent().set(&DataKey::Charity(charity_id), &charity);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Charity(charity_id), &charity);
     }
 
     pub fn donate(env: Env, donor: Address, charity_id: u32, amount: i128) {
@@ -105,7 +122,11 @@ impl CharityContract {
             panic!("Invalid amount");
         }
 
-        let mut charity: Charity = env.storage().persistent().get(&DataKey::Charity(charity_id)).unwrap();
+        let mut charity: Charity = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Charity(charity_id))
+            .unwrap();
         if !charity.verified {
             panic!("Charity not verified");
         }
@@ -116,18 +137,26 @@ impl CharityContract {
 
         let donor_key = DataKey::DonorTotal(donor.clone(), charity_id);
         let prev_total: i128 = env.storage().persistent().get(&donor_key).unwrap_or(0);
-        
+
         if prev_total == 0 {
             charity.contributor_count += 1;
-            let mut donors: Vec<Address> = env.storage().persistent().get(&DataKey::DonorList(charity_id)).unwrap();
+            let mut donors: Vec<Address> = env
+                .storage()
+                .persistent()
+                .get(&DataKey::DonorList(charity_id))
+                .unwrap();
             donors.push_back(donor.clone());
-            env.storage().persistent().set(&DataKey::DonorList(charity_id), &donors);
+            env.storage()
+                .persistent()
+                .set(&DataKey::DonorList(charity_id), &donors);
         }
 
         let new_total = prev_total + amount;
         env.storage().persistent().set(&donor_key, &new_total);
         charity.total_raised += amount;
-        env.storage().persistent().set(&DataKey::Charity(charity_id), &charity);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Charity(charity_id), &charity);
 
         Self::update_leaderboard(env.clone(), donor.clone(), amount);
     }
@@ -138,8 +167,14 @@ impl CharityContract {
         let token = token::Client::new(&env, &token_addr);
         token.transfer(&funder, &env.current_contract_address(), &amount);
 
-        let pool: i128 = env.storage().instance().get(&DataKey::MatchingPool).unwrap();
-        env.storage().instance().set(&DataKey::MatchingPool, &(pool + amount));
+        let pool: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MatchingPool)
+            .unwrap();
+        env.storage()
+            .instance()
+            .set(&DataKey::MatchingPool, &(pool + amount));
     }
 
     pub fn distribute_matching(env: Env, admin: Address, charity_id: u32) -> i128 {
@@ -149,24 +184,42 @@ impl CharityContract {
             panic!("Unauthorized");
         }
 
-        let charity: Charity = env.storage().persistent().get(&DataKey::Charity(charity_id)).unwrap();
-        let donors: Vec<Address> = env.storage().persistent().get(&DataKey::DonorList(charity_id)).unwrap();
-        
+        let charity: Charity = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Charity(charity_id))
+            .unwrap();
+        let donors: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DonorList(charity_id))
+            .unwrap();
+
         let mut sum_sqrt = 0i128;
         for donor in donors.iter() {
-            let amount: i128 = env.storage().persistent().get(&DataKey::DonorTotal(donor.clone(), charity_id)).unwrap();
+            let amount: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::DonorTotal(donor.clone(), charity_id))
+                .unwrap();
             sum_sqrt += Self::sqrt(amount);
         }
-        
+
         let qf_amount = sum_sqrt * sum_sqrt - charity.total_raised;
-        let pool: i128 = env.storage().instance().get(&DataKey::MatchingPool).unwrap();
+        let pool: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MatchingPool)
+            .unwrap();
         let payout = if qf_amount > pool { pool } else { qf_amount };
 
         if payout > 0 {
             let token_addr: Address = env.storage().instance().get(&DataKey::TokenAddr).unwrap();
             let token = token::Client::new(&env, &token_addr);
             token.transfer(&env.current_contract_address(), &charity.wallet, &payout);
-            env.storage().instance().set(&DataKey::MatchingPool, &(pool - payout));
+            env.storage()
+                .instance()
+                .set(&DataKey::MatchingPool, &(pool - payout));
         }
 
         payout
@@ -174,15 +227,32 @@ impl CharityContract {
 
     pub fn issue_receipt(env: Env, donor: Address, charity_id: u32) -> u32 {
         donor.require_auth();
-        let total: i128 = env.storage().persistent().get(&DataKey::DonorTotal(donor.clone(), charity_id)).unwrap_or(0);
+        let total: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DonorTotal(donor.clone(), charity_id))
+            .unwrap_or(0);
         if total == 0 {
             panic!("No donations found");
         }
 
-        let id: u32 = env.storage().instance().get(&DataKey::NextReceiptId).unwrap();
-        let receipt = Receipt { id, donor: donor.clone(), charity_id, total_donated: total };
-        env.storage().persistent().set(&DataKey::Receipt(id), &receipt);
-        env.storage().instance().set(&DataKey::NextReceiptId, &(id + 1));
+        let id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextReceiptId)
+            .unwrap();
+        let receipt = Receipt {
+            id,
+            donor: donor.clone(),
+            charity_id,
+            total_donated: total,
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::Receipt(id), &receipt);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextReceiptId, &(id + 1));
         id
     }
 
@@ -197,7 +267,10 @@ impl CharityContract {
     }
 
     pub fn get_charity(env: Env, charity_id: u32) -> Charity {
-        env.storage().persistent().get(&DataKey::Charity(charity_id)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&DataKey::Charity(charity_id))
+            .unwrap()
     }
 
     pub fn get_leaderboard(env: Env) -> Vec<(Address, i128)> {
@@ -205,11 +278,16 @@ impl CharityContract {
     }
 
     pub fn get_donor_total(env: Env, donor: Address, charity_id: u32) -> i128 {
-        env.storage().persistent().get(&DataKey::DonorTotal(donor, charity_id)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::DonorTotal(donor, charity_id))
+            .unwrap_or(0)
     }
 
     fn sqrt(n: i128) -> i128 {
-        if n == 0 { return 0; }
+        if n == 0 {
+            return 0;
+        }
         let mut x = n;
         let mut y = (x + 1) / 2;
         while y < x {
@@ -220,9 +298,10 @@ impl CharityContract {
     }
 
     fn update_leaderboard(env: Env, donor: Address, amount: i128) {
-        let mut board: Vec<(Address, i128)> = env.storage().instance().get(&DataKey::Leaderboard).unwrap();
+        let mut board: Vec<(Address, i128)> =
+            env.storage().instance().get(&DataKey::Leaderboard).unwrap();
         let mut found = false;
-        
+
         for i in 0..board.len() {
             if board.get(i).unwrap().0 == donor {
                 let current = board.get(i).unwrap();
@@ -231,7 +310,7 @@ impl CharityContract {
                 break;
             }
         }
-        
+
         if !found {
             board.push_back((donor, amount));
         }

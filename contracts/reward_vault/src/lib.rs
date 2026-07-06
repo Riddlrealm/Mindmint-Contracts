@@ -64,7 +64,9 @@ impl RewardVaultContract {
         if lock_periods.is_empty() || lock_periods.len() != bonus_bps.len() {
             panic!("Invalid lock options");
         }
-        if early_withdraw_penalty_bps > BASIS_POINTS as u32 || emergency_penalty_bps > BASIS_POINTS as u32 {
+        if early_withdraw_penalty_bps > BASIS_POINTS as u32
+            || emergency_penalty_bps > BASIS_POINTS as u32
+        {
             panic!("Invalid penalty");
         }
 
@@ -146,14 +148,18 @@ impl RewardVaultContract {
         let token_client = token::Client::new(&env, &config.token);
         token_client.transfer(&owner, &env.current_contract_address(), &amount);
 
-        env.storage().persistent().set(&DataKey::Vault(owner), &vault);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Vault(owner), &vault);
     }
 
     pub fn set_beneficiary(env: Env, owner: Address, beneficiary: Address) {
         owner.require_auth();
         let mut vault = Self::must_get_vault(env.clone(), owner.clone());
         vault.beneficiary = Some(beneficiary);
-        env.storage().persistent().set(&DataKey::Vault(owner), &vault);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Vault(owner), &vault);
     }
 
     pub fn extend_lock(env: Env, owner: Address, additional_lock_period: u64) {
@@ -176,7 +182,9 @@ impl RewardVaultContract {
         vault.bonus_bps = new_bonus_bps;
         vault.maturity_at += additional_lock_period;
 
-        env.storage().persistent().set(&DataKey::Vault(owner), &vault);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Vault(owner), &vault);
     }
 
     pub fn withdraw_mature(env: Env, owner: Address) -> i128 {

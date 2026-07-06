@@ -1,7 +1,9 @@
 #![cfg(test)]
 
 use super::*;
-use reward_token::{RewardToken as RewardTokenContract, RewardTokenClient as RewardTokenContractClient};
+use reward_token::{
+    RewardToken as RewardTokenContract, RewardTokenClient as RewardTokenContractClient,
+};
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env, String,
@@ -35,8 +37,12 @@ impl MockAchievementNft {
             panic!("not admin");
         }
 
-        env.storage().persistent().set(&MockKey::Owner(token_id), &to);
-        env.storage().persistent().set(&MockKey::Rarity(token_id), &rarity);
+        env.storage()
+            .persistent()
+            .set(&MockKey::Owner(token_id), &to);
+        env.storage()
+            .persistent()
+            .set(&MockKey::Rarity(token_id), &rarity);
     }
 
     pub fn owner_of(env: Env, token_id: u32) -> Address {
@@ -52,7 +58,9 @@ impl MockAchievementNft {
         if owner != from {
             panic!("not owner");
         }
-        env.storage().persistent().set(&MockKey::Owner(token_id), &to);
+        env.storage()
+            .persistent()
+            .set(&MockKey::Owner(token_id), &to);
     }
 
     pub fn burn(env: Env, owner: Address, token_id: u32) {
@@ -62,7 +70,9 @@ impl MockAchievementNft {
             panic!("not owner");
         }
         env.storage().persistent().remove(&MockKey::Owner(token_id));
-        env.storage().persistent().remove(&MockKey::Rarity(token_id));
+        env.storage()
+            .persistent()
+            .remove(&MockKey::Rarity(token_id));
     }
 }
 
@@ -267,6 +277,6 @@ fn rarity_rate_differences_affect_rewards() {
 
     let p1 = s.staking.pending_rewards(&1u32);
     let p2 = s.staking.pending_rewards(&2u32);
-    assert_eq!(p1, 50);  // (110 - 100) * 5
+    assert_eq!(p1, 50); // (110 - 100) * 5
     assert_eq!(p2, 200); // (110 - 100) * 20
 }

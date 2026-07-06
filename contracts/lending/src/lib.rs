@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol};
 
 const BASIS_POINTS: i128 = 10_000;
 
@@ -156,14 +154,11 @@ impl LendingContract {
             created_time,
         };
 
-        Self::transfer_asset(
-            &env,
-            &loan_asset,
-            &lender,
-            &env.current_contract_address(),
-        );
+        Self::transfer_asset(&env, &loan_asset, &lender, &env.current_contract_address());
 
-        env.storage().persistent().set(&DataKey::Offer(offer_id), &offer);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Offer(offer_id), &offer);
         offer_id
     }
 
@@ -184,7 +179,9 @@ impl LendingContract {
         }
 
         offer.status = OfferStatus::Cancelled;
-        env.storage().persistent().set(&DataKey::Offer(offer_id), &offer);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Offer(offer_id), &offer);
 
         Self::transfer_asset(
             &env,
@@ -238,8 +235,12 @@ impl LendingContract {
         };
 
         offer.status = OfferStatus::Accepted;
-        env.storage().persistent().set(&DataKey::Offer(offer_id), &offer);
-        env.storage().persistent().set(&DataKey::Loan(loan_id), &loan);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Offer(offer_id), &offer);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Loan(loan_id), &loan);
 
         Self::transfer_asset(
             &env,
@@ -310,7 +311,9 @@ impl LendingContract {
             }
         }
 
-        env.storage().persistent().set(&DataKey::Loan(loan_id), &loan);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Loan(loan_id), &loan);
     }
 
     pub fn liquidate(env: Env, lender: Address, loan_id: u64) {
@@ -342,7 +345,9 @@ impl LendingContract {
             &loan.lender,
         );
 
-        env.storage().persistent().set(&DataKey::Loan(loan_id), &loan);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Loan(loan_id), &loan);
         env.storage()
             .persistent()
             .remove(&DataKey::ExtensionRequest(loan_id));
@@ -416,7 +421,9 @@ impl LendingContract {
         loan.due_time += request.requested_extension_secs;
         loan.extension_secs += request.requested_extension_secs;
 
-        env.storage().persistent().set(&DataKey::Loan(loan_id), &loan);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Loan(loan_id), &loan);
         env.storage()
             .persistent()
             .remove(&DataKey::ExtensionRequest(loan_id));
@@ -509,11 +516,10 @@ impl LendingContract {
             return;
         }
         let delta = accrual_end - loan.last_accrual_time;
-        let interest = (loan.outstanding_principal
-            * loan.terms.interest_bps as i128
-            * delta as i128)
-            / duration as i128
-            / BASIS_POINTS;
+        let interest =
+            (loan.outstanding_principal * loan.terms.interest_bps as i128 * delta as i128)
+                / duration as i128
+                / BASIS_POINTS;
         loan.accrued_interest += interest;
         loan.last_accrual_time = accrual_end;
     }

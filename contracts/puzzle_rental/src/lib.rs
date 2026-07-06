@@ -3,7 +3,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, Map, Symbol, Vec, log,
+    contract, contractimpl, contracttype, log, token, Address, Env, Map, Symbol, Vec,
 };
 
 // ============================================================
@@ -189,6 +189,7 @@ impl PuzzleRentalContract {
 
     /// Create a new rental listing for an NFT.
     /// The caller must own the NFT and authorize this call.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_listing(
         env: Env,
         owner: Address,
@@ -260,10 +261,8 @@ impl PuzzleRentalContract {
             .instance()
             .set(&DataKey::ActiveListings, &active);
 
-        env.events().publish(
-            (Symbol::new(&env, events::LISTING_CREATED),),
-            listing_id,
-        );
+        env.events()
+            .publish((Symbol::new(&env, events::LISTING_CREATED),), listing_id);
 
         log!(&env, "Listing created: {}", listing_id);
         listing_id
@@ -291,10 +290,8 @@ impl PuzzleRentalContract {
         // Remove from active listings index
         Self::remove_from_active_listings(&env, listing_id);
 
-        env.events().publish(
-            (Symbol::new(&env, events::LISTING_CANCELLED),),
-            listing_id,
-        );
+        env.events()
+            .publish((Symbol::new(&env, events::LISTING_CANCELLED),), listing_id);
     }
 
     // ----------------------------------------------------------
@@ -303,12 +300,7 @@ impl PuzzleRentalContract {
 
     /// Accept a rental listing and pay for access.
     /// `periods` is how many rental periods the renter wants.
-    pub fn rent(
-        env: Env,
-        renter: Address,
-        listing_id: u64,
-        periods: u32,
-    ) -> u64 {
+    pub fn rent(env: Env, renter: Address, listing_id: u64, periods: u32) -> u64 {
         renter.require_auth();
 
         if periods == 0 {
@@ -379,7 +371,13 @@ impl PuzzleRentalContract {
             (rental_id, listing_id, total_cost),
         );
 
-        log!(&env, "Rental started: id={} listing={} cost={}", rental_id, listing_id, total_cost);
+        log!(
+            &env,
+            "Rental started: id={} listing={} cost={}",
+            rental_id,
+            listing_id,
+            total_cost
+        );
         rental_id
     }
 
@@ -442,7 +440,13 @@ impl PuzzleRentalContract {
             (rental_id, additional_periods, extension_cost),
         );
 
-        log!(&env, "Rental extended: id={} added_periods={} cost={}", rental_id, additional_periods, extension_cost);
+        log!(
+            &env,
+            "Rental extended: id={} added_periods={} cost={}",
+            rental_id,
+            additional_periods,
+            extension_cost
+        );
     }
 
     /// Terminate a rental early. Renter gets a partial refund based on
@@ -475,7 +479,10 @@ impl PuzzleRentalContract {
         let total_duration = rental.end_time - rental.start_time;
 
         // Calculate refund for unused portion
-        let refund = if remaining_time > 0 && total_duration > 0 && rental.early_termination_refund_pct > 0 {
+        let refund = if remaining_time > 0
+            && total_duration > 0
+            && rental.early_termination_refund_pct > 0
+        {
             let unused_ratio_numerator = remaining_time as i128;
             let unused_ratio_denominator = total_duration as i128;
             let raw_refund = rental.total_paid * unused_ratio_numerator / unused_ratio_denominator;
@@ -510,7 +517,12 @@ impl PuzzleRentalContract {
             (rental_id, refund),
         );
 
-        log!(&env, "Rental terminated: id={} refund={}", rental_id, refund);
+        log!(
+            &env,
+            "Rental terminated: id={} refund={}",
+            rental_id,
+            refund
+        );
     }
 
     /// Mark a rental as expired if its end_time has passed.
@@ -545,10 +557,8 @@ impl PuzzleRentalContract {
             .persistent()
             .set(&DataKey::Rental(rental_id), &rental);
 
-        env.events().publish(
-            (Symbol::new(&env, events::RENTAL_EXPIRED),),
-            rental_id,
-        );
+        env.events()
+            .publish((Symbol::new(&env, events::RENTAL_EXPIRED),), rental_id);
 
         log!(&env, "Rental expired: id={}", rental_id);
     }
@@ -569,24 +579,19 @@ impl PuzzleRentalContract {
         let now = env.ledger().timestamp();
 
         for rental_id in rental_ids.iter() {
-            let rental: RentalAgreement = match env
-                .storage()
-                .persistent()
-                .get(&DataKey::Rental(rental_id))
-            {
-                Some(r) => r,
-                None => continue,
-            };
+            let rental: RentalAgreement =
+                match env.storage().persistent().get(&DataKey::Rental(rental_id)) {
+                    Some(r) => r,
+                    None => continue,
+                };
 
             if rental.status == RentalStatus::Active
                 && rental.nft_contract == nft_contract
                 && rental.nft_token_id == nft_token_id
                 && now < rental.end_time
             {
-                env.events().publish(
-                    (Symbol::new(&env, events::ACCESS_CHECKED),),
-                    (renter, true),
-                );
+                env.events()
+                    .publish((Symbol::new(&env, events::ACCESS_CHECKED),), (renter, true));
                 return true;
             }
         }

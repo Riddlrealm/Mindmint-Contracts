@@ -3,12 +3,16 @@
 use super::*;
 use soroban_sdk::{testutils::Address as _, token, Address, Env};
 
-fn create_token_contract<'a>(e: &Env, admin: &Address) -> (token::Client<'a>, token::StellarAssetClient<'a>) {
-    let contract_address = e.register_stellar_asset_contract_v2(admin.clone())
+fn create_token_contract<'a>(
+    e: &Env,
+    admin: &Address,
+) -> (token::Client<'a>, token::StellarAssetClient<'a>) {
+    let contract_address = e
+        .register_stellar_asset_contract_v2(admin.clone())
         .address();
     (
         token::Client::new(e, &contract_address),
-        token::StellarAssetClient::new(e, &contract_address)
+        token::StellarAssetClient::new(e, &contract_address),
     )
 }
 
@@ -53,7 +57,7 @@ fn test_tournament_flow() {
 
     // Record result (User1 wins)
     tournament_client.record_result(&user1);
-    
+
     // Verify changes
     assert_eq!(tournament_client.get_state(), TournamentState::Ended);
     // User1 should have 900 (remaining) + 200 (prize) = 1100
@@ -83,10 +87,10 @@ fn test_cancel_and_refund() {
     assert_eq!(tournament_client.get_state(), TournamentState::Cancelled);
 
     tournament_client.withdraw_refund(&user1);
-    
+
     // User1 should be back to 1000
     assert_eq!(token_client.balance(&user1), 1000);
-    
+
     // Participants list should be empty (or at least user1 removed)
     let participants = tournament_client.get_participants();
     assert!(!participants.contains(&user1));

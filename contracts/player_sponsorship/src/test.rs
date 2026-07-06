@@ -2,9 +2,7 @@
 
 use super::*;
 use soroban_sdk::{
-    contract, contractimpl, symbol_short, token,
-    testutils::Address as _,
-    Address, Env,
+    contract, contractimpl, symbol_short, testutils::Address as _, token, Address, Env,
 };
 
 #[contract]
@@ -37,7 +35,11 @@ impl MockLeaderboard {
             .set(&(symbol_short!("RANK"), player, period as u32), &rank);
     }
 
-    pub fn get_player_rank(env: Env, player: Address, period: leaderboard_types::TimePeriod) -> u32 {
+    pub fn get_player_rank(
+        env: Env,
+        player: Address,
+        period: leaderboard_types::TimePeriod,
+    ) -> u32 {
         env.storage()
             .persistent()
             .get(&(symbol_short!("RANK"), player, period as u32))
@@ -45,7 +47,9 @@ impl MockLeaderboard {
     }
 }
 
-fn setup(env: &Env) -> (
+fn setup(
+    env: &Env,
+) -> (
     PlayerSponsorshipContractClient<'_>,
     token::Client<'_>,
     Address,

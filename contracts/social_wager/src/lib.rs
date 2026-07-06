@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env,
-    Symbol,
+    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol,
 };
 
 const DEFAULT_FEE_BPS: u32 = 200;
@@ -131,11 +130,7 @@ impl SocialWagerContract {
         Ok(())
     }
 
-    pub fn set_oracle(
-        env: Env,
-        admin: Address,
-        oracle: Address,
-    ) -> Result<(), SocialWagerError> {
+    pub fn set_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), SocialWagerError> {
         admin.require_auth();
 
         let mut config = Self::get_config(env.clone())?;
@@ -185,7 +180,9 @@ impl SocialWagerContract {
             &stake_amount,
         );
 
-        env.storage().persistent().set(&DataKey::Wager(wager_id), &wager);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Wager(wager_id), &wager);
         env.storage()
             .instance()
             .set(&DataKey::NextWagerId, &(wager_id + 1));
@@ -225,7 +222,9 @@ impl SocialWagerContract {
         );
 
         wager.status = WagerStatus::Active;
-        env.storage().persistent().set(&DataKey::Wager(wager_id), &wager);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Wager(wager_id), &wager);
         env.events()
             .publish((EVENT_WAGER, EVENT_ACCEPT), (wager_id, opponent));
 
@@ -259,7 +258,9 @@ impl SocialWagerContract {
         );
 
         wager.status = WagerStatus::Declined;
-        env.storage().persistent().set(&DataKey::Wager(wager_id), &wager);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Wager(wager_id), &wager);
         env.events()
             .publish((EVENT_WAGER, EVENT_DECLINE), (wager_id, opponent));
 
@@ -289,7 +290,9 @@ impl SocialWagerContract {
 
         wager.winner = Some(winner.clone());
         wager.status = WagerStatus::ResultSubmitted;
-        env.storage().persistent().set(&DataKey::Wager(wager_id), &wager);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Wager(wager_id), &wager);
         env.events()
             .publish((EVENT_WAGER, EVENT_RESULT), (wager_id, winner));
 
@@ -308,10 +311,7 @@ impl SocialWagerContract {
 
         winner.require_auth();
 
-        let stored_winner = wager
-            .winner
-            .clone()
-            .ok_or(SocialWagerError::WinnerNotSet)?;
+        let stored_winner = wager.winner.clone().ok_or(SocialWagerError::WinnerNotSet)?;
         if winner != stored_winner {
             return Err(SocialWagerError::Unauthorized);
         }
@@ -334,9 +334,13 @@ impl SocialWagerContract {
         }
 
         wager.status = WagerStatus::Claimed;
-        env.storage().persistent().set(&DataKey::Wager(wager_id), &wager);
-        env.events()
-            .publish((EVENT_WAGER, EVENT_CLAIM), (wager_id, winner, payout_amount, fee_amount));
+        env.storage()
+            .persistent()
+            .set(&DataKey::Wager(wager_id), &wager);
+        env.events().publish(
+            (EVENT_WAGER, EVENT_CLAIM),
+            (wager_id, winner, payout_amount, fee_amount),
+        );
 
         Ok(wager)
     }
@@ -362,13 +366,13 @@ impl SocialWagerContract {
     }
 
     fn next_wager_id(env: &Env) -> u64 {
-        env.storage().instance().get(&DataKey::NextWagerId).unwrap_or(1)
+        env.storage()
+            .instance()
+            .get(&DataKey::NextWagerId)
+            .unwrap_or(1)
     }
 
-    fn cancel_if_expired(
-        env: &Env,
-        wager: &mut SocialWager,
-    ) -> Result<bool, SocialWagerError> {
+    fn cancel_if_expired(env: &Env, wager: &mut SocialWager) -> Result<bool, SocialWagerError> {
         if wager.status != WagerStatus::Pending {
             return Ok(false);
         }
@@ -389,10 +393,11 @@ impl SocialWagerContract {
         env.storage()
             .persistent()
             .set(&DataKey::Wager(wager.wager_id), wager);
-        env.events()
-            .publish((EVENT_WAGER, EVENT_CANCEL), (wager.wager_id, wager.challenger.clone()));
+        env.events().publish(
+            (EVENT_WAGER, EVENT_CANCEL),
+            (wager.wager_id, wager.challenger.clone()),
+        );
 
         Ok(true)
     }
 }
-

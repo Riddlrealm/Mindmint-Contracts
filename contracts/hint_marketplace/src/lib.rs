@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, token, Address, Bytes, Env, Symbol, Vec,
+    contract, contracterror, contractimpl, contracttype, token, Address, Bytes, Env, Symbol, Vec,
 };
 
 // ──────────────────────────────────────────────────────────
@@ -186,7 +186,9 @@ impl HintMarketplace {
 
         env.storage().instance().set(&DataKey::Config, &config);
         env.storage().instance().set(&DataKey::HintCounter, &0u64);
-        env.storage().instance().set(&DataKey::ListingCounter, &0u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::ListingCounter, &0u64);
         env.storage().instance().set(&DataKey::PackCounter, &0u64);
     }
 
@@ -252,7 +254,9 @@ impl HintMarketplace {
             .get(&DataKey::HintCounter)
             .unwrap_or(0);
         hint_id += 1;
-        env.storage().instance().set(&DataKey::HintCounter, &hint_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::HintCounter, &hint_id);
 
         let now = env.ledger().timestamp();
 
@@ -331,7 +335,9 @@ impl HintMarketplace {
             .get(&DataKey::ListingCounter)
             .unwrap_or(0);
         listing_id += 1;
-        env.storage().instance().set(&DataKey::ListingCounter, &listing_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::ListingCounter, &listing_id);
 
         let listing = HintListing {
             listing_id,
@@ -420,8 +426,16 @@ impl HintMarketplace {
         );
 
         let token_client = token::Client::new(&env, &listing.payment_token);
-        token_client.transfer(&buyer, &env.current_contract_address(), &listing.current_price);
-        token_client.transfer(&env.current_contract_address(), &listing.seller, &seller_amount);
+        token_client.transfer(
+            &buyer,
+            &env.current_contract_address(),
+            &listing.current_price,
+        );
+        token_client.transfer(
+            &env.current_contract_address(),
+            &listing.seller,
+            &seller_amount,
+        );
 
         if fee_amount > 0 {
             token_client.transfer(
@@ -520,9 +534,7 @@ impl HintMarketplace {
             _ => HintQuality::Good,
         };
 
-        env.storage()
-            .instance()
-            .set(&DataKey::Hint(hint_id), &hint);
+        env.storage().instance().set(&DataKey::Hint(hint_id), &hint);
     }
 
     pub fn create_pack(
@@ -560,7 +572,9 @@ impl HintMarketplace {
             .get(&DataKey::PackCounter)
             .unwrap_or(0);
         pack_id += 1;
-        env.storage().instance().set(&DataKey::PackCounter, &pack_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::PackCounter, &pack_id);
 
         let now = env.ledger().timestamp();
 
@@ -619,7 +633,11 @@ impl HintMarketplace {
 
         let token_client = token::Client::new(&env, &payment_token);
         token_client.transfer(&buyer, &env.current_contract_address(), &pack.pack_price);
-        token_client.transfer(&env.current_contract_address(), &pack.creator, &creator_amount);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &pack.creator,
+            &creator_amount,
+        );
 
         if fee_amount > 0 {
             token_client.transfer(
@@ -636,9 +654,7 @@ impl HintMarketplace {
                 .get(&DataKey::Hint(hint_id))
                 .expect("Hint not found");
             hint.total_sales += 1;
-            env.storage()
-                .instance()
-                .set(&DataKey::Hint(hint_id), &hint);
+            env.storage().instance().set(&DataKey::Hint(hint_id), &hint);
         }
     }
 
@@ -885,7 +901,9 @@ impl HintMarketplace {
     }
 
     pub fn get_rating(env: Env, hint_id: u64, rater: Address) -> Option<Rating> {
-        env.storage().instance().get(&DataKey::Rating(hint_id, rater))
+        env.storage()
+            .instance()
+            .get(&DataKey::Rating(hint_id, rater))
     }
 
     pub fn get_listings_by_hint(env: Env, hint_id: u64) -> Vec<u64> {
@@ -916,7 +934,9 @@ impl HintMarketplace {
     }
 
     pub fn get_demand_metrics(env: Env, hint_id: u64) -> Option<DemandMetrics> {
-        env.storage().instance().get(&DataKey::DemandMetrics(hint_id))
+        env.storage()
+            .instance()
+            .get(&DataKey::DemandMetrics(hint_id))
     }
 
     pub fn get_packs_by_creator(env: Env, creator: Address) -> Vec<u64> {

@@ -4,9 +4,9 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, symbol_short};
-use soroban_sdk::token::Client as TokenClient;
 use crate::storage::*;
+use soroban_sdk::token::Client as TokenClient;
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 
 #[contract]
 pub struct LiquidityMiningContract;
@@ -76,9 +76,9 @@ impl LiquidityMiningContract {
         // Snapshot total LP staked at closing time
         epoch.end_at = env.ledger().timestamp();
         epoch.total_lp_staked = get_global_lp_staked(&env);
-        
+
         set_epoch(&env, current_id, &epoch);
-        
+
         current_id
     }
 
@@ -103,7 +103,10 @@ impl LiquidityMiningContract {
         let global_staked = get_global_lp_staked(&env);
         set_global_lp_staked(&env, global_staked + amount);
 
-        env.events().publish((symbol_short!("Stake"), symbol_short!("LP")), (provider, amount));
+        env.events().publish(
+            (symbol_short!("Stake"), symbol_short!("LP")),
+            (provider, amount),
+        );
     }
 
     pub fn unstake_lp(env: Env, provider: Address, amount: i128) {
@@ -136,7 +139,10 @@ impl LiquidityMiningContract {
         let client = TokenClient::new(&env, &lp_token);
         client.transfer(&env.current_contract_address(), &provider, &amount);
 
-        env.events().publish((symbol_short!("Unstake"), symbol_short!("LP")), (provider, amount));
+        env.events().publish(
+            (symbol_short!("Unstake"), symbol_short!("LP")),
+            (provider, amount),
+        );
     }
 
     pub fn claim_mining_reward(env: Env, provider: Address, epoch_id: u32) -> i128 {
@@ -154,7 +160,7 @@ impl LiquidityMiningContract {
         let mut pos = get_position(&env, &provider);
         if pos.lp_tokens == 0 {
             // Cannot earn if you had no tokens during the epoch tracking.
-            // Notice: since we require pending claims to be zero before modifying stake, 
+            // Notice: since we require pending claims to be zero before modifying stake,
             // pos.lp_tokens is exactly what they had when the epoch closed.
             return 0;
         }
@@ -166,7 +172,8 @@ impl LiquidityMiningContract {
         let mut reward = 0;
         if epoch.total_lp_staked > 0 {
             // Check precision limits in production. Safe enough for general tokens.
-            reward = (pos.lp_tokens as i128 * epoch.reward_budget as i128) / epoch.total_lp_staked as i128;
+            reward = (pos.lp_tokens as i128 * epoch.reward_budget as i128)
+                / epoch.total_lp_staked as i128;
         }
 
         set_has_claimed(&env, &provider, epoch_id);
@@ -180,7 +187,10 @@ impl LiquidityMiningContract {
             client.transfer(&env.current_contract_address(), &provider, &reward);
         }
 
-        env.events().publish((symbol_short!("Claim"), symbol_short!("Reward")), (provider, epoch_id, reward));
+        env.events().publish(
+            (symbol_short!("Claim"), symbol_short!("Reward")),
+            (provider, epoch_id, reward),
+        );
 
         reward
     }
@@ -192,7 +202,7 @@ impl LiquidityMiningContract {
     fn require_no_pending_claims(env: &Env, provider: &Address) {
         let pos = get_position(env, provider);
         let current_id = get_current_epoch_id(env);
-        
+
         // If there are closed epochs the user hasn't claimed yet, block modification
         for i in (pos.last_claim_epoch + 1)..=current_id {
             if let Some(epoch) = get_epoch(env, i) {

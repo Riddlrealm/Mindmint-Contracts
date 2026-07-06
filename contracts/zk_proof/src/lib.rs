@@ -197,7 +197,7 @@ pub struct PrivacyPool {
 pub struct DepositRecord {
     pub commitment: BytesN<32>,
     pub leaf_index: u32,
-    pub view_tag: Option<BytesN<32>>,
+    pub view_tag: Vec<BytesN<32>>, // SDK 21.x: Option<&contracttype> workaround; empty=None, single=Some
     pub deposited_at: u64,
 }
 
@@ -278,7 +278,9 @@ impl ZkProofContract {
         admin.require_auth();
 
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::CircuitCounter, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::CircuitCounter, &0u32);
         env.storage().instance().set(&DataKey::PoolCounter, &0u32);
 
         // Built-in circuit #1: permissive (min_depth=0).
@@ -311,10 +313,8 @@ impl ZkProofContract {
             },
         )?;
 
-        env.events().publish(
-            (symbol_short!("zk_init"),),
-            (admin, basic_id, strict_id),
-        );
+        env.events()
+            .publish((symbol_short!("zk_init"),), (admin, basic_id, strict_id));
 
         Ok(())
     }
@@ -342,9 +342,7 @@ impl ZkProofContract {
         let mut stored = spec.clone();
         stored.id = id;
         env.storage().instance().set(&DataKey::Circuit(id), &stored);
-        env.storage()
-            .instance()
-            .set(&DataKey::CircuitCounter, &id);
+        env.storage().instance().set(&DataKey::CircuitCounter, &id);
 
         env.events().publish(
             (symbol_short!("zk_circ"),),
@@ -365,11 +363,7 @@ impl ZkProofContract {
         if denomination <= 0 {
             return Err(ZkError::ZeroDenomination);
         }
-        if !env
-            .storage()
-            .instance()
-            .has(&DataKey::Circuit(circuit_id))
-        {
+        if !env.storage().instance().has(&DataKey::Circuit(circuit_id)) {
             return Err(ZkError::CircuitNotFound);
         }
 
@@ -391,10 +385,8 @@ impl ZkProofContract {
         env.storage().instance().set(&DataKey::Pool(id), &pool);
         env.storage().instance().set(&DataKey::PoolCounter, &id);
 
-        env.events().publish(
-            (symbol_short!("zk_pool"),),
-            (id, denomination, circuit_id),
-        );
+        env.events()
+            .publish((symbol_short!("zk_pool"),), (id, denomination, circuit_id));
         Ok(id)
     }
 
@@ -417,10 +409,8 @@ impl ZkProofContract {
         }
         pool.active = active;
         env.storage().instance().set(&DataKey::Pool(pool_id), &pool);
-        env.events().publish(
-            (symbol_short!("zk_pause"),),
-            (pool_id, active),
-        );
+        env.events()
+            .publish((symbol_short!("zk_pause"),), (pool_id, active));
         Ok(())
     }
 
@@ -437,10 +427,8 @@ impl ZkProofContract {
         env.storage()
             .instance()
             .set(&DataKey::Auditor(scope_tag.clone()), &auditor);
-        env.events().publish(
-            (symbol_short!("zk_aud"),),
-            (scope_tag, auditor),
-        );
+        env.events()
+            .publish((symbol_short!("zk_aud"),), (scope_tag, auditor));
         Ok(())
     }
 
@@ -516,10 +504,19 @@ impl ZkProofContract {
         pool.leaf_count += 1;
         env.storage().instance().set(&DataKey::Pool(pool_id), &pool);
 
+        // SDK 21.x: view_tag is now Vec<BytesN<32>>. Build single-element vec on Some.
+        let view_tag_vec: Vec<BytesN<32>> = match view_tag.clone() {
+            Some(tag) => {
+                let mut v = Vec::new(&env);
+                v.push_back(tag);
+                v
+            }
+            None => Vec::new(&env),
+        };
         let record = DepositRecord {
             commitment: commitment.clone(),
             leaf_index,
-            view_tag: view_tag.clone(),
+            view_tag: view_tag_vec,
             deposited_at: env.ledger().timestamp(),
         };
         env.storage()
@@ -533,10 +530,8 @@ impl ZkProofContract {
             .instance()
             .set(&DataKey::LeafHash(pool_id, leaf_index), &leaf_hash);
 
-        env.events().publish(
-            (symbol_short!("zk_dep"),),
-            (pool_id, leaf_index, depositor),
-        );
+        env.events()
+            .publish((symbol_short!("zk_dep"),), (pool_id, leaf_index, depositor));
         Ok(leaf_index)
     }
 
@@ -685,10 +680,9 @@ impl ZkProofContract {
         }
 
         // Mark the nullifier as spent – replay protection.
-        env.storage().instance().set(
-            &DataKey::Nullifier(pool_id, proof.nullifier.clone()),
-            &true,
-        );
+        env.storage()
+            .instance()
+            .set(&DataKey::Nullifier(pool_id, proof.nullifier.clone()), &true);
 
         // Append to the immutable withdrawal history.
         let count: u32 = env
@@ -710,10 +704,8 @@ impl ZkProofContract {
             .instance()
             .set(&DataKey::WithdrawalCount(pool_id), &(count + 1));
 
-        env.events().publish(
-            (symbol_short!("zk_wdr"),),
-            (pool_id, count, caller),
-        );
+        env.events()
+            .publish((symbol_short!("zk_wdr"),), (pool_id, count, caller));
 
         Ok(())
     }
@@ -752,13 +744,16 @@ impl ZkProofContract {
 
         env.events().publish(
             (symbol_short!("zk_aud_q"),),
-            (pool_id, view_tag, auditor),
+            (pool_id, view_tag.clone(), auditor),
         );
 
+        // SDK 21.x: view_tag is Vec<BytesN<32>>. Wrap original into a Vec.
+        let mut view_tag_vec: Vec<BytesN<32>> = Vec::new(&env);
+        view_tag_vec.push_back(view_tag);
         Ok(DepositRecord {
             commitment,
             leaf_index,
-            view_tag: Some(view_tag),
+            view_tag: view_tag_vec,
             deposited_at: 0, // privacy: timestamp not leaked via this path
         })
     }
@@ -882,13 +877,7 @@ impl ZkProofContract {
         merkle_root: BytesN<32>,
         public_signals: Vec<BytesN<32>>,
     ) -> BytesN<32> {
-        rebuild_binding(
-            &env,
-            &commitment,
-            &nullifier,
-            &merkle_root,
-            &public_signals,
-        )
+        rebuild_binding(&env, &commitment, &nullifier, &merkle_root, &public_signals)
     }
 
     /// Recompute the Merkle root for a hypothetical leaf set.  Provided
@@ -1063,9 +1052,10 @@ fn rebuild_binding(
     public_signals: &Vec<BytesN<32>>,
 ) -> BytesN<32> {
     let mut buf = Bytes::new(env);
-    let mut i: u32 = 0;
-    while (i as usize) < BINDING_PREFIX.len() {
-        buf.push_back(BINDING_PREFIX[i as usize]);
+    // SDK 21.x: indexing a fixed-size [u8; 32] array requires `usize`.
+    let mut i: usize = 0;
+    while i < BINDING_PREFIX.len() {
+        buf.push_back(BINDING_PREFIX[i]);
         i += 1;
     }
     let c = commitment.to_array();
@@ -1143,8 +1133,7 @@ fn verify_proof_inner(
         return Ok(false);
     }
     let leaf_hash = hash_leaf(env.clone(), proof.commitment.clone());
-    let computed_root =
-        verify_merkle_path(env, leaf_hash, proof.leaf_index, &proof.merkle_path);
+    let computed_root = verify_merkle_path(env, leaf_hash, proof.leaf_index, &proof.merkle_path);
     if computed_root != proof.merkle_root {
         return Ok(false);
     }
@@ -1215,4 +1204,3 @@ fn hash_amount(env: &Env, denomination: i128) -> BytesN<32> {
 // ===========================================================================
 // Tests
 // ===========================================================================
-

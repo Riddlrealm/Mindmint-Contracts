@@ -33,7 +33,9 @@ impl Storage {
     }
 
     pub fn set_paused(env: &Env, paused: bool) {
-        env.storage().instance().set(&symbol_short!("paused"), &paused);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("paused"), &paused);
     }
 
     pub fn get_paused(env: &Env) -> bool {
@@ -92,9 +94,7 @@ impl Storage {
     }
 
     pub fn set_audit_logs(env: &Env, logs: &Vec<AuditEntry>) {
-        env.storage()
-            .instance()
-            .set(&symbol_short!("audits"), logs);
+        env.storage().instance().set(&symbol_short!("audits"), logs);
     }
 
     pub fn add_audit_entry(

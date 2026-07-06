@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, String, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String, Symbol, Vec};
 
 const VOTING_WINDOW_SECONDS: u64 = 7 * 24 * 60 * 60;
 
@@ -67,10 +65,17 @@ impl CommunityGrantContract {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::Quorum, &quorum);
-        env.storage().instance().set(&DataKey::NextProposalId, &1u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextProposalId, &1u64);
     }
 
-    pub fn submit_proposal(env: Env, applicant: Address, amount_requested: i128, milestones: Vec<GrantMilestone>) -> u64 {
+    pub fn submit_proposal(
+        env: Env,
+        applicant: Address,
+        amount_requested: i128,
+        milestones: Vec<GrantMilestone>,
+    ) -> u64 {
         applicant.require_auth();
 
         if amount_requested <= 0 {
@@ -111,7 +116,9 @@ impl CommunityGrantContract {
             voting_ends_at: now + VOTING_WINDOW_SECONDS,
         };
 
-        env.storage().persistent().set(&DataKey::Proposal(id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(id), &proposal);
 
         env.events().publish(
             (Symbol::new(&env, "ProposalSubmitted"), id),
@@ -153,7 +160,9 @@ impl CommunityGrantContract {
         }
 
         env.storage().persistent().set(&voted_key, &true);
-        env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
 
         env.events().publish(
             (Symbol::new(&env, "VoteCast"), proposal_id),
@@ -183,7 +192,9 @@ impl CommunityGrantContract {
 
         milestone.verified = true;
         proposal.milestones.set(milestone_index, milestone);
-        env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
 
         env.events().publish(
             (Symbol::new(&env, "MilestoneVerified"), proposal_id),
@@ -221,9 +232,15 @@ impl CommunityGrantContract {
 
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
-        token_client.transfer(&env.current_contract_address(), &applicant, &milestone.amount);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &applicant,
+            &milestone.amount,
+        );
 
-        env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
 
         env.events().publish(
             (Symbol::new(&env, "MilestoneClaimed"), proposal_id),
@@ -274,8 +291,14 @@ impl CommunityGrantContract {
     }
 
     fn next_proposal_id(env: &Env) -> u64 {
-        let id: u64 = env.storage().instance().get(&DataKey::NextProposalId).unwrap();
-        env.storage().instance().set(&DataKey::NextProposalId, &(id + 1));
+        let id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextProposalId)
+            .unwrap();
+        env.storage()
+            .instance()
+            .set(&DataKey::NextProposalId, &(id + 1));
         id
     }
 

@@ -3,12 +3,12 @@
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 
 #[cfg(not(test))]
-const DAY_IN_LEDGERS: u32 = 17280;          // ≈ 24 hours (5s per ledger)
+const DAY_IN_LEDGERS: u32 = 17280; // ≈ 24 hours (5s per ledger)
 #[cfg(test)]
 const DAY_IN_LEDGERS: u32 = 2;
 
 #[cfg(not(test))]
-const GRACE_PERIOD_LEDGERS: u32 = 8640;     // ≈ 12 hour grace period
+const GRACE_PERIOD_LEDGERS: u32 = 8640; // ≈ 12 hour grace period
 #[cfg(test)]
 const GRACE_PERIOD_LEDGERS: u32 = 2;
 const MAX_STREAK_DAYS: u32 = 30;
@@ -146,11 +146,12 @@ impl DailyRewardsContract {
         let current = env.ledger().sequence();
         let diff = current.saturating_sub(user_data.last_claim_ledger);
 
-        let next_streak = if user_data.total_logins == 0 || diff <= (DAY_IN_LEDGERS + GRACE_PERIOD_LEDGERS) {
-            (user_data.current_streak + 1).min(MAX_STREAK_DAYS)
-        } else {
-            1
-        };
+        let next_streak =
+            if user_data.total_logins == 0 || diff <= (DAY_IN_LEDGERS + GRACE_PERIOD_LEDGERS) {
+                (user_data.current_streak + 1).min(MAX_STREAK_DAYS)
+            } else {
+                1
+            };
 
         Self::calculate_reward(next_streak)
     }
@@ -161,15 +162,12 @@ impl DailyRewardsContract {
 
     fn get_user_streak(env: &Env, user: &Address) -> UserStreak {
         let key = DataKey::UserStreak(user.clone());
-        env.storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(UserStreak {
-                current_streak: 0,
-                last_claim_ledger: 0,
-                total_logins: 0,
-                last_claim_hash: 0,
-            })
+        env.storage().persistent().get(&key).unwrap_or(UserStreak {
+            current_streak: 0,
+            last_claim_ledger: 0,
+            total_logins: 0,
+            last_claim_hash: 0,
+        })
     }
 
     fn set_user_streak(env: &Env, user: &Address, data: &UserStreak) {
@@ -239,7 +237,8 @@ mod test {
         assert_eq!(client.claim_daily(&user), 100);
 
         // Advance exactly 1 day
-        env.ledger().with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
+        env.ledger()
+            .with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
 
         // Day 2
         assert_eq!(client.claim_daily(&user), 150);
@@ -254,7 +253,8 @@ mod test {
 
         for day in 0..7 {
             if day > 0 {
-                env.ledger().with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
+                env.ledger()
+                    .with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
             }
             let reward = client.claim_daily(&user);
 
@@ -322,7 +322,8 @@ mod test {
 
         assert!(!client.can_claim(&user)); // same ledger
 
-        env.ledger().with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
+        env.ledger()
+            .with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
 
         assert!(client.can_claim(&user)); // next "day"
     }
@@ -333,7 +334,8 @@ mod test {
 
         client.claim_daily(&user); // streak 1
 
-        env.ledger().with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
+        env.ledger()
+            .with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
 
         assert_eq!(client.preview_next_reward(&user), 150); // next = streak 2
 
@@ -347,7 +349,8 @@ mod test {
 
         for i in 0..35 {
             if i > 0 {
-                env.ledger().with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
+                env.ledger()
+                    .with_mut(|li| li.sequence_number += DAY_IN_LEDGERS);
             }
             let _ = client.claim_daily(&user);
         }

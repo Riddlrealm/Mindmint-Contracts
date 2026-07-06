@@ -157,7 +157,9 @@ impl AchievementSets {
 
         env.storage().persistent().set(&DataKey::Config, &cfg);
         env.storage().persistent().set(&DataKey::NextSetId, &1u32);
-        env.storage().persistent().set(&DataKey::NextSynergyId, &1u32);
+        env.storage()
+            .persistent()
+            .set(&DataKey::NextSynergyId, &1u32);
         env.storage()
             .persistent()
             .set(&DataKey::NextEditionTokenId, &1u32);
@@ -165,6 +167,7 @@ impl AchievementSets {
 
     // ───────────── Admin: define sets/synergies ─────────────
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_set(
         env: Env,
         admin: Address,
@@ -233,7 +236,7 @@ impl AchievementSets {
         }
 
         for sid in required_set_ids.iter() {
-            let set_id = sid.clone();
+            let set_id = sid;
             Self::load_set(&env, set_id);
         }
 
@@ -270,7 +273,9 @@ impl AchievementSets {
     }
 
     pub fn get_synergy(env: Env, synergy_id: u32) -> Option<Synergy> {
-        env.storage().persistent().get(&DataKey::Synergy(synergy_id))
+        env.storage()
+            .persistent()
+            .get(&DataKey::Synergy(synergy_id))
     }
 
     pub fn get_unlocks(env: Env, player: Address) -> Vec<Symbol> {
@@ -300,8 +305,8 @@ impl AchievementSets {
 
         SetProgressView {
             completed_puzzle_ids: completed,
-            required_count: required_count as u32,
-            completed_count: completed_count as u32,
+            required_count,
+            completed_count,
             is_completed,
             is_claimed,
         }
@@ -361,7 +366,9 @@ impl AchievementSets {
     }
 
     pub fn get_edition_token(env: Env, token_id: u32) -> Option<EditionToken> {
-        env.storage().persistent().get(&DataKey::EditionToken(token_id))
+        env.storage()
+            .persistent()
+            .get(&DataKey::EditionToken(token_id))
     }
 
     // ───────────── Core: sync + claim ─────────────
@@ -375,7 +382,7 @@ impl AchievementSets {
 
         let mut completed = Vec::new(&env);
         for pid in set.required_puzzle_ids.iter() {
-            let puzzle_id = pid.clone();
+            let puzzle_id = pid;
             if owned_puzzles.contains(&puzzle_id) && !completed.contains(&puzzle_id) {
                 completed.push_back(puzzle_id);
             }
@@ -474,8 +481,10 @@ impl AchievementSets {
                 .persistent()
                 .set(&DataKey::EditionByOwner(player.clone()), &owned);
 
-            env.events()
-                .publish((EVT_ED_MINT, player.clone()), (set_id, token_id, new_claimed));
+            env.events().publish(
+                (EVT_ED_MINT, player.clone()),
+                (set_id, token_id, new_claimed),
+            );
         }
 
         Self::grant_unlock(&env, &player, set.unlock_key);
@@ -504,7 +513,7 @@ impl AchievementSets {
         }
 
         for sid in syn.required_set_ids.iter() {
-            let set_id = sid.clone();
+            let set_id = sid;
             let view = Self::sync_player_set(env.clone(), player.clone(), set_id);
             if !view.is_completed {
                 panic!("synergy not completed");
@@ -618,7 +627,7 @@ impl AchievementSets {
             return false;
         }
         for pid in set.required_puzzle_ids.iter() {
-            let puzzle_id = pid.clone();
+            let puzzle_id = pid;
             if !completed_puzzle_ids.contains(&puzzle_id) {
                 return false;
             }
@@ -664,13 +673,7 @@ impl AchievementSets {
         Self::update_global_leaderboard(env, cfg, player);
     }
 
-    fn update_set_leaderboard(
-        env: &Env,
-        cfg: &Config,
-        set_id: u32,
-        player: &Address,
-        score: i128,
-    ) {
+    fn update_set_leaderboard(env: &Env, cfg: &Config, set_id: u32, player: &Address, score: i128) {
         let now = env.ledger().timestamp();
         // Fix 2: `let mut lb` — variable doesn't need to be mutable; use directly
         let lb: Vec<SetLeaderboardEntry> = env

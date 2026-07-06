@@ -99,7 +99,9 @@ impl PrizePoolContract {
         };
 
         e.storage().persistent().set(&DataKey::Pool(id), &pool);
-        e.storage().persistent().set(&DataKey::Contributions(id), &Vec::<Contribution>::new(&e));
+        e.storage()
+            .persistent()
+            .set(&DataKey::Contributions(id), &Vec::<Contribution>::new(&e));
         id += 1;
         e.storage().instance().set(&DataKey::NextPoolId, &id);
         id - 1
@@ -111,7 +113,11 @@ impl PrizePoolContract {
             panic!("Invalid amount");
         }
 
-        let mut pool: Pool = e.storage().persistent().get(&DataKey::Pool(pool_id)).unwrap();
+        let mut pool: Pool = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Pool(pool_id))
+            .unwrap();
         if pool.status != PoolStatus::Open {
             panic!("Pool not open");
         }
@@ -120,9 +126,18 @@ impl PrizePoolContract {
         let client = token::Client::new(&e, &token);
         client.transfer(&user, &e.current_contract_address(), &amount);
 
-        let mut contributions: Vec<Contribution> = e.storage().persistent().get(&DataKey::Contributions(pool_id)).unwrap();
-        contributions.push_back(Contribution { contributor: user.clone(), amount });
-        e.storage().persistent().set(&DataKey::Contributions(pool_id), &contributions);
+        let mut contributions: Vec<Contribution> = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Contributions(pool_id))
+            .unwrap();
+        contributions.push_back(Contribution {
+            contributor: user.clone(),
+            amount,
+        });
+        e.storage()
+            .persistent()
+            .set(&DataKey::Contributions(pool_id), &contributions);
 
         pool.total += amount;
         e.storage().persistent().set(&DataKey::Pool(pool_id), &pool);
@@ -136,7 +151,11 @@ impl PrizePoolContract {
     pub fn distribute(e: Env, admin: Address, pool_id: u32, winners: Vec<Address>) {
         admin.require_auth();
 
-        let mut pool: Pool = e.storage().persistent().get(&DataKey::Pool(pool_id)).unwrap();
+        let mut pool: Pool = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Pool(pool_id))
+            .unwrap();
         if pool.status != PoolStatus::Open {
             panic!("Pool not open for distribution");
         }
@@ -175,7 +194,9 @@ impl PrizePoolContract {
             distributed_at: now,
         };
 
-        e.storage().persistent().set(&DataKey::Distribution(pool_id), &distr);
+        e.storage()
+            .persistent()
+            .set(&DataKey::Distribution(pool_id), &distr);
 
         // Mark pool as Distributed but keep funds in contract for winners to claim
         pool.status = PoolStatus::Distributed;
@@ -187,7 +208,11 @@ impl PrizePoolContract {
     pub fn claim(e: Env, user: Address, pool_id: u32) {
         user.require_auth();
 
-        let mut distr: Distribution = e.storage().persistent().get(&DataKey::Distribution(pool_id)).unwrap();
+        let mut distr: Distribution = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Distribution(pool_id))
+            .unwrap();
 
         // find user in winners (use u32 indices)
         let mut idx: Option<u32> = None;
@@ -222,7 +247,9 @@ impl PrizePoolContract {
 
         claimed_vec.set(idx_u, true);
         distr.claimed = claimed_vec.clone();
-        e.storage().persistent().set(&DataKey::Distribution(pool_id), &distr);
+        e.storage()
+            .persistent()
+            .set(&DataKey::Distribution(pool_id), &distr);
 
         let mut stats: Stats = e.storage().instance().get(&DataKey::Stats).unwrap();
         stats.total_distributed += amount;
@@ -232,10 +259,22 @@ impl PrizePoolContract {
     pub fn rollover_unclaimed(e: Env, owner: Address, pool_id: u32, target_pool_id: u32) {
         owner.require_auth();
 
-        let pool: Pool = e.storage().persistent().get(&DataKey::Pool(pool_id)).unwrap();
-        let mut target: Pool = e.storage().persistent().get(&DataKey::Pool(target_pool_id)).unwrap();
+        let pool: Pool = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Pool(pool_id))
+            .unwrap();
+        let mut target: Pool = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Pool(target_pool_id))
+            .unwrap();
 
-        let distr: Distribution = e.storage().persistent().get(&DataKey::Distribution(pool_id)).unwrap();
+        let distr: Distribution = e
+            .storage()
+            .persistent()
+            .get(&DataKey::Distribution(pool_id))
+            .unwrap();
 
         let now = e.ledger().timestamp();
 
@@ -266,17 +305,24 @@ impl PrizePoolContract {
 
         // add unclaimed to target pool total
         target.total += unclaimed;
-        e.storage().persistent().set(&DataKey::Pool(target_pool_id), &target);
+        e.storage()
+            .persistent()
+            .set(&DataKey::Pool(target_pool_id), &target);
 
         // update distribution record to mark all as claimed now
         let mut new_distr = distr.clone();
         new_distr.claimed = claimed_vec.clone();
-        e.storage().persistent().set(&DataKey::Distribution(pool_id), &new_distr);
+        e.storage()
+            .persistent()
+            .set(&DataKey::Distribution(pool_id), &new_distr);
     }
 
     // Views
     pub fn get_pool(e: Env, pool_id: u32) -> Pool {
-        e.storage().persistent().get(&DataKey::Pool(pool_id)).unwrap()
+        e.storage()
+            .persistent()
+            .get(&DataKey::Pool(pool_id))
+            .unwrap()
     }
 
     pub fn get_stats(e: Env) -> Stats {
@@ -284,6 +330,9 @@ impl PrizePoolContract {
     }
 
     pub fn get_distribution(e: Env, pool_id: u32) -> Distribution {
-        e.storage().persistent().get(&DataKey::Distribution(pool_id)).unwrap()
+        e.storage()
+            .persistent()
+            .get(&DataKey::Distribution(pool_id))
+            .unwrap()
     }
 }

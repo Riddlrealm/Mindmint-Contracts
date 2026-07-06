@@ -89,8 +89,8 @@ pub struct RateLimitWindow {
 #[derive(Clone, Debug)]
 pub struct BehavioralPattern {
     pub avg_interaction_interval_ms: u64,
-    pub pattern_variance: u32,   // 0-1000, lower = more bot-like
-    pub consistency_score: u32,  // 0-1000, higher = more bot-like
+    pub pattern_variance: u32,       // 0-1000, lower = more bot-like
+    pub consistency_score: u32,      // 0-1000, higher = more bot-like
     pub time_distribution: Vec<u64>, // timestamps of last 10 interactions
     pub gas_pattern_variance: u32,
 }
@@ -99,11 +99,11 @@ pub struct BehavioralPattern {
 #[derive(Clone, Debug)]
 pub struct CaptchaChallenge {
     pub challenge_id: u32,
-    pub difficulty: u32,          // 1-5 difficulty levels
+    pub difficulty: u32, // 1-5 difficulty levels
     pub created_at: u64,
     pub expires_at: u64,
     pub target_prefix: BytesN<4>, // Hash prefix challenge
-    pub min_iterations: u32,     // Proof of work iterations required
+    pub min_iterations: u32,      // Proof of work iterations required
 }
 
 #[contracttype]
@@ -121,7 +121,7 @@ pub struct SuspiciousActivity {
     pub activity_type: ActivityType,
     pub timestamp: u64,
     pub evidence: Symbol,
-    pub severity: u32,            // 1-10 severity scale
+    pub severity: u32, // 1-10 severity scale
 }
 
 #[contracttype]
@@ -156,8 +156,8 @@ pub struct PenaltyRecord {
 #[repr(u32)]
 pub enum PenaltyType {
     Warning,
-    TemporaryBan,      // Hours
-    ExtendedBan,       // Days
+    TemporaryBan, // Hours
+    ExtendedBan,  // Days
     PermanentBan,
     ScoreReduction,
     VerificationRequired,
@@ -271,11 +271,11 @@ impl AntiBot {
             admin: admin.clone(),
             verifiers: Vec::new(&env),
             max_attempts_per_window: 10,
-            rate_limit_window_seconds: 300, // 5 minutes
+            rate_limit_window_seconds: 300,    // 5 minutes
             min_solve_time_threshold_ms: 5000, // 5 seconds minimum
-            suspicious_solve_time_ms: 2000,   // 2 seconds is suspicious
+            suspicious_solve_time_ms: 2000,    // 2 seconds is suspicious
             captcha_difficulty: 2,
-            captcha_validity_seconds: 300,    // 5 minutes
+            captcha_validity_seconds: 300, // 5 minutes
             pattern_analysis_window: 10,
             max_consecutive_fast_solves: 3,
             appeal_period_days: 7,
@@ -286,14 +286,15 @@ impl AntiBot {
 
         env.storage().instance().set(&DataKey::Config, &config);
         env.storage().instance().set(&DataKey::Initialized, &true);
-        env.storage().instance().set(&DataKey::ChallengeCounter, &0u32);
-        env.storage().instance().set(&DataKey::PenaltyCounter, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::ChallengeCounter, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::PenaltyCounter, &0u32);
         env.storage().instance().set(&DataKey::AppealCounter, &0u32);
 
-        env.events().publish(
-            (symbol_short!("init"), admin),
-            (),
-        );
+        env.events().publish((symbol_short!("init"), admin), ());
 
         Ok(())
     }
@@ -317,7 +318,7 @@ impl AntiBot {
             .ok_or(AntiBotError::NotInitialized)?;
 
         let caller = env.current_contract_address(); // Use invoker in real scenario
-        // For now, require admin or check if caller is in verifiers list
+                                                     // For now, require admin or check if caller is in verifiers list
         config.admin.require_auth();
         Ok(())
     }
@@ -375,7 +376,10 @@ impl AntiBot {
     // CAPTCHA-LIKE VERIFICATION
     // ========================================================================
 
-    pub fn generate_captcha_challenge(env: Env, player: Address) -> Result<CaptchaChallenge, AntiBotError> {
+    pub fn generate_captcha_challenge(
+        env: Env,
+        player: Address,
+    ) -> Result<CaptchaChallenge, AntiBotError> {
         player.require_auth();
 
         let config: Config = env
@@ -391,19 +395,24 @@ impl AntiBot {
             .unwrap_or(0);
 
         let new_counter = counter + 1;
-        env.storage().instance().set(&DataKey::ChallengeCounter, &new_counter);
+        env.storage()
+            .instance()
+            .set(&DataKey::ChallengeCounter, &new_counter);
 
         let now = env.ledger().timestamp();
         let difficulty = config.captcha_difficulty;
-        
+
         // Generate pseudo-random challenge based on timestamp and player address
-        let seed_bytes = Bytes::from_array(&env, &[
-            (now & 0xFF) as u8,
-            ((now >> 8) & 0xFF) as u8,
-            ((now >> 16) & 0xFF) as u8,
-            ((now >> 24) & 0xFF) as u8,
-        ]);
-        
+        let seed_bytes = Bytes::from_array(
+            &env,
+            &[
+                (now & 0xFF) as u8,
+                ((now >> 8) & 0xFF) as u8,
+                ((now >> 16) & 0xFF) as u8,
+                ((now >> 24) & 0xFF) as u8,
+            ],
+        );
+
         let hash: BytesN<32> = env.crypto().sha256(&seed_bytes).into();
         let mut prefix_bytes = [0u8; 4];
         for i in 0..4u32 {
@@ -468,21 +477,24 @@ impl AntiBot {
         // Use the player's raw bytes representation
         // In Soroban, we can convert Address to bytes using to_string or by using as a key
         // For simplicity, we'll use a hash of the address combined with the challenge_id
-        let challenge_bytes = Bytes::from_array(&env, &[
-            ((proof.challenge_id >> 0) & 0xFF) as u8,
-            ((proof.challenge_id >> 8) & 0xFF) as u8,
-            ((proof.challenge_id >> 16) & 0xFF) as u8,
-            ((proof.challenge_id >> 24) & 0xFF) as u8,
-        ]);
+        let challenge_bytes = Bytes::from_array(
+            &env,
+            &[
+                ((proof.challenge_id >> 0) & 0xFF) as u8,
+                ((proof.challenge_id >> 8) & 0xFF) as u8,
+                ((proof.challenge_id >> 16) & 0xFF) as u8,
+                ((proof.challenge_id >> 24) & 0xFF) as u8,
+            ],
+        );
         data.append(&challenge_bytes);
-        
+
         // Append nonce bytes
         for i in 0..8 {
             data.push_back(((proof.nonce >> (i * 8)) & 0xFF) as u8);
         }
 
         let computed_hash: BytesN<32> = env.crypto().sha256(&data).into();
-        
+
         // Verify proof hash matches computed
         if computed_hash != proof.proof_hash {
             return Err(AntiBotError::VerificationFailed);
@@ -542,7 +554,7 @@ impl AntiBot {
             .ok_or(AntiBotError::NotInitialized)?;
 
         let now = env.ledger().timestamp();
-        
+
         let mut window: RateLimitWindow = env
             .storage()
             .persistent()
@@ -614,14 +626,14 @@ impl AntiBot {
             .ok_or(AntiBotError::NotInitialized)?;
 
         let now = env.ledger().timestamp();
-        
+
         // Get or create profile
         let mut profile = Self::get_or_create_profile(&env, &player);
-        
+
         // Update basic stats
         profile.total_attempts += 1;
         profile.last_activity = now;
-        
+
         if success {
             profile.successful_attempts += 1;
         } else {
@@ -631,7 +643,7 @@ impl AntiBot {
         // Check for too-fast solve
         if success && solve_time_ms < config.min_solve_time_threshold_ms {
             profile.consecutive_fast_solves += 1;
-            
+
             if solve_time_ms < config.suspicious_solve_time_ms {
                 Self::record_suspicious_activity(
                     &env,
@@ -647,9 +659,10 @@ impl AntiBot {
 
         // Update average solve time
         if success && profile.successful_attempts > 0 {
-            profile.avg_solve_time_ms = 
-                (profile.avg_solve_time_ms * (profile.successful_attempts - 1) as u64 + solve_time_ms)
-                    / profile.successful_attempts as u64;
+            profile.avg_solve_time_ms = (profile.avg_solve_time_ms
+                * (profile.successful_attempts - 1) as u64
+                + solve_time_ms)
+                / profile.successful_attempts as u64;
         }
 
         // Check for bot patterns
@@ -677,7 +690,7 @@ impl AntiBot {
             .persistent()
             .get(&DataKey::ActivityCount(player.clone()))
             .unwrap_or(0);
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::ActivityHistory(player.clone(), count), &activity);
@@ -690,7 +703,7 @@ impl AntiBot {
 
         // Update trust score based on activity
         Self::update_trust_score(&env, &mut profile)?;
-        
+
         Self::update_profile(&env, &player, &profile);
 
         env.events().publish(
@@ -713,7 +726,7 @@ impl AntiBot {
             .ok_or(AntiBotError::NotInitialized)?;
 
         let window_size = config.pattern_analysis_window as usize;
-        
+
         let mut pattern: BehavioralPattern = env
             .storage()
             .persistent()
@@ -728,7 +741,7 @@ impl AntiBot {
 
         // Add new timestamp
         pattern.time_distribution.push_back(new_activity.timestamp);
-        
+
         // Keep only last N timestamps
         while pattern.time_distribution.len() > window_size as u32 {
             let _ = pattern.time_distribution.remove(0);
@@ -738,7 +751,7 @@ impl AntiBot {
         if pattern.time_distribution.len() >= 3 {
             let mut intervals = Vec::new(&env);
             let len = pattern.time_distribution.len();
-            
+
             for i in 1..len {
                 let current = pattern.time_distribution.get(i).unwrap_or(0);
                 let prev = pattern.time_distribution.get(i - 1).unwrap_or(0);
@@ -759,9 +772,9 @@ impl AntiBot {
                 };
                 variance_sum += diff * diff;
             }
-            
+
             let variance = variance_sum / intervals.len() as u64;
-            
+
             // High consistency (low variance) is suspicious for bots
             // Normalize to 0-1000 scale
             pattern.pattern_variance = (variance.min(1000000) / 1000) as u32;
@@ -771,12 +784,11 @@ impl AntiBot {
             if new_activity.gas_used > 0 {
                 // Bot might use consistent gas amounts
                 let gas_threshold = 100; // threshold for gas consistency
-                pattern.gas_pattern_variance = 
-                    if new_activity.gas_used % 1000 == 0 {
-                        900 // suspicious: round gas usage
-                    } else {
-                        400 // normal variance
-                    };
+                pattern.gas_pattern_variance = if new_activity.gas_used % 1000 == 0 {
+                    900 // suspicious: round gas usage
+                } else {
+                    400 // normal variance
+                };
             }
         }
 
@@ -796,7 +808,7 @@ impl AntiBot {
     pub fn analyze_player(env: Env, player: Address) -> Result<PlayerAnalysis, AntiBotError> {
         let profile = Self::get_or_create_profile(&env, &player);
         let pattern = Self::get_behavioral_pattern(env.clone(), player.clone());
-        
+
         let mut risk_factors: Vec<Symbol> = Vec::new(&env);
         let mut recommendation = symbol_short!("allow");
         let mut bot_probability: u32 = 0;
@@ -818,7 +830,7 @@ impl AntiBot {
                 risk_factors.push_back(symbol_short!("cons_time"));
                 bot_probability += 25;
             }
-            
+
             if p.gas_pattern_variance > 700 {
                 risk_factors.push_back(symbol_short!("gas_patt"));
                 bot_probability += 15;
@@ -866,7 +878,7 @@ impl AntiBot {
     ) -> Result<(), AntiBotError> {
         let now = env.ledger().timestamp();
         let evidence_for_event = evidence.clone();
-        
+
         let activity = SuspiciousActivity {
             activity_type,
             timestamp: now,
@@ -879,29 +891,27 @@ impl AntiBot {
             .persistent()
             .get(&DataKey::SuspiciousCount(player.clone()))
             .unwrap_or(0);
-        
-        env.storage()
-            .persistent()
-            .set(&DataKey::SuspiciousActivity(player.clone(), count), &activity);
+
+        env.storage().persistent().set(
+            &DataKey::SuspiciousActivity(player.clone(), count),
+            &activity,
+        );
         env.storage()
             .persistent()
             .set(&DataKey::SuspiciousCount(player.clone()), &(count + 1));
 
         // Update player status if needed
         let mut profile = Self::get_or_create_profile(env, player);
-        
-        if profile.status != 3 
-            && profile.status != 4
-            && profile.status != 7 {
-            
+
+        if profile.status != 3 && profile.status != 4 && profile.status != 7 {
             // Check if we should flag the player
             let total_suspicious = count + 1;
             let high_severity_count = Self::count_high_severity_activities(env, player);
-            
+
             if severity >= 8 || (total_suspicious >= 5 && high_severity_count >= 2) {
                 profile.status = 3;
                 Self::update_profile(env, player, &profile);
-                
+
                 env.events().publish(
                     (symbol_short!("flagged"), player.clone()),
                     (evidence_for_event, severity),
@@ -918,7 +928,7 @@ impl AntiBot {
             .persistent()
             .get(&DataKey::SuspiciousCount(player.clone()))
             .unwrap_or(0);
-        
+
         let mut high_count = 0;
         for i in 0..count {
             if let Some(activity) = env
@@ -945,11 +955,11 @@ impl AntiBot {
             .persistent()
             .get(&DataKey::SuspiciousCount(player.clone()))
             .unwrap_or(0);
-        
+
         let mut result = Vec::new(&env);
         let start = offset.min(count);
         let end = (offset + limit).min(count);
-        
+
         for i in start..end {
             if let Some(activity) = env
                 .storage()
@@ -959,7 +969,7 @@ impl AntiBot {
                 result.push_back(activity);
             }
         }
-        
+
         result
     }
 
@@ -975,12 +985,16 @@ impl AntiBot {
         profile.status = 3;
         Self::update_profile(&env, &player, &profile);
 
-        Self::record_suspicious_activity(&env, &player, ActivityType::SuspiciousTiming, reason.clone(), severity)?;
+        Self::record_suspicious_activity(
+            &env,
+            &player,
+            ActivityType::SuspiciousTiming,
+            reason.clone(),
+            severity,
+        )?;
 
-        env.events().publish(
-            (symbol_short!("flagged"), player),
-            (reason, severity),
-        );
+        env.events()
+            .publish((symbol_short!("flagged"), player), (reason, severity));
 
         Ok(())
     }
@@ -989,16 +1003,14 @@ impl AntiBot {
         Self::require_admin(&env)?;
 
         let mut profile = Self::get_or_create_profile(&env, &player);
-        
+
         match profile.status {
             3 | 2 => {
                 profile.status = 1;
                 Self::update_profile(&env, &player, &profile);
-                
-                env.events().publish(
-                    (symbol_short!("unflagged"), player),
-                    (),
-                );
+
+                env.events()
+                    .publish((symbol_short!("unflagged"), player), ());
                 Ok(())
             }
             _ => Err(AntiBotError::Unauthorized),
@@ -1043,7 +1055,12 @@ impl AntiBot {
 
         env.events().publish(
             (symbol_short!("window"), puzzle_id),
-            (min_solve_time_ms, max_solve_time_ms, submission_start, submission_end),
+            (
+                min_solve_time_ms,
+                max_solve_time_ms,
+                submission_start,
+                submission_end,
+            ),
         );
 
         Ok(())
@@ -1064,7 +1081,9 @@ impl AntiBot {
         let now = env.ledger().timestamp();
 
         // Check submission window
-        if now < window.submission_start || now > window.submission_end + (window.grace_period_ms / 1000) {
+        if now < window.submission_start
+            || now > window.submission_end + (window.grace_period_ms / 1000)
+        {
             Self::record_suspicious_activity(
                 &env,
                 &player,
@@ -1115,7 +1134,9 @@ impl AntiBot {
         let pattern = env
             .storage()
             .persistent()
-            .get::<DataKey, BehavioralPattern>(&DataKey::BehavioralPattern(profile.address.clone()));
+            .get::<DataKey, BehavioralPattern>(&DataKey::BehavioralPattern(
+                profile.address.clone(),
+            ));
 
         let mut score: u32 = 500; // Start neutral
 
@@ -1159,7 +1180,7 @@ impl AntiBot {
 
         // Update reputation tier
         profile.reputation_tier = match profile.trust_score {
-            0..=199 => 0, // New/Suspicious
+            0..=199 => 0,   // New/Suspicious
             200..=399 => 1, // Low trust
             400..=599 => 2, // Neutral
             600..=749 => 3, // Good
@@ -1204,9 +1225,12 @@ impl AntiBot {
             .storage()
             .instance()
             .get(&DataKey::PenaltyCounter)
-            .unwrap_or(0) + 1;
-        
-        env.storage().instance().set(&DataKey::PenaltyCounter, &penalty_id);
+            .unwrap_or(0)
+            + 1;
+
+        env.storage()
+            .instance()
+            .set(&DataKey::PenaltyCounter, &penalty_id);
 
         // Calculate expiration
         let expires_at = match penalty_type {
@@ -1239,13 +1263,15 @@ impl AntiBot {
             .persistent()
             .get(&DataKey::PlayerPenaltyCount(player.clone()))
             .unwrap_or(0);
-        
-        env.storage()
-            .persistent()
-            .set(&DataKey::PlayerPenalties(player.clone(), player_penalty_count), &penalty_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::PlayerPenaltyCount(player.clone()), &(player_penalty_count + 1));
+
+        env.storage().persistent().set(
+            &DataKey::PlayerPenalties(player.clone(), player_penalty_count),
+            &penalty_id,
+        );
+        env.storage().persistent().set(
+            &DataKey::PlayerPenaltyCount(player.clone()),
+            &(player_penalty_count + 1),
+        );
 
         // Update player profile
         let mut profile = Self::get_or_create_profile(&env, &player);
@@ -1285,7 +1311,7 @@ impl AntiBot {
             .ok_or(AntiBotError::Unauthorized)?;
 
         penalty.active = false;
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Penalty(penalty_id), &penalty);
@@ -1300,10 +1326,8 @@ impl AntiBot {
             }
         }
 
-        env.events().publish(
-            (symbol_short!("pen_rem"), penalty_id),
-            (),
-        );
+        env.events()
+            .publish((symbol_short!("pen_rem"), penalty_id), ());
 
         Ok(())
     }
@@ -1320,10 +1344,10 @@ impl AntiBot {
             .persistent()
             .get(&DataKey::PlayerPenaltyCount(player.clone()))
             .unwrap_or(0);
-        
+
         let now = env.ledger().timestamp();
         let mut active = 0;
-        
+
         for i in 0..count {
             if let Some(penalty_id) = env
                 .storage()
@@ -1341,7 +1365,7 @@ impl AntiBot {
                 }
             }
         }
-        
+
         active
     }
 
@@ -1400,22 +1424,25 @@ impl AntiBot {
             .instance()
             .get(&DataKey::AppealCounter)
             .unwrap_or(0);
-        
+
         for i in 1..=appeal_count {
             if let Some(existing_appeal) = env
                 .storage()
                 .persistent()
                 .get::<DataKey, Appeal>(&DataKey::Appeal(i))
             {
-                if existing_appeal.penalty_id == penalty_id 
-                    && existing_appeal.status == AppealStatus::Pending {
+                if existing_appeal.penalty_id == penalty_id
+                    && existing_appeal.status == AppealStatus::Pending
+                {
                     return Err(AntiBotError::AlreadyAppealed);
                 }
             }
         }
 
         let new_appeal_id = appeal_count + 1;
-        env.storage().instance().set(&DataKey::AppealCounter, &new_appeal_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::AppealCounter, &new_appeal_id);
 
         let appeal = Appeal {
             appeal_id: new_appeal_id,
@@ -1490,7 +1517,7 @@ impl AntiBot {
             // Remove the penalty
             let _ = Self::remove_penalty(env.clone(), appeal.penalty_id);
             profile.status = 1;
-            
+
             // Restore some trust score
             profile.trust_score = (profile.trust_score + 100).min(1000);
         } else {
@@ -1513,9 +1540,7 @@ impl AntiBot {
     }
 
     pub fn get_appeal(env: Env, appeal_id: u32) -> Option<Appeal> {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Appeal(appeal_id))
+        env.storage().persistent().get(&DataKey::Appeal(appeal_id))
     }
 
     // ========================================================================
@@ -1534,10 +1559,8 @@ impl AntiBot {
         profile.trust_score = 1000;
         Self::update_profile(&env, &player, &profile);
 
-        env.events().publish(
-            (symbol_short!("whitelist"), player),
-            (),
-        );
+        env.events()
+            .publish((symbol_short!("whitelist"), player), ());
 
         Ok(())
     }
@@ -1554,19 +1577,12 @@ impl AntiBot {
         profile.trust_score = 800;
         Self::update_profile(&env, &player, &profile);
 
-        env.events().publish(
-            (symbol_short!("unwhite"), player),
-            (),
-        );
+        env.events().publish((symbol_short!("unwhite"), player), ());
 
         Ok(())
     }
 
-    pub fn blacklist_player(
-        env: Env,
-        player: Address,
-        reason: Symbol,
-    ) -> Result<(), AntiBotError> {
+    pub fn blacklist_player(env: Env, player: Address, reason: Symbol) -> Result<(), AntiBotError> {
         Self::require_admin(&env)?;
 
         env.storage()
@@ -1588,10 +1604,8 @@ impl AntiBot {
             10,
         )?;
 
-        env.events().publish(
-            (symbol_short!("blacklist"), player),
-            (reason_for_event,),
-        );
+        env.events()
+            .publish((symbol_short!("blacklist"), player), (reason_for_event,));
 
         Ok(())
     }
@@ -1608,10 +1622,7 @@ impl AntiBot {
         profile.trust_score = 300; // Low starting score
         Self::update_profile(&env, &player, &profile);
 
-        env.events().publish(
-            (symbol_short!("unblack"), player),
-            (),
-        );
+        env.events().publish((symbol_short!("unblack"), player), ());
 
         Ok(())
     }
@@ -1661,12 +1672,8 @@ impl AntiBot {
         Self::check_rate_limit(env.clone(), player.clone())?;
 
         // Validate submission time window
-        let time_valid = Self::validate_submission_time(
-            env.clone(),
-            player.clone(),
-            puzzle_id,
-            solve_time_ms,
-        )?;
+        let time_valid =
+            Self::validate_submission_time(env.clone(), player.clone(), puzzle_id, solve_time_ms)?;
 
         if !time_valid {
             return Ok(VerificationResult {
@@ -1679,7 +1686,7 @@ impl AntiBot {
 
         // Get player analysis
         let analysis = Self::analyze_player(env.clone(), player.clone())?;
-        
+
         let mut allowed = true;
         let mut required_action = symbol_short!("none");
 
@@ -1688,7 +1695,7 @@ impl AntiBot {
             rec if rec == symbol_short!("block") => {
                 allowed = false;
                 required_action = symbol_short!("blocked");
-                
+
                 // Apply penalty for high bot probability
                 if analysis.bot_probability > 85 {
                     let _ = Self::apply_penalty(
@@ -1750,7 +1757,7 @@ impl AntiBot {
             .instance()
             .get(&DataKey::Config)
             .ok_or(AntiBotError::NotInitialized)?;
-        
+
         config.verifiers.push_back(verifier);
         env.storage().instance().set(&DataKey::Config, &config);
 
@@ -1765,12 +1772,12 @@ impl AntiBot {
             .instance()
             .get(&DataKey::Config)
             .ok_or(AntiBotError::NotInitialized)?;
-        
+
         let index = config.verifiers.iter().position(|v| v == verifier);
         if let Some(idx) = index {
             let _ = config.verifiers.remove(idx.try_into().unwrap());
         }
-        
+
         env.storage().instance().set(&DataKey::Config, &config);
         Ok(())
     }
@@ -1803,4 +1810,3 @@ pub struct VerificationResult {
 // ============================================================================
 // TEST MODULE
 // ============================================================================
-

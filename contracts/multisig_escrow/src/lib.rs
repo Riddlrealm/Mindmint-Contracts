@@ -81,7 +81,7 @@ pub enum EscrowError {
 // ---------------------------------------------------------------------------
 
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum EscrowState {
     Pending = 0,
     Active = 1,
@@ -93,14 +93,14 @@ pub enum EscrowState {
 }
 
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum VoteAction {
     ApproveRelease = 0,
     ApproveRefund = 1,
 }
 
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DisputeResolution {
     Release = 0,
     Refund = 1,
@@ -112,8 +112,8 @@ pub enum DisputeResolution {
 pub struct Dispute {
     pub raised_by: Address,
     pub raised_at: u64,
-    pub evidence_hash: Option<BytesN<32>>,
-    pub resolution: Option<DisputeResolution>,
+    pub evidence_hash: Vec<BytesN<32>>, // SDK 21.x: Option<&contracttype> workaround; empty=None, single=Some
+    pub resolution: Vec<DisputeResolution>, // SDK 21.x: Option<&contracttype> workaround
     pub resolved_at: Option<u64>,
 }
 
@@ -132,7 +132,7 @@ pub struct Escrow {
     pub expires_at: u64,
     pub funded: bool,
     pub state: EscrowState,
-    pub dispute: Option<Dispute>,
+    pub dispute: Vec<Dispute>, // SDK 21.x: Option<&contracttype> workaround
 }
 
 #[contracttype]
@@ -255,12 +255,10 @@ impl MultisigEscrowContract {
             expires_at,
             funded: false,
             state: EscrowState::Pending,
-            dispute: None,
+            dispute: Vec::new(&env),
         };
         env.storage().instance().set(&DataKey::Escrow(id), &escrow);
-        env.storage()
-            .instance()
-            .set(&DataKey::EscrowCounter, &id);
+        env.storage().instance().set(&DataKey::EscrowCounter, &id);
 
         env.events().publish(
             (symbol_short!("ms_crt"),),
@@ -297,7 +295,9 @@ impl MultisigEscrowContract {
 
         escrow.funded = true;
         escrow.state = EscrowState::Active;
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events().publish(
             (symbol_short!("ms_fund"),),
@@ -372,10 +372,8 @@ impl MultisigEscrowContract {
             }
         }
 
-        env.events().publish(
-            (symbol_short!("ms_sign"),),
-            (escrow_id, signer, action),
-        );
+        env.events()
+            .publish((symbol_short!("ms_sign"),), (escrow_id, signer, action));
         Ok(())
     }
 
@@ -416,7 +414,9 @@ impl MultisigEscrowContract {
         );
 
         escrow.state = EscrowState::Released;
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events().publish(
             (symbol_short!("ms_rel"),),
@@ -457,7 +457,9 @@ impl MultisigEscrowContract {
         );
 
         escrow.state = EscrowState::Refunded;
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events().publish(
             (symbol_short!("ms_rfd"),),
@@ -492,7 +494,7 @@ impl MultisigEscrowContract {
         if escrow.state != EscrowState::Active {
             return Err(EscrowError::InvalidState);
         }
-        if escrow.dispute.is_some() {
+        if escrow.dispute.is_empty() == false {
             return Err(EscrowError::AlreadyDisputed);
         }
         if escrow.arbitrator.is_none() {
@@ -502,15 +504,24 @@ impl MultisigEscrowContract {
             return Err(EscrowError::InvalidDisputeCaster);
         }
 
-        escrow.dispute = Some(Dispute {
+        // SDK 21.x: evidence_hash field is Vec<BytesN<32>>. Build single-element vec on Some.
+        let mut evidence_vec: Vec<BytesN<32>> = Vec::new(&env);
+        if let Some(h) = evidence_hash.clone() {
+            evidence_vec.push_back(h);
+        }
+        let mut dispute_vec: Vec<Dispute> = Vec::new(&env);
+        dispute_vec.push_back(Dispute {
             raised_by: caller.clone(),
             raised_at: env.ledger().timestamp(),
-            evidence_hash: evidence_hash.clone(),
-            resolution: None,
+            evidence_hash: evidence_vec,
+            resolution: Vec::new(&env),
             resolved_at: None,
         });
+        escrow.dispute = dispute_vec;
         escrow.state = EscrowState::Disputed;
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events().publish(
             (symbol_short!("ms_disp"),),
@@ -572,11 +583,18 @@ impl MultisigEscrowContract {
         }
 
         // Stamp the dispute with the resolution.
-        let mut dispute = escrow.dispute.clone().unwrap();
-        dispute.resolution = Some(resolution.clone());
+        // Vec<Dispute> from previous round; use get(0).unwrap() (guarded by state==Disputed check).
+        let mut dispute = escrow.dispute.get(0).unwrap();
+        let mut res_vec: Vec<DisputeResolution> = Vec::new(&env);
+        res_vec.push_back(resolution.clone());
+        dispute.resolution = res_vec;
         dispute.resolved_at = Some(env.ledger().timestamp());
-        escrow.dispute = Some(dispute);
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        let mut disp_vec: Vec<Dispute> = Vec::new(&env);
+        disp_vec.push_back(dispute);
+        escrow.dispute = disp_vec;
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
         env.events().publish(
             (symbol_short!("ms_dres"),),
@@ -638,9 +656,12 @@ impl MultisigEscrowContract {
         }
         escrow.state = EscrowState::Cancelled;
         escrow.funded = false;
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
-        env.events().publish((symbol_short!("ms_cncl"),), (escrow_id, depositor));
+        env.events()
+            .publish((symbol_short!("ms_cncl"),), (escrow_id, depositor));
         Ok(())
     }
 
@@ -674,9 +695,12 @@ impl MultisigEscrowContract {
 
         escrow.state = EscrowState::Expired;
         escrow.funded = false;
-        env.storage().instance().set(&DataKey::Escrow(escrow_id), &escrow);
+        env.storage()
+            .instance()
+            .set(&DataKey::Escrow(escrow_id), &escrow);
 
-        env.events().publish((symbol_short!("ms_exp"),), (escrow_id, escrow.depositor));
+        env.events()
+            .publish((symbol_short!("ms_exp"),), (escrow_id, escrow.depositor));
         Ok(())
     }
 
@@ -689,7 +713,9 @@ impl MultisigEscrowContract {
     }
 
     pub fn get_vote(env: Env, escrow_id: u64, signer: Address) -> Option<VoteAction> {
-        env.storage().instance().get(&DataKey::Vote(escrow_id, signer))
+        env.storage()
+            .instance()
+            .get(&DataKey::Vote(escrow_id, signer))
     }
 
     /// Combined counters for dashboards / off-chain indexing.
@@ -767,4 +793,3 @@ fn has_duplicates(list: &Vec<Address>) -> bool {
 // ===========================================================================
 // Tests
 // ===========================================================================
-

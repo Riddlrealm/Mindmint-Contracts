@@ -1,5 +1,5 @@
-use soroban_sdk::{Env, Address};
-use crate::types::{DataKey, VotingConfig, PuzzleVote, PuzzleVotingAggregate};
+use crate::types::{DataKey, PuzzleVote, PuzzleVotingAggregate, VotingConfig};
+use soroban_sdk::{Address, Env};
 
 //
 // ──────────────────────────────────────────────────────────

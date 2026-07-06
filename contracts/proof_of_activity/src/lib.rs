@@ -2,8 +2,10 @@
 
 mod types;
 
-use soroban_sdk::{contract, contractimpl, contracterror, vec, Address, Env, Symbol, symbol_short, Vec};
-use types::{ActivityType};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, symbol_short, vec, Address, Env, Symbol, Vec,
+};
+use types::ActivityType;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -27,9 +29,15 @@ impl ProofOfActivityContract {
             return Err(ContractError::AlreadyInitialized);
         }
 
-        env.storage().instance().set(&symbol_short!("OR_CFG"), &admin);
-        env.storage().instance().set(&symbol_short!("ORACLES"), &vec![&env, admin.clone()]);
-        env.storage().instance().set(&symbol_short!("PROOF_CNT"), &0u64);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("OR_CFG"), &admin);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("ORACLES"), &vec![&env, admin.clone()]);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("PROOF_CNT"), &0u64);
 
         Ok(())
     }
@@ -43,33 +51,33 @@ impl ProofOfActivityContract {
         score: u64,
     ) -> Result<u64, ContractError> {
         oracle.require_auth();
-        
+
         Self::is_authorized(&env, &oracle)?;
 
         let proof_id = Self::get_next_proof_id(&env);
-        
+
         // Store proof data as tuple in persistent storage
-        let proof_data = (player.clone(), activity_type as u32, ref_id.clone(), env.ledger().timestamp(), score);
+        let proof_data = (
+            player.clone(),
+            activity_type as u32,
+            ref_id.clone(),
+            env.ledger().timestamp(),
+            score,
+        );
         env.storage()
             .persistent()
             .set(&(symbol_short!("PROOF"), proof_id), &proof_data);
 
         // Update player's proof count for this activity type
         let count_key = (symbol_short!("CNT"), player.clone(), activity_type as u32);
-        let current_count: u32 = env.storage()
-            .persistent()
-            .get(&count_key)
-            .unwrap_or(0);
+        let current_count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
         env.storage()
             .persistent()
             .set(&count_key, &(current_count + 1));
 
         // Update player's total score
         let score_key = (symbol_short!("SCORE"), player.clone());
-        let current_score: u64 = env.storage()
-            .persistent()
-            .get(&score_key)
-            .unwrap_or(0);
+        let current_score: u64 = env.storage().persistent().get(&score_key).unwrap_or(0);
         env.storage()
             .persistent()
             .set(&score_key, &(current_score + score));
@@ -83,7 +91,10 @@ impl ProofOfActivityContract {
         Ok(proof_id)
     }
 
-    pub fn get_proof(env: Env, proof_id: u64) -> Result<(Address, u32, Symbol, u64, u64), ContractError> {
+    pub fn get_proof(
+        env: Env,
+        proof_id: u64,
+    ) -> Result<(Address, u32, Symbol, u64, u64), ContractError> {
         env.storage()
             .persistent()
             .get(&(symbol_short!("PROOF"), proof_id))
@@ -110,9 +121,16 @@ impl ProofOfActivityContract {
 
         let mut found_count = 0;
         let mut collected = 0;
-        
+
         for proof_id in 1..=proof_counter {
-            if let Some(proof) = env.storage().persistent().get::<(Symbol, u64), (Address, u32, Symbol, u64, u64)>(&(symbol_short!("PROOF"), proof_id)) {
+            if let Some(proof) = env
+                .storage()
+                .persistent()
+                .get::<(Symbol, u64), (Address, u32, Symbol, u64, u64)>(&(
+                    symbol_short!("PROOF"),
+                    proof_id,
+                ))
+            {
                 if proof.0 == player && proof.1 == activity_type as u32 {
                     if found_count >= offset && collected < limit {
                         proofs.push_back(proof);
@@ -128,10 +146,7 @@ impl ProofOfActivityContract {
 
     pub fn get_activity_score(env: Env, player: Address) -> u64 {
         let score_key = (symbol_short!("SCORE"), player);
-        env.storage()
-            .persistent()
-            .get(&score_key)
-            .unwrap_or(0)
+        env.storage().persistent().get(&score_key).unwrap_or(0)
     }
 
     pub fn get_activity_count(env: Env, player: Address, activity_type: u32) -> u32 {
@@ -144,40 +159,44 @@ impl ProofOfActivityContract {
 
     pub fn add_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), ContractError> {
         admin.require_auth();
-        
+
         Self::is_admin(&env, &admin)?;
-        
+
         let mut oracles: Vec<Address> = env
             .storage()
             .instance()
             .get(&symbol_short!("ORACLES"))
             .unwrap_or_else(|| vec![&env]);
-        
+
         oracles.push_back(oracle.clone());
-        env.storage().instance().set(&symbol_short!("ORACLES"), &oracles);
+        env.storage()
+            .instance()
+            .set(&symbol_short!("ORACLES"), &oracles);
 
         Ok(())
     }
 
     pub fn remove_oracle(env: Env, admin: Address, oracle: Address) -> Result<(), ContractError> {
         admin.require_auth();
-        
+
         Self::is_admin(&env, &admin)?;
-        
+
         let oracles: Vec<Address> = env
             .storage()
             .instance()
             .get(&symbol_short!("ORACLES"))
             .unwrap_or_else(|| vec![&env]);
-        
+
         let mut new_oracles = vec![&env];
         for existing_oracle in oracles.iter() {
             if existing_oracle != oracle {
                 new_oracles.push_back(existing_oracle);
             }
         }
-        
-        env.storage().instance().set(&symbol_short!("ORACLES"), &new_oracles);
+
+        env.storage()
+            .instance()
+            .set(&symbol_short!("ORACLES"), &new_oracles);
 
         Ok(())
     }
@@ -192,10 +211,12 @@ impl ProofOfActivityContract {
             .instance()
             .get(&symbol_short!("PROOF_CNT"))
             .unwrap_or(0);
-        
+
         let next_id = counter + 1;
-        env.storage().instance().set(&symbol_short!("OR_CNT"), &next_id);
-        
+        env.storage()
+            .instance()
+            .set(&symbol_short!("OR_CNT"), &next_id);
+
         next_id
     }
 
@@ -205,7 +226,7 @@ impl ProofOfActivityContract {
             .instance()
             .get(&symbol_short!("OR_CFG"))
             .ok_or(ContractError::NotInitialized)?;
-        
+
         if admin == *address {
             Ok(())
         } else {
@@ -219,13 +240,13 @@ impl ProofOfActivityContract {
             .instance()
             .get(&symbol_short!("ORACLES"))
             .unwrap_or_else(|| vec![env]);
-        
+
         for authorized_oracle in oracles.iter() {
             if authorized_oracle == *oracle {
                 return Ok(());
             }
         }
-        
+
         Err(ContractError::Unauthorized)
     }
 }

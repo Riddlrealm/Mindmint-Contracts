@@ -89,7 +89,9 @@ impl TournamentPrizePoolContract {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Oracle, &oracle);
         env.storage().instance().set(&DataKey::Token, &token);
-        env.storage().instance().set(&DataKey::NextTournamentId, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextTournamentId, &0u32);
 
         Ok(())
     }
@@ -138,13 +140,15 @@ impl TournamentPrizePoolContract {
             distributed: false,
         };
 
-        env.storage().persistent().set(&DataKey::Tournament(id), &pool);
-        env.storage().instance().set(&DataKey::NextTournamentId, &(id + 1));
+        env.storage()
+            .persistent()
+            .set(&DataKey::Tournament(id), &pool);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextTournamentId, &(id + 1));
 
-        env.events().publish(
-            (symbol_short!("locked"), organiser),
-            (id, amount),
-        );
+        env.events()
+            .publish((symbol_short!("locked"), organiser), (id, amount));
 
         Ok(id)
     }
@@ -171,7 +175,9 @@ impl TournamentPrizePoolContract {
         );
 
         pool.status = TournamentStatus::Cancelled;
-        env.storage().persistent().set(&DataKey::Tournament(tournament_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Tournament(tournament_id), &pool);
 
         env.events().publish(
             (symbol_short!("cancel"), pool.organiser.clone()),
@@ -209,15 +215,15 @@ impl TournamentPrizePoolContract {
         }
 
         pool.status = TournamentStatus::StandingsSubmitted;
-        env.storage().persistent().set(&DataKey::Tournament(tournament_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Tournament(tournament_id), &pool);
         env.storage()
             .persistent()
             .set(&DataKey::Standings(tournament_id), &ranked_players);
 
-        env.events().publish(
-            (symbol_short!("standng"), oracle),
-            tournament_id,
-        );
+        env.events()
+            .publish((symbol_short!("standng"), oracle), tournament_id);
 
         Ok(())
     }
@@ -250,22 +256,18 @@ impl TournamentPrizePoolContract {
             let share = (total * bps as i128) / 10_000i128;
 
             if share > 0 {
-                token_client.transfer(
-                    &env.current_contract_address(),
-                    &player,
-                    &share,
-                );
+                token_client.transfer(&env.current_contract_address(), &player, &share);
 
-                env.events().publish(
-                    (symbol_short!("prize"), player),
-                    (tournament_id, share),
-                );
+                env.events()
+                    .publish((symbol_short!("prize"), player), (tournament_id, share));
             }
         }
 
         pool.status = TournamentStatus::Distributed;
         pool.distributed = true;
-        env.storage().persistent().set(&DataKey::Tournament(tournament_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Tournament(tournament_id), &pool);
 
         Ok(())
     }

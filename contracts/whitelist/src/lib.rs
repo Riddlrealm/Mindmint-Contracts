@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, contractmeta,
-    Address, Env, Vec, BytesN, Symbol, symbol_short, Bytes
+    contract, contracterror, contractimpl, contractmeta, contracttype, symbol_short, Address,
+    Bytes, BytesN, Env, Symbol, Vec,
 };
 
 mod test;
@@ -79,7 +79,7 @@ impl WhitelistContract {
         permissions: Vec<Symbol>,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         if tier == 0 {
             return Err(WhitelistError::InvalidTier);
         }
@@ -93,7 +93,7 @@ impl WhitelistContract {
 
         let key = (WHITELIST, address);
         env.storage().persistent().set(&key, &entry);
-        
+
         Ok(())
     }
 
@@ -104,10 +104,10 @@ impl WhitelistContract {
         address: Address,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         let key = (WHITELIST, address);
         env.storage().persistent().remove(&key);
-        
+
         Ok(())
     }
 
@@ -118,16 +118,16 @@ impl WhitelistContract {
         entries: Vec<WhitelistEntry>,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         for entry in entries.iter() {
             if entry.tier == 0 {
                 return Err(WhitelistError::InvalidTier);
             }
-            
+
             let key = (WHITELIST, entry.address.clone());
             env.storage().persistent().set(&key, &entry);
         }
-        
+
         Ok(())
     }
 
@@ -138,23 +138,19 @@ impl WhitelistContract {
         addresses: Vec<Address>,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         for address in addresses.iter() {
             let key = (WHITELIST, address);
             env.storage().persistent().remove(&key);
         }
-        
+
         Ok(())
     }
 
     /// Check if address is whitelisted and has required tier
-    pub fn is_whitelisted(
-        env: Env,
-        address: Address,
-        required_tier: Option<u32>,
-    ) -> bool {
+    pub fn is_whitelisted(env: Env, address: Address, required_tier: Option<u32>) -> bool {
         let key = (WHITELIST, address);
-        
+
         if let Some(entry) = env.storage().persistent().get::<_, WhitelistEntry>(&key) {
             // Check expiration
             if let Some(expiration) = entry.expiration {
@@ -162,12 +158,12 @@ impl WhitelistContract {
                     return false;
                 }
             }
-            
+
             // Check tier requirement
             if let Some(req_tier) = required_tier {
                 return entry.tier >= req_tier;
             }
-            
+
             true
         } else {
             false
@@ -175,13 +171,9 @@ impl WhitelistContract {
     }
 
     /// Check if address has specific permission
-    pub fn has_permission(
-        env: Env,
-        address: Address,
-        permission: Symbol,
-    ) -> bool {
+    pub fn has_permission(env: Env, address: Address, permission: Symbol) -> bool {
         let key = (WHITELIST, address);
-        
+
         if let Some(entry) = env.storage().persistent().get::<_, WhitelistEntry>(&key) {
             // Check expiration
             if let Some(expiration) = entry.expiration {
@@ -189,7 +181,7 @@ impl WhitelistContract {
                     return false;
                 }
             }
-            
+
             entry.permissions.contains(&permission)
         } else {
             false
@@ -210,21 +202,24 @@ impl WhitelistContract {
         permissions: Vec<Symbol>,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         if tier == 0 {
             return Err(WhitelistError::InvalidTier);
         }
-        
+
         let key = (TIER_PERMS, tier);
         env.storage().persistent().set(&key, &permissions);
-        
+
         Ok(())
     }
 
     /// Get tier permissions
     pub fn get_tier_permissions(env: Env, tier: u32) -> Vec<Symbol> {
         let key = (TIER_PERMS, tier);
-        env.storage().persistent().get(&key).unwrap_or(Vec::new(&env))
+        env.storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(Vec::new(&env))
     }
 
     /// Set merkle root for gas-optimized verification
@@ -234,9 +229,9 @@ impl WhitelistContract {
         merkle_root: BytesN<32>,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         env.storage().instance().set(&MERKLE_ROOT, &merkle_root);
-        
+
         Ok(())
     }
 
@@ -248,14 +243,14 @@ impl WhitelistContract {
         proof: Vec<BytesN<32>>,
     ) -> Result<bool, WhitelistError> {
         let merkle_root: Option<BytesN<32>> = env.storage().instance().get(&MERKLE_ROOT);
-        
+
         if merkle_root.is_none() {
             return Err(WhitelistError::InvalidMerkleProof);
         }
-        
+
         let leaf = Self::compute_leaf(&env, &address, tier);
         let computed_root = Self::compute_merkle_root(&env, leaf, proof);
-        
+
         Ok(computed_root == merkle_root.unwrap())
     }
 
@@ -267,15 +262,15 @@ impl WhitelistContract {
         total_entries: u32,
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
-        
+
         let snapshot = WhitelistSnapshot {
             block_number: env.ledger().sequence(),
             merkle_root,
             total_entries,
         };
-        
+
         env.storage().instance().set(&SNAPSHOT, &snapshot);
-        
+
         Ok(())
     }
 
@@ -292,9 +287,9 @@ impl WhitelistContract {
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &current_admin)?;
         new_admin.require_auth();
-        
+
         env.storage().instance().set(&ADMIN, &new_admin);
-        
+
         Ok(())
     }
 
@@ -306,9 +301,9 @@ impl WhitelistContract {
     // Helper functions
     fn require_admin(env: &Env, admin: &Address) -> Result<(), WhitelistError> {
         admin.require_auth();
-        
+
         let stored_admin: Option<Address> = env.storage().instance().get(&ADMIN);
-        
+
         match stored_admin {
             Some(stored) if stored == *admin => Ok(()),
             Some(_) => Err(WhitelistError::NotAuthorized),
@@ -319,32 +314,32 @@ impl WhitelistContract {
     fn compute_leaf(env: &Env, address: &Address, tier: u32) -> BytesN<32> {
         // Simple leaf computation using address and tier
         let mut bytes = Bytes::new(env);
-        
+
         // Add a simple representation of the address (just use first few bytes)
         let addr_str = address.to_string();
         for i in 0..addr_str.len().min(8) {
             bytes.push_back(i as u8); // Simplified representation
         }
-        
+
         // Add tier bytes
         let tier_bytes = tier.to_be_bytes();
         for byte in tier_bytes.iter() {
             bytes.push_back(*byte);
         }
-        
+
         env.crypto().keccak256(&bytes).into()
     }
 
     fn compute_merkle_root(env: &Env, leaf: BytesN<32>, proof: Vec<BytesN<32>>) -> BytesN<32> {
         let mut current_hash = leaf;
-        
+
         for proof_element in proof.iter() {
             let mut combined = Bytes::new(env);
-            
+
             // Determine order for consistent hashing
             let current_bytes = current_hash.as_ref();
             let proof_bytes = proof_element.as_ref();
-            
+
             if current_bytes < proof_bytes {
                 for byte in current_bytes.iter() {
                     combined.push_back(byte);
@@ -360,10 +355,10 @@ impl WhitelistContract {
                     combined.push_back(byte);
                 }
             }
-            
+
             current_hash = env.crypto().keccak256(&combined).into();
         }
-        
+
         current_hash
     }
 }

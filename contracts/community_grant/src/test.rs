@@ -24,7 +24,16 @@ fn milestone(env: &Env, description: &str, amount: i128) -> GrantMilestone {
     }
 }
 
-fn setup() -> (Env, CommunityGrantContractClient<'static>, TokenClient<'static>, StellarAssetClient<'static>, Address, Address, Address, Address) {
+fn setup() -> (
+    Env,
+    CommunityGrantContractClient<'static>,
+    TokenClient<'static>,
+    StellarAssetClient<'static>,
+    Address,
+    Address,
+    Address,
+    Address,
+) {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -82,7 +91,10 @@ fn test_submit_vote_approve_verify_claim_flow() {
 
     client.verify_milestone(&admin, &proposal_id, &0);
     let proposal_after_verify = client.get_proposal(&proposal_id);
-    assert_eq!(proposal_after_verify.milestones.get(0).unwrap().verified, true);
+    assert_eq!(
+        proposal_after_verify.milestones.get(0).unwrap().verified,
+        true
+    );
 
     let before = token_client.balance(&applicant);
     client.claim_milestone(&applicant, &proposal_id, &0);
@@ -90,7 +102,10 @@ fn test_submit_vote_approve_verify_claim_flow() {
     assert_eq!(after - before, 400);
 
     let proposal_after_claim = client.get_proposal(&proposal_id);
-    assert_eq!(proposal_after_claim.milestones.get(0).unwrap().claimed, true);
+    assert_eq!(
+        proposal_after_claim.milestones.get(0).unwrap().claimed,
+        true
+    );
 }
 
 #[test]

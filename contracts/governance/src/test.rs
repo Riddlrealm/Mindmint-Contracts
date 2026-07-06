@@ -1,8 +1,11 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, Symbol, Vec, Val, IntoVal};
 use reward_token::{RewardToken, RewardTokenClient};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    Address, Env, IntoVal, Symbol, Val, Vec,
+};
 
 #[test]
 fn test_governance_flow() {
@@ -12,7 +15,7 @@ fn test_governance_flow() {
     // 1. Setup Token (Use RewardToken which has total_supply)
     let token_contract_id = env.register_contract(None, RewardToken);
     let token = RewardTokenClient::new(&env, &token_contract_id);
-    
+
     let admin = Address::generate(&env);
     token.initialize(
         &admin,
@@ -27,13 +30,7 @@ fn test_governance_flow() {
 
     // 3. Initialize Governance
     // Voting delay: 100s, Period: 1000s, Threshold: 100, Quorum: 10%
-    governance_client.initialize(
-        &token_contract_id,
-        &100,
-        &1000,
-        &100,
-        &10,
-    );
+    governance_client.initialize(&token_contract_id, &100, &1000, &100, &10);
 
     // Authorize governance contract as minter
     token.authorize_minter(&governance_contract_id);
@@ -49,7 +46,7 @@ fn test_governance_flow() {
 
     // 5. User 1 deposits
     governance_client.deposit(&user1, &500); // User1 has 500 VP
-    
+
     assert_eq!(governance_client.get_user_voting_power(&user1), 500);
     assert_eq!(token.balance(&user1), 500);
     assert_eq!(token.balance(&governance_contract_id), 500);
@@ -62,15 +59,18 @@ fn test_governance_flow() {
     assert_eq!(governance_client.get_user_voting_power(&user2), 0);
 
     // 7. Create Proposal
-    
+
     let action = ProposalActionInput {
         contract_id: token_contract_id.clone(),
         function_name: Symbol::new(&env, "mint"),
-        args: Vec::from_array(&env, [
-            governance_contract_id.into_val(&env), // minter (governance contract)
-            user3.into_val(&env), // Address implements IntoVal<Env, Val>
-            1000_i128.into_val(&env),
-        ]),
+        args: Vec::from_array(
+            &env,
+            [
+                governance_contract_id.into_val(&env), // minter (governance contract)
+                user3.into_val(&env),                  // Address implements IntoVal<Env, Val>
+                1000_i128.into_val(&env),
+            ],
+        ),
     };
 
     let proposal_id = governance_client.propose(
@@ -105,12 +105,12 @@ fn test_governance_flow() {
     // 11. Execute
     // Note: Execution calls `token.mint`. `RewardToken.mint` checks `is_authorized_minter` or admin.
     // `mock_all_auths` should pass auth checks.
-    
+
     governance_client.execute(&proposal_id);
-    
+
     let proposal = governance_client.get_proposal_info(&proposal_id);
     assert_eq!(proposal.status, ProposalStatus::Executed);
-    
+
     // Check if mint happened (User3 started with 100, minted 1000 -> 1100)
     assert_eq!(token.balance(&user3), 1100);
 }

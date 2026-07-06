@@ -53,7 +53,6 @@ pub struct FractionalNftContract;
 
 #[contractimpl]
 impl FractionalNftContract {
-
     pub fn initialize(env: Env, admin: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("already_initialized");
@@ -76,11 +75,8 @@ impl FractionalNftContract {
         // Fix: invoke_contract requires Vec<Val>, not a tuple.
         // Each argument must be converted with .into_val(&env).
         let owner_of_args: soroban_sdk::Vec<Val> = vec![&env, nft_id.into_val(&env)];
-        let current_owner: Address = env.invoke_contract(
-            &nft_contract,
-            &Symbol::new(&env, "owner_of"),
-            owner_of_args,
-        );
+        let current_owner: Address =
+            env.invoke_contract(&nft_contract, &Symbol::new(&env, "owner_of"), owner_of_args);
 
         if current_owner != owner {
             panic!("not_nft_owner");
@@ -92,11 +88,7 @@ impl FractionalNftContract {
             env.current_contract_address().into_val(&env),
             nft_id.into_val(&env),
         ];
-        env.invoke_contract::<()>(
-            &nft_contract,
-            &Symbol::new(&env, "transfer"),
-            transfer_args,
-        );
+        env.invoke_contract::<()>(&nft_contract, &Symbol::new(&env, "transfer"), transfer_args);
 
         let id = Self::next_vault_id(&env);
 
@@ -144,7 +136,9 @@ impl FractionalNftContract {
         vault.buyout_offer_price = offer_price;
         vault.buyout_deadline = deadline;
 
-        env.storage().persistent().set(&DataKey::Vault(vault_id), &vault);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Vault(vault_id), &vault);
 
         env.events().publish(
             (symbol_short!("BuyoutIn"), vault_id),
@@ -153,7 +147,11 @@ impl FractionalNftContract {
     }
 
     fn next_vault_id(env: &Env) -> u64 {
-        let mut id: u64 = env.storage().instance().get(&DataKey::VaultCount).unwrap_or(0);
+        let mut id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::VaultCount)
+            .unwrap_or(0);
         id += 1;
         env.storage().instance().set(&DataKey::VaultCount, &id);
         id

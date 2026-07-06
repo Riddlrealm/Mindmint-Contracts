@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    Address, Env, String, Vec, Map, Symbol, token,
+    contract, contractimpl, contracttype, token, Address, Env, Map, String, Symbol, Vec,
 };
 
 //
@@ -27,17 +26,17 @@ pub enum Role {
 
 #[contracttype]
 pub enum DataKey {
-    Config,                    // GuildConfig
-    Member(Address),           // Role
-    MembersList,               // Vec<Address>
-    TreasuryToken,             // Address
-    Resource(Symbol),          // i128
-    Achievement(Symbol),       // u32
-    Proposal(u32),             // Proposal
-    ProposalCounter,           // u32
-    Competition(u32),          // Competition
-    WithdrawalProposal(u32),   // WithdrawalProposal
-    WithdrawalProposalCounter, // u32
+    Config,                        // GuildConfig
+    Member(Address),               // Role
+    MembersList,                   // Vec<Address>
+    TreasuryToken,                 // Address
+    Resource(Symbol),              // i128
+    Achievement(Symbol),           // u32
+    Proposal(u32),                 // Proposal
+    ProposalCounter,               // u32
+    Competition(u32),              // Competition
+    WithdrawalProposal(u32),       // WithdrawalProposal
+    WithdrawalProposalCounter,     // u32
     WithdrawalVoted(u32, Address), // bool
 }
 
@@ -96,7 +95,6 @@ pub struct GuildContract;
 
 #[contractimpl]
 impl GuildContract {
-
     // ───────────── INITIALIZATION ─────────────
 
     pub fn initialize(env: Env, leader: Address, name: String, token_address: Address) {
@@ -108,10 +106,16 @@ impl GuildContract {
 
         env.storage().persistent().set(
             &DataKey::Config,
-            &GuildConfig { name, disbanded: false, withdrawal_threshold: 10_000 },
+            &GuildConfig {
+                name,
+                disbanded: false,
+                withdrawal_threshold: 10_000,
+            },
         );
 
-        env.storage().instance().set(&DataKey::TreasuryToken, &token_address);
+        env.storage()
+            .instance()
+            .set(&DataKey::TreasuryToken, &token_address);
         Self::set_role_internal(&env, leader, Role::Leader);
     }
 
@@ -142,36 +146,61 @@ impl GuildContract {
         member.require_auth();
         Self::assert_active(&env);
 
-        let token_addr: Address =
-            env.storage().instance().get(&DataKey::TreasuryToken).unwrap();
+        let token_addr: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::TreasuryToken)
+            .unwrap();
         let client = token::Client::new(&env, &token_addr);
 
         client.transfer(&member, &env.current_contract_address(), &amount);
     }
 
-    pub fn withdraw(env: Env, officer: Address, amount: i128, deadline: Option<u64>) -> Option<u32> {
+    pub fn withdraw(
+        env: Env,
+        officer: Address,
+        amount: i128,
+        deadline: Option<u64>,
+    ) -> Option<u32> {
         officer.require_auth();
         Self::assert_officer_or_leader(&env, &officer);
         Self::assert_active(&env);
 
         let config: GuildConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        
+
         if amount > config.withdrawal_threshold {
-            let mut id: u32 = env.storage().persistent().get(&DataKey::WithdrawalProposalCounter).unwrap_or(0);
+            let mut id: u32 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::WithdrawalProposalCounter)
+                .unwrap_or(0);
             id += 1;
             let d = deadline.unwrap_or(env.ledger().timestamp() + 86400); // 24h default
-            
+
             let wp = WithdrawalProposal {
-                id, officer, amount, yes: 0, no: 0, deadline: d, executed: false
+                id,
+                officer,
+                amount,
+                yes: 0,
+                no: 0,
+                deadline: d,
+                executed: false,
             };
-            
-            env.storage().persistent().set(&DataKey::WithdrawalProposal(id), &wp);
-            env.storage().persistent().set(&DataKey::WithdrawalProposalCounter, &id);
+
+            env.storage()
+                .persistent()
+                .set(&DataKey::WithdrawalProposal(id), &wp);
+            env.storage()
+                .persistent()
+                .set(&DataKey::WithdrawalProposalCounter, &id);
             return Some(id);
         }
 
-        let token_addr: Address =
-            env.storage().instance().get(&DataKey::TreasuryToken).unwrap();
+        let token_addr: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::TreasuryToken)
+            .unwrap();
         let client = token::Client::new(&env, &token_addr);
 
         let balance = client.balance(&env.current_contract_address());
@@ -196,7 +225,11 @@ impl GuildContract {
             panic!("Already voted");
         }
 
-        let mut proposal: WithdrawalProposal = env.storage().persistent().get(&DataKey::WithdrawalProposal(proposal_id)).unwrap();
+        let mut proposal: WithdrawalProposal = env
+            .storage()
+            .persistent()
+            .get(&DataKey::WithdrawalProposal(proposal_id))
+            .unwrap();
 
         if env.ledger().timestamp() > proposal.deadline {
             panic!("Voting closed");
@@ -212,7 +245,9 @@ impl GuildContract {
             proposal.no += 1;
         }
 
-        env.storage().persistent().set(&DataKey::WithdrawalProposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::WithdrawalProposal(proposal_id), &proposal);
         env.storage().persistent().set(&voted_key, &true);
     }
 
@@ -220,7 +255,11 @@ impl GuildContract {
         executor.require_auth();
         Self::assert_active(&env);
 
-        let mut proposal: WithdrawalProposal = env.storage().persistent().get(&DataKey::WithdrawalProposal(proposal_id)).unwrap();
+        let mut proposal: WithdrawalProposal = env
+            .storage()
+            .persistent()
+            .get(&DataKey::WithdrawalProposal(proposal_id))
+            .unwrap();
 
         if env.ledger().timestamp() > proposal.deadline {
             panic!("Proposal expired");
@@ -230,17 +269,27 @@ impl GuildContract {
             panic!("Already executed");
         }
 
-        let members: Vec<Address> = env.storage().persistent().get(&DataKey::MembersList).unwrap();
-        let total_members = members.len() as u32;
+        let members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MembersList)
+            .unwrap();
+        let total_members = members.len();
 
         if proposal.yes <= total_members / 2 {
             panic!("Not enough approvals");
         }
 
         proposal.executed = true;
-        env.storage().persistent().set(&DataKey::WithdrawalProposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::WithdrawalProposal(proposal_id), &proposal);
 
-        let token_addr: Address = env.storage().instance().get(&DataKey::TreasuryToken).unwrap();
+        let token_addr: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::TreasuryToken)
+            .unwrap();
         let client = token::Client::new(&env, &token_addr);
 
         let balance = client.balance(&env.current_contract_address());
@@ -248,7 +297,11 @@ impl GuildContract {
             panic!("Insufficient funds");
         }
 
-        client.transfer(&env.current_contract_address(), &proposal.officer, &proposal.amount);
+        client.transfer(
+            &env.current_contract_address(),
+            &proposal.officer,
+            &proposal.amount,
+        );
     }
 
     // ───────────── SHARED RESOURCES ─────────────
@@ -258,11 +311,16 @@ impl GuildContract {
         Self::assert_officer_or_leader(&env, &officer);
         Self::assert_active(&env);
 
-        let mut current: i128 =
-            env.storage().persistent().get(&DataKey::Resource(resource.clone())).unwrap_or(0);
+        let mut current: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Resource(resource.clone()))
+            .unwrap_or(0);
 
         current += amount;
-        env.storage().persistent().set(&DataKey::Resource(resource), &current);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Resource(resource), &current);
     }
 
     // ───────────── ACHIEVEMENTS ─────────────
@@ -272,11 +330,16 @@ impl GuildContract {
         Self::assert_officer_or_leader(&env, &officer);
         Self::assert_active(&env);
 
-        let mut count: u32 =
-            env.storage().persistent().get(&DataKey::Achievement(achievement.clone())).unwrap_or(0);
+        let mut count: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Achievement(achievement.clone()))
+            .unwrap_or(0);
 
         count += 1;
-        env.storage().persistent().set(&DataKey::Achievement(achievement), &count);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Achievement(achievement), &count);
     }
 
     // ───────────── VOTING ─────────────
@@ -286,8 +349,11 @@ impl GuildContract {
         Self::assert_officer_or_leader(&env, &officer);
         Self::assert_active(&env);
 
-        let mut id: u32 =
-            env.storage().persistent().get(&DataKey::ProposalCounter).unwrap_or(0);
+        let mut id: u32 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ProposalCounter)
+            .unwrap_or(0);
         id += 1;
 
         let proposal = Proposal {
@@ -298,8 +364,12 @@ impl GuildContract {
             executed: false,
         };
 
-        env.storage().persistent().set(&DataKey::Proposal(id), &proposal);
-        env.storage().persistent().set(&DataKey::ProposalCounter, &id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ProposalCounter, &id);
 
         id
     }
@@ -312,8 +382,11 @@ impl GuildContract {
             panic!("Not a member");
         }
 
-        let mut proposal: Proposal =
-            env.storage().persistent().get(&DataKey::Proposal(proposal_id)).unwrap();
+        let mut proposal: Proposal = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Proposal(proposal_id))
+            .unwrap();
 
         if env.ledger().timestamp() > proposal.deadline {
             panic!("Voting closed");
@@ -325,7 +398,9 @@ impl GuildContract {
             proposal.no += 1;
         }
 
-        env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Proposal(proposal_id), &proposal);
     }
 
     // ───────────── INTER-GUILD COMPETITION ─────────────
@@ -345,7 +420,11 @@ impl GuildContract {
 
         env.storage().persistent().set(
             &DataKey::Competition(id),
-            &Competition { opponent, reward, won },
+            &Competition {
+                opponent,
+                reward,
+                won,
+            },
         );
     }
 
@@ -355,19 +434,24 @@ impl GuildContract {
         leader.require_auth();
         Self::assert_leader(&env, &leader);
 
-        let mut config: GuildConfig =
-            env.storage().persistent().get(&DataKey::Config).unwrap();
+        let mut config: GuildConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
 
         if config.disbanded {
             panic!("Already disbanded");
         }
 
-        let token_addr: Address =
-            env.storage().instance().get(&DataKey::TreasuryToken).unwrap();
+        let token_addr: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::TreasuryToken)
+            .unwrap();
         let client = token::Client::new(&env, &token_addr);
 
-        let members: Vec<Address> =
-            env.storage().persistent().get(&DataKey::MembersList).unwrap();
+        let members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MembersList)
+            .unwrap();
 
         let total = client.balance(&env.current_contract_address());
         let share = total / members.len() as i128;
@@ -383,14 +467,21 @@ impl GuildContract {
     // ───────────── HELPERS ─────────────
 
     fn set_role_internal(env: &Env, user: Address, role: Role) {
-        env.storage().persistent().set(&DataKey::Member(user.clone()), &role);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Member(user.clone()), &role);
 
-        let mut members: Vec<Address> =
-            env.storage().persistent().get(&DataKey::MembersList).unwrap_or(Vec::new(env));
+        let mut members: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MembersList)
+            .unwrap_or(Vec::new(env));
 
         if !members.contains(&user) {
             members.push_back(user);
-            env.storage().persistent().set(&DataKey::MembersList, &members);
+            env.storage()
+                .persistent()
+                .set(&DataKey::MembersList, &members);
         }
     }
 
@@ -412,8 +503,7 @@ impl GuildContract {
     }
 
     fn assert_active(env: &Env) {
-        let cfg: GuildConfig =
-            env.storage().persistent().get(&DataKey::Config).unwrap();
+        let cfg: GuildConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
         if cfg.disbanded {
             panic!("Guild disbanded");
         }

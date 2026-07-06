@@ -1,7 +1,5 @@
 #![no_std]
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String, Vec};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[contracttype]
@@ -52,9 +50,9 @@ pub enum VestingType {
 pub enum VestingEvent {
     ScheduleCreated(u64, Address, i128), // schedule_id, beneficiary, total_amount
     TokensReleased(u64, Address, i128),  // schedule_id, beneficiary, amount
-    MilestoneCompleted(u64, u32),       // schedule_id, milestone_id
-    ScheduleRevoked(u64, i128),         // schedule_id, unvested_amount
-    ScheduleModified(u64),              // schedule_id
+    MilestoneCompleted(u64, u32),        // schedule_id, milestone_id
+    ScheduleRevoked(u64, i128),          // schedule_id, unvested_amount
+    ScheduleModified(u64),               // schedule_id
     ContractPaused,
     ContractUnpaused,
 }
@@ -65,7 +63,7 @@ pub struct VestingContract;
 #[contractimpl]
 impl VestingContract {
     /// Initialize the vesting contract
-    /// 
+    ///
     /// # Arguments
     /// * `admin` - Address that will have admin privileges
     /// * `token` - Address of the token contract to be vested
@@ -79,11 +77,13 @@ impl VestingContract {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Token, &token);
         env.storage().instance().set(&DataKey::Paused, &false);
-        env.storage().instance().set(&DataKey::NextScheduleId, &0u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextScheduleId, &0u64);
     }
 
     /// Create a new vesting schedule
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address that will receive vested tokens
     /// * `total_amount` - Total amount of tokens to vest
@@ -93,9 +93,10 @@ impl VestingContract {
     /// * `revocable` - Whether admin can revoke this schedule
     /// * `vesting_type` - Type of vesting (TimeBased, MilestoneBased, or Hybrid)
     /// * `milestones` - List of milestones (required for MilestoneBased/Hybrid)
-    /// 
+    ///
     /// # Returns
     /// The schedule ID
+    #[allow(clippy::too_many_arguments)]
     pub fn create_schedule(
         env: Env,
         beneficiary: Address,
@@ -132,13 +133,13 @@ impl VestingContract {
         }
 
         // Validate milestone requirement for milestone-based vesting
-        match vesting_type {
-            VestingType::MilestoneBased | VestingType::Hybrid => {
-                if milestones.is_empty() {
-                    panic!("Milestones required for milestone-based vesting");
-                }
+        if matches!(
+            vesting_type,
+            VestingType::MilestoneBased | VestingType::Hybrid
+        ) {
+            if milestones.is_empty() {
+                panic!("Milestones required for milestone-based vesting");
             }
-            _ => {}
         }
 
         let schedule_id = Self::get_next_schedule_id(&env);
@@ -175,10 +176,10 @@ impl VestingContract {
     }
 
     /// Release vested tokens to the beneficiary
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address to release tokens to
-    /// 
+    ///
     /// # Returns
     /// Amount of tokens released
     pub fn release(env: Env, beneficiary: Address) -> i128 {
@@ -213,7 +214,10 @@ impl VestingContract {
         token_client.transfer(&env.current_contract_address(), &beneficiary, &releasable);
 
         env.events().publish(
-            (String::from_str(&env, "tokens_released"), schedule.schedule_id),
+            (
+                String::from_str(&env, "tokens_released"),
+                schedule.schedule_id,
+            ),
             VestingEvent::TokensReleased(schedule.schedule_id, beneficiary, releasable),
         );
 
@@ -221,7 +225,7 @@ impl VestingContract {
     }
 
     /// Complete a milestone (admin only)
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address whose milestone to complete
     /// * `milestone_id` - ID of the milestone to mark as completed
@@ -265,17 +269,20 @@ impl VestingContract {
             .set(&DataKey::VestingSchedule(beneficiary), &schedule);
 
         env.events().publish(
-            (String::from_str(&env, "milestone_completed"), schedule.schedule_id),
+            (
+                String::from_str(&env, "milestone_completed"),
+                schedule.schedule_id,
+            ),
             VestingEvent::MilestoneCompleted(schedule.schedule_id, milestone_id),
         );
     }
 
     /// Revoke a vesting schedule (admin only, only if revocable)
     /// Returns unvested tokens to admin
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address whose schedule to revoke
-    /// 
+    ///
     /// # Returns
     /// Amount of unvested tokens returned to admin
     pub fn revoke_schedule(env: Env, beneficiary: Address) -> i128 {
@@ -312,7 +319,10 @@ impl VestingContract {
         }
 
         env.events().publish(
-            (String::from_str(&env, "schedule_revoked"), schedule.schedule_id),
+            (
+                String::from_str(&env, "schedule_revoked"),
+                schedule.schedule_id,
+            ),
             VestingEvent::ScheduleRevoked(schedule.schedule_id, unvested_amount),
         );
 
@@ -321,11 +331,12 @@ impl VestingContract {
 
     /// Modify vesting schedule parameters (admin only)
     /// Cannot reduce already vested amounts
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address whose schedule to modify
     /// * `new_vesting_duration` - New vesting duration (0 to keep current)
     /// * `new_milestones` - New milestones (empty to keep current)
+    #[allow(clippy::too_many_arguments)]
     pub fn modify_schedule(
         env: Env,
         beneficiary: Address,
@@ -348,7 +359,7 @@ impl VestingContract {
 
         // Only allow modifications that don't reduce already vested amounts
         let current_vested = Self::calculate_vested_amount(&env, &schedule);
-        
+
         if new_vesting_duration > 0 {
             schedule.vesting_duration = new_vesting_duration;
         }
@@ -376,7 +387,10 @@ impl VestingContract {
             .set(&DataKey::VestingSchedule(beneficiary), &schedule);
 
         env.events().publish(
-            (String::from_str(&env, "schedule_modified"), schedule.schedule_id),
+            (
+                String::from_str(&env, "schedule_modified"),
+                schedule.schedule_id,
+            ),
             VestingEvent::ScheduleModified(schedule.schedule_id),
         );
     }
@@ -385,14 +399,18 @@ impl VestingContract {
     pub fn pause(env: Env) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        
-        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+
+        let paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false);
         if paused {
             panic!("Already paused");
         }
-        
+
         env.storage().instance().set(&DataKey::Paused, &true);
-        
+
         env.events().publish(
             (String::from_str(&env, "contract_paused"),),
             VestingEvent::ContractPaused,
@@ -403,14 +421,18 @@ impl VestingContract {
     pub fn unpause(env: Env) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        
-        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+
+        let paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false);
         if !paused {
             panic!("Already unpaused");
         }
-        
+
         env.storage().instance().set(&DataKey::Paused, &false);
-        
+
         env.events().publish(
             (String::from_str(&env, "contract_unpaused"),),
             VestingEvent::ContractUnpaused,
@@ -418,18 +440,21 @@ impl VestingContract {
     }
 
     /// Check if contract is paused
-    /// 
+    ///
     /// # Returns
     /// true if paused, false otherwise
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
     }
 
     /// Get vesting schedule details
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address to get schedule for
-    /// 
+    ///
     /// # Returns
     /// VestingSchedule struct with all details
     pub fn get_schedule(env: Env, beneficiary: Address) -> VestingSchedule {
@@ -440,10 +465,10 @@ impl VestingContract {
     }
 
     /// Get amount of tokens currently releasable
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address to check
-    /// 
+    ///
     /// # Returns
     /// Amount of tokens that can be released now
     pub fn get_releasable_amount(env: Env, beneficiary: Address) -> i128 {
@@ -462,10 +487,10 @@ impl VestingContract {
     }
 
     /// Get total vested amount (including already released)
-    /// 
+    ///
     /// # Arguments
     /// * `beneficiary` - Address to check
-    /// 
+    ///
     /// # Returns
     /// Total amount vested so far
     pub fn get_vested_amount(env: Env, beneficiary: Address) -> i128 {
@@ -483,7 +508,7 @@ impl VestingContract {
     }
 
     /// Get admin address
-    /// 
+    ///
     /// # Returns
     /// Address of the contract admin
     pub fn get_admin(env: Env) -> Address {
@@ -491,7 +516,7 @@ impl VestingContract {
     }
 
     /// Get token address
-    /// 
+    ///
     /// # Returns
     /// Address of the token being vested
     pub fn get_token(env: Env) -> Address {
@@ -539,9 +564,12 @@ impl VestingContract {
         vested
     }
 
-
     fn require_not_paused(env: &Env) {
-        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+        let paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false);
         if paused {
             panic!("Contract is paused");
         }
@@ -553,7 +581,9 @@ impl VestingContract {
             .instance()
             .get(&DataKey::NextScheduleId)
             .unwrap_or(0);
-        env.storage().instance().set(&DataKey::NextScheduleId, &(id + 1));
+        env.storage()
+            .instance()
+            .set(&DataKey::NextScheduleId, &(id + 1));
         id
     }
 }

@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec};
 
 #[contracttype]
 #[derive(Clone)]
@@ -65,7 +63,9 @@ impl AchievementNFT {
         let key = DataKey::PuzzleCompleted(user, puzzle_id);
 
         env.storage().persistent().set(&key, &true);
-        env.storage().persistent().extend_ttl(&key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
     }
 
     //  Mint NFT
@@ -110,7 +110,9 @@ impl AchievementNFT {
         // Store NFT
         let key = DataKey::Achievement(token_id);
         env.storage().persistent().set(&key, &achievement);
-        env.storage().persistent().extend_ttl(&key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
 
         // Update owner collection
         let mut collection = Self::get_collection_internal(&env, to.clone());
@@ -131,7 +133,8 @@ impl AchievementNFT {
         env.storage().instance().set(&DataKey::Counters, &counters);
 
         // Emit event
-        env.events().publish((symbol_short!("minted"), to), token_id);
+        env.events()
+            .publish((symbol_short!("minted"), to), token_id);
 
         token_id
     }
@@ -170,9 +173,11 @@ impl AchievementNFT {
         env.storage()
             .persistent()
             .set(&DataKey::OwnerCollection(from.clone()), &from_col);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::OwnerCollection(from.clone()), 100_000, 500_000);
+        env.storage().persistent().extend_ttl(
+            &DataKey::OwnerCollection(from.clone()),
+            100_000,
+            500_000,
+        );
 
         // Add to receiver
         let mut to_col = Self::get_collection_internal(&env, to.clone());
@@ -184,9 +189,11 @@ impl AchievementNFT {
         env.storage()
             .persistent()
             .set(&DataKey::OwnerCollection(to.clone()), &to_col);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::OwnerCollection(to.clone()), 100_000, 500_000);
+        env.storage().persistent().extend_ttl(
+            &DataKey::OwnerCollection(to.clone()),
+            100_000,
+            500_000,
+        );
 
         // Update owner
         achievement.owner = to.clone();
@@ -231,14 +238,14 @@ impl AchievementNFT {
 
     //Total supply
     pub fn total_supply(env: Env) -> u32 {
-        let counters: Counters = env
-            .storage()
-            .instance()
-            .get(&DataKey::Counters)
-            .unwrap_or(Counters {
-                next_token_id: 1,
-                total_supply: 0,
-            });
+        let counters: Counters =
+            env.storage()
+                .instance()
+                .get(&DataKey::Counters)
+                .unwrap_or(Counters {
+                    next_token_id: 1,
+                    total_supply: 0,
+                });
         counters.total_supply
     }
 
@@ -288,7 +295,9 @@ impl AchievementNFT {
 
     //  Get full NFT data
     pub fn get_achievement(env: Env, token_id: u32) -> Option<Achievement> {
-        env.storage().persistent().get(&DataKey::Achievement(token_id))
+        env.storage()
+            .persistent()
+            .get(&DataKey::Achievement(token_id))
     }
 
     //  Get unique puzzle IDs

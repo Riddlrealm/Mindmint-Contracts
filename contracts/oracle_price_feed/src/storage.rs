@@ -43,41 +43,37 @@ impl Storage {
             .persistent()
             .get(&key)
             .unwrap_or_else(|| Vec::new(env));
-        
+
         history.push_back(snapshot.clone());
-        
+
         // Keep only last 100 snapshots
         if history.len() > 100 {
             history.remove(0);
         }
-        
+
         env.storage().persistent().set(&key, &history);
     }
 
-    pub fn get_price_history(
-        env: &Env,
-        pair_id: &Symbol,
-        limit: u32,
-    ) -> Vec<PriceSnapshot> {
+    pub fn get_price_history(env: &Env, pair_id: &Symbol, limit: u32) -> Vec<PriceSnapshot> {
         let key = (symbol_short!("history"), pair_id.clone());
         let history: Vec<PriceSnapshot> = env
             .storage()
             .persistent()
             .get(&key)
             .unwrap_or_else(|| Vec::new(env));
-        
+
         let len = history.len();
         let start = if len > limit as u32 {
             len - limit as u32
         } else {
             0
         };
-        
+
         let mut result = Vec::new(env);
         for i in start..len {
             result.push_back(history.get(i).unwrap().clone());
         }
-        
+
         result
     }
 }

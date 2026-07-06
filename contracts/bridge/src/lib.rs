@@ -1,6 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Bytes, BytesN, Env, Map, Vec};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Bytes,
+    BytesN, Env, Map, Vec,
+};
 
 /// Cross-Chain Asset Bridge Contract
 ///
@@ -24,18 +27,18 @@ pub enum AssetType {
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BridgeAction {
-    Lock = 0,    // Lock assets on source chain
-    Unlock = 1,  // Unlock assets on destination chain
+    Lock = 0,   // Lock assets on source chain
+    Unlock = 1, // Unlock assets on destination chain
 }
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BridgeStatus {
-    Pending = 0,     // Awaiting validation
-    Confirmed = 1,   // Confirmed by validators
-    Completed = 2,   // Successfully processed
-    Failed = 3,      // Failed validation
-    Cancelled = 4,   // Cancelled by user/admin
+    Pending = 0,   // Awaiting validation
+    Confirmed = 1, // Confirmed by validators
+    Completed = 2, // Successfully processed
+    Failed = 3,    // Failed validation
+    Cancelled = 4, // Cancelled by user/admin
 }
 
 /// Cross-chain message format for asset transfers
@@ -145,15 +148,15 @@ pub struct WrappedNFT {
 pub enum DataKey {
     Config,
     Validators,                    // Vec<Address>
-    ValidatorSetVersion,          // u32
-    LockedAssets(BytesN<32>),     // LockedAsset
-    WrappedNFTs(i128),           // WrappedNFT
-    NFTMetadata(i128),           // NFTMetadata
-    ProcessedMessages,           // Map<BytesN<32>, BridgeStatus>
+    ValidatorSetVersion,           // u32
+    LockedAssets(BytesN<32>),      // LockedAsset
+    WrappedNFTs(i128),             // WrappedNFT
+    NFTMetadata(i128),             // NFTMetadata
+    ProcessedMessages,             // Map<BytesN<32>, BridgeStatus>
     MessageSignatures(BytesN<32>), // Vec<ValidatorSignature>
-    UserNonces(Address),         // u64
-    BridgeNonces,                // u64
-    FeeBalance(Address),         // i128 - accumulated fees per token
+    UserNonces(Address),           // u64
+    BridgeNonces,                  // u64
+    FeeBalance(Address),           // i128 - accumulated fees per token
 }
 
 /// Custom error codes for the bridge contract
@@ -223,7 +226,7 @@ impl BridgeContract {
             max_validators: MAX_VALIDATORS,
             base_fee_bps: 30, // 0.3% base fee
             fee_collector,
-            min_fee: 1_000_000, // 1 XLM minimum
+            min_fee: 1_000_000,         // 1 XLM minimum
             max_fee: 1_000_000_000_000, // 1M XLM maximum
             paused: false,
             chain_id,
@@ -246,7 +249,11 @@ impl BridgeContract {
         Self::assert_admin(&env, &admin)?;
         Self::assert_not_paused(&env)?;
 
-        let mut validators: Vec<Address> = env.storage().instance().get(&DataKey::Validators).unwrap_or(Vec::new(&env));
+        let mut validators: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Validators)
+            .unwrap_or(Vec::new(&env));
 
         if validators.contains(&validator) {
             return Err(Error::InvalidMessage);
@@ -257,16 +264,22 @@ impl BridgeContract {
         }
 
         validators.push_back(validator.clone());
-        env.storage().instance().set(&DataKey::Validators, &validators);
+        env.storage()
+            .instance()
+            .set(&DataKey::Validators, &validators);
 
         // Increment validator set version
-        let version: u32 = env.storage().instance().get(&DataKey::ValidatorSetVersion).unwrap_or(1);
-        env.storage().instance().set(&DataKey::ValidatorSetVersion, &(version + 1));
+        let version: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::ValidatorSetVersion)
+            .unwrap_or(1);
+        env.storage()
+            .instance()
+            .set(&DataKey::ValidatorSetVersion, &(version + 1));
 
-        env.events().publish(
-            (symbol_short!("V_ADD"), validator),
-            version + 1,
-        );
+        env.events()
+            .publish((symbol_short!("V_ADD"), validator), version + 1);
 
         Ok(())
     }
@@ -277,7 +290,11 @@ impl BridgeContract {
         Self::assert_admin(&env, &admin)?;
         Self::assert_not_paused(&env)?;
 
-        let mut validators: Vec<Address> = env.storage().instance().get(&DataKey::Validators).unwrap_or(Vec::new(&env));
+        let mut validators: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Validators)
+            .unwrap_or(Vec::new(&env));
 
         let mut new_validators: Vec<Address> = Vec::new(&env);
         let mut found = false;
@@ -294,16 +311,22 @@ impl BridgeContract {
             return Err(Error::InvalidMessage);
         }
 
-        env.storage().instance().set(&DataKey::Validators, &new_validators);
+        env.storage()
+            .instance()
+            .set(&DataKey::Validators, &new_validators);
 
         // Increment validator set version
-        let version: u32 = env.storage().instance().get(&DataKey::ValidatorSetVersion).unwrap_or(1);
-        env.storage().instance().set(&DataKey::ValidatorSetVersion, &(version + 1));
+        let version: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::ValidatorSetVersion)
+            .unwrap_or(1);
+        env.storage()
+            .instance()
+            .set(&DataKey::ValidatorSetVersion, &(version + 1));
 
-        env.events().publish(
-            (symbol_short!("V_REM"), validator),
-            version + 1,
-        );
+        env.events()
+            .publish((symbol_short!("V_REM"), validator), version + 1);
 
         Ok(())
     }
@@ -339,10 +362,8 @@ impl BridgeContract {
         config.paused = paused;
         env.storage().instance().set(&DataKey::Config, &config);
 
-        env.events().publish(
-            (symbol_short!("B_PAUSE"), paused),
-            env.ledger().timestamp(),
-        );
+        env.events()
+            .publish((symbol_short!("B_PAUSE"), paused), env.ledger().timestamp());
 
         Ok(())
     }
@@ -395,10 +416,14 @@ impl BridgeContract {
         let fee_amount = Self::calculate_fee(&env, amount, &config)?;
 
         // Generate unique message ID
-        let message_id = Self::generate_message_id(&env, &sender, asset_type.clone(), amount, dest_chain);
+        let message_id =
+            Self::generate_message_id(&env, &sender, asset_type.clone(), amount, dest_chain);
 
         // Check for replay attack
-        let processed: Option<BridgeStatus> = env.storage().instance().get(&DataKey::ProcessedMessages)
+        let processed: Option<BridgeStatus> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ProcessedMessages)
             .and_then(|m: Map<BytesN<32>, BridgeStatus>| m.get(message_id.clone()));
 
         if processed.is_some() {
@@ -430,7 +455,9 @@ impl BridgeContract {
             recipient: recipient.clone(),
         };
 
-        env.storage().instance().set(&DataKey::LockedAssets(message_id.clone()), &locked_asset);
+        env.storage()
+            .instance()
+            .set(&DataKey::LockedAssets(message_id.clone()), &locked_asset);
 
         // Create bridge message
         let message = BridgeMessage {
@@ -456,11 +483,15 @@ impl BridgeContract {
         }
 
         // Initialize message status
-        let mut processed_messages: Map<BytesN<32>, BridgeStatus> = env.storage().instance()
+        let mut processed_messages: Map<BytesN<32>, BridgeStatus> = env
+            .storage()
+            .instance()
             .get(&DataKey::ProcessedMessages)
             .unwrap_or(Map::new(&env));
         processed_messages.set(message_id.clone(), BridgeStatus::Pending);
-        env.storage().instance().set(&DataKey::ProcessedMessages, &processed_messages);
+        env.storage()
+            .instance()
+            .set(&DataKey::ProcessedMessages, &processed_messages);
 
         // Emit bridge initiation event
         env.events().publish(
@@ -482,7 +513,11 @@ impl BridgeContract {
         Self::assert_not_paused(&env)?;
 
         // Verify validator is authorized
-        let validators: Vec<Address> = env.storage().instance().get(&DataKey::Validators).unwrap_or(Vec::new(&env));
+        let validators: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Validators)
+            .unwrap_or(Vec::new(&env));
         if !validators.contains(&validator) {
             return Err(Error::Unauthorized);
         }
@@ -490,7 +525,10 @@ impl BridgeContract {
         let config: BridgeConfig = env.storage().instance().get(&DataKey::Config).unwrap();
 
         // Verify message hasn't been processed
-        let processed: Option<BridgeStatus> = env.storage().instance().get(&DataKey::ProcessedMessages)
+        let processed: Option<BridgeStatus> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ProcessedMessages)
             .and_then(|m: Map<BytesN<32>, BridgeStatus>| m.get(message.message_id.clone()));
 
         if let Some(status) = processed {
@@ -500,7 +538,13 @@ impl BridgeContract {
         }
 
         // Verify signatures
-        Self::verify_signatures(&env, &message, &signatures, &validators, config.required_signatures)?;
+        Self::verify_signatures(
+            &env,
+            &message,
+            &signatures,
+            &validators,
+            config.required_signatures,
+        )?;
 
         // Process the bridge action
         match message.action {
@@ -514,14 +558,21 @@ impl BridgeContract {
         }
 
         // Update message status
-        let mut processed_messages: Map<BytesN<32>, BridgeStatus> = env.storage().instance()
+        let mut processed_messages: Map<BytesN<32>, BridgeStatus> = env
+            .storage()
+            .instance()
             .get(&DataKey::ProcessedMessages)
             .unwrap_or(Map::new(&env));
         processed_messages.set(message.message_id.clone(), BridgeStatus::Completed);
-        env.storage().instance().set(&DataKey::ProcessedMessages, &processed_messages);
+        env.storage()
+            .instance()
+            .set(&DataKey::ProcessedMessages, &processed_messages);
 
         // Store signatures for audit
-        env.storage().instance().set(&DataKey::MessageSignatures(message.message_id.clone()), &signatures);
+        env.storage().instance().set(
+            &DataKey::MessageSignatures(message.message_id.clone()),
+            &signatures,
+        );
 
         // Emit completion event
         env.events().publish(
@@ -533,15 +584,13 @@ impl BridgeContract {
     }
 
     /// Cancel a pending bridge operation (user or admin)
-    pub fn cancel_bridge(
-        env: Env,
-        caller: Address,
-        message_id: BytesN<32>,
-    ) -> Result<(), Error> {
+    pub fn cancel_bridge(env: Env, caller: Address, message_id: BytesN<32>) -> Result<(), Error> {
         caller.require_auth();
 
         // Get locked asset info
-        let locked_asset: LockedAsset = env.storage().instance()
+        let locked_asset: LockedAsset = env
+            .storage()
+            .instance()
             .get(&DataKey::LockedAssets(message_id.clone()))
             .ok_or(Error::AssetNotLocked)?;
 
@@ -552,7 +601,10 @@ impl BridgeContract {
         }
 
         // Check message status
-        let processed: Option<BridgeStatus> = env.storage().instance().get(&DataKey::ProcessedMessages)
+        let processed: Option<BridgeStatus> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ProcessedMessages)
             .and_then(|m: Map<BytesN<32>, BridgeStatus>| m.get(message_id.clone()));
 
         if let Some(status) = processed {
@@ -565,7 +617,11 @@ impl BridgeContract {
         match locked_asset.asset_type {
             AssetType::Token => {
                 let token_client = token::Client::new(&env, &locked_asset.asset_address);
-                token_client.transfer(&env.current_contract_address(), &locked_asset.owner, &locked_asset.amount);
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &locked_asset.owner,
+                    &locked_asset.amount,
+                );
             }
             AssetType::NFT => {
                 // Handle NFT refund
@@ -573,19 +629,23 @@ impl BridgeContract {
         }
 
         // Update status
-        let mut processed_messages: Map<BytesN<32>, BridgeStatus> = env.storage().instance()
+        let mut processed_messages: Map<BytesN<32>, BridgeStatus> = env
+            .storage()
+            .instance()
             .get(&DataKey::ProcessedMessages)
             .unwrap_or(Map::new(&env));
         processed_messages.set(message_id.clone(), BridgeStatus::Cancelled);
-        env.storage().instance().set(&DataKey::ProcessedMessages, &processed_messages);
+        env.storage()
+            .instance()
+            .set(&DataKey::ProcessedMessages, &processed_messages);
 
         // Remove locked asset record
-        env.storage().instance().remove(&DataKey::LockedAssets(message_id.clone()));
+        env.storage()
+            .instance()
+            .remove(&DataKey::LockedAssets(message_id.clone()));
 
-        env.events().publish(
-            (symbol_short!("B_CANCEL"), message_id),
-            locked_asset.amount,
-        );
+        env.events()
+            .publish((symbol_short!("B_CANCEL"), message_id), locked_asset.amount);
 
         Ok(())
     }
@@ -605,7 +665,8 @@ impl BridgeContract {
         Self::assert_not_paused(&env)?;
 
         // Generate wrapped token ID
-        let wrapped_token_id = Self::generate_wrapped_token_id(&env, nft_contract.clone(), token_id, dest_chain);
+        let wrapped_token_id =
+            Self::generate_wrapped_token_id(&env, nft_contract.clone(), token_id, dest_chain);
 
         // Store wrapping information
         let wrapped_nft = WrappedNFT {
@@ -617,7 +678,9 @@ impl BridgeContract {
             wrapped_at: env.ledger().timestamp(),
         };
 
-        env.storage().instance().set(&DataKey::WrappedNFTs(wrapped_token_id), &wrapped_nft);
+        env.storage()
+            .instance()
+            .set(&DataKey::WrappedNFTs(wrapped_token_id), &wrapped_nft);
 
         // TODO: Implement actual NFT transfer from owner to bridge
         // This would require calling the NFT contract's transfer function
@@ -640,7 +703,9 @@ impl BridgeContract {
         owner.require_auth();
         Self::assert_not_paused(&env)?;
 
-        let wrapped_nft: WrappedNFT = env.storage().instance()
+        let wrapped_nft: WrappedNFT = env
+            .storage()
+            .instance()
             .get(&DataKey::WrappedNFTs(wrapped_token_id))
             .ok_or(Error::NFTNotWrapped)?;
 
@@ -652,7 +717,9 @@ impl BridgeContract {
         // This would require calling the original NFT contract
 
         // Remove wrapped NFT record
-        env.storage().instance().remove(&DataKey::WrappedNFTs(wrapped_token_id));
+        env.storage()
+            .instance()
+            .remove(&DataKey::WrappedNFTs(wrapped_token_id));
 
         let original_contract = wrapped_nft.original_contract;
         let original_token_id = wrapped_nft.original_token_id;
@@ -672,20 +739,29 @@ impl BridgeContract {
     }
 
     pub fn get_validators(env: Env) -> Vec<Address> {
-        env.storage().instance().get(&DataKey::Validators).unwrap_or(Vec::new(&env))
+        env.storage()
+            .instance()
+            .get(&DataKey::Validators)
+            .unwrap_or(Vec::new(&env))
     }
 
     pub fn get_message_status(env: Env, message_id: BytesN<32>) -> Option<BridgeStatus> {
-        env.storage().instance().get(&DataKey::ProcessedMessages)
+        env.storage()
+            .instance()
+            .get(&DataKey::ProcessedMessages)
             .and_then(|m: Map<BytesN<32>, BridgeStatus>| m.get(message_id))
     }
 
     pub fn get_locked_asset(env: Env, message_id: BytesN<32>) -> Option<LockedAsset> {
-        env.storage().instance().get(&DataKey::LockedAssets(message_id))
+        env.storage()
+            .instance()
+            .get(&DataKey::LockedAssets(message_id))
     }
 
     pub fn get_wrapped_nft(env: Env, wrapped_token_id: i128) -> Option<WrappedNFT> {
-        env.storage().instance().get(&DataKey::WrappedNFTs(wrapped_token_id))
+        env.storage()
+            .instance()
+            .get(&DataKey::WrappedNFTs(wrapped_token_id))
     }
 
     // ───────────── INTERNAL HELPERS ─────────────
@@ -740,7 +816,11 @@ impl BridgeContract {
     }
 
     fn get_next_bridge_nonce(env: &Env) -> u64 {
-        let current: u64 = env.storage().instance().get(&DataKey::BridgeNonces).unwrap_or(0);
+        let current: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::BridgeNonces)
+            .unwrap_or(0);
         let next = current + 1;
         env.storage().instance().set(&DataKey::BridgeNonces, &next);
         next
@@ -820,7 +900,11 @@ impl BridgeContract {
             AssetType::Token => {
                 let token_client = token::Client::new(env, &message.asset_address);
                 let recipient_addr = Self::bytes_to_address(env, &message.recipient)?;
-                token_client.transfer(&env.current_contract_address(), &recipient_addr, &message.asset_amount);
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &recipient_addr,
+                    &message.asset_amount,
+                );
             }
             AssetType::NFT => {
                 // Handle NFT unlock
@@ -859,4 +943,3 @@ impl BridgeContract {
         Ok(())
     }
 }
-

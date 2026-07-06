@@ -120,6 +120,17 @@
                       "val": {
                         "string": "DAO"
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "withdrawal_threshold"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 10000
+                        }
+                      }
                     }
                   ]
                 }
@@ -398,7 +409,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Officer or Leader only' from contract function 'Symbol(obj#45)'"
+                  "string": "caught panic 'Officer or Leader only' from contract function 'Symbol(obj#47)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"

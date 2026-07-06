@@ -4,7 +4,13 @@ use super::*;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
 use soroban_sdk::{Address, Env, String};
 
-fn setup_env() -> (Env, Address, Address, Address, LoyaltyPointsContractClient<'static>) {
+fn setup_env() -> (
+    Env,
+    Address,
+    Address,
+    Address,
+    LoyaltyPointsContractClient<'static>,
+) {
     let env = Env::default();
     env.mock_all_auths();
 

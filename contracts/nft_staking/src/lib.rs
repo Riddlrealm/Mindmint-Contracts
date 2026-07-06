@@ -69,9 +69,9 @@ pub struct PositionView {
 #[contracttype]
 pub enum DataKey {
     Config,
-    Position(u32),      // token_id => NFTStakePosition
-    RarityConfig(u32),  // rarity => RarityConfig
-    TokenRarity(u32),   // token_id => rarity
+    Position(u32),     // token_id => NFTStakePosition
+    RarityConfig(u32), // rarity => RarityConfig
+    TokenRarity(u32),  // token_id => rarity
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -133,7 +133,9 @@ impl NftStakingContract {
 
         let key = DataKey::RarityConfig(rarity);
         env.storage().persistent().set(&key, &cfg);
-        env.storage().persistent().extend_ttl(&key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
     }
 
     /// Configure the rarity tier for a specific token id (admin only).
@@ -154,7 +156,9 @@ impl NftStakingContract {
 
         let key = DataKey::TokenRarity(token_id);
         env.storage().persistent().set(&key, &rarity);
-        env.storage().persistent().extend_ttl(&key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
     }
 
     // ───────────── Core: stake/claim/unstake ─────────────
@@ -183,7 +187,9 @@ impl NftStakingContract {
             .storage()
             .persistent()
             .get(&DataKey::TokenRarity(token_id))
-            .unwrap_or_else(|| soroban_sdk::panic_with_error!(&env, NftStakingError::InvalidTokenRarity));
+            .unwrap_or_else(|| {
+                soroban_sdk::panic_with_error!(&env, NftStakingError::InvalidTokenRarity)
+            });
 
         if !env
             .storage()
@@ -206,7 +212,9 @@ impl NftStakingContract {
         };
 
         env.storage().persistent().set(&pos_key, &position);
-        env.storage().persistent().extend_ttl(&pos_key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&pos_key, 100_000, 500_000);
 
         env.events()
             .publish((Symbol::new(&env, "NFTStaked"), token_id), staker);
@@ -235,13 +243,17 @@ impl NftStakingContract {
             let minter = env.current_contract_address();
             rewards.mint(&minter, &pos.staker, &pending);
 
-            env.events()
-                .publish((Symbol::new(&env, "RewardsClaimed"), token_id), (pos.staker.clone(), pending));
+            env.events().publish(
+                (Symbol::new(&env, "RewardsClaimed"), token_id),
+                (pos.staker.clone(), pending),
+            );
         }
 
         let pos_key = DataKey::Position(token_id);
         env.storage().persistent().set(&pos_key, &pos);
-        env.storage().persistent().extend_ttl(&pos_key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&pos_key, 100_000, 500_000);
 
         pending
     }
@@ -269,21 +281,23 @@ impl NftStakingContract {
             let minter = env.current_contract_address();
             rewards.mint(&minter, &pos.staker, &pending);
 
-            env.events()
-                .publish((Symbol::new(&env, "RewardsClaimed"), token_id), (pos.staker.clone(), pending));
+            env.events().publish(
+                (Symbol::new(&env, "RewardsClaimed"), token_id),
+                (pos.staker.clone(), pending),
+            );
         }
 
         // Return NFT to staker.
         let nft = AchievementNFTClient::new(&env, &cfg.nft_contract);
-        nft.transfer(
-            &env.current_contract_address(),
-            &pos.staker,
-            &token_id,
-        );
+        nft.transfer(&env.current_contract_address(), &pos.staker, &token_id);
 
-        env.storage().persistent().remove(&DataKey::Position(token_id));
-        env.events()
-            .publish((Symbol::new(&env, "NFTUnstaked"), token_id), pos.staker.clone());
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Position(token_id));
+        env.events().publish(
+            (Symbol::new(&env, "NFTUnstaked"), token_id),
+            pos.staker.clone(),
+        );
 
         pending
     }
@@ -331,7 +345,9 @@ impl NftStakingContract {
         env.storage()
             .persistent()
             .get(&DataKey::Position(token_id))
-            .unwrap_or_else(|| soroban_sdk::panic_with_error!(env, NftStakingError::PositionNotFound))
+            .unwrap_or_else(|| {
+                soroban_sdk::panic_with_error!(env, NftStakingError::PositionNotFound)
+            })
     }
 
     fn tokens_per_ledger(env: &Env, rarity: u32) -> i128 {
@@ -339,7 +355,9 @@ impl NftStakingContract {
             .storage()
             .persistent()
             .get(&DataKey::RarityConfig(rarity))
-            .unwrap_or_else(|| soroban_sdk::panic_with_error!(env, NftStakingError::RarityNotConfigured));
+            .unwrap_or_else(|| {
+                soroban_sdk::panic_with_error!(env, NftStakingError::RarityNotConfigured)
+            });
         cfg.tokens_per_ledger
     }
 

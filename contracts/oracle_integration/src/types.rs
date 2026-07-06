@@ -64,7 +64,6 @@ pub enum OracleSource {
     MedianFeed(Address, Symbol),
 }
 
-
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AssetSourceConfig {

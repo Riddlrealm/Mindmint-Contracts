@@ -127,7 +127,6 @@ pub struct GamificationRewardsContract;
 
 #[contractimpl]
 impl GamificationRewardsContract {
-
     // ✅ FIXED initialize()
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();

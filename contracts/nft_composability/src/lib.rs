@@ -4,8 +4,8 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Map, Symbol, Vec, symbol_short};
 use crate::storage::*;
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Map, Symbol, Vec};
 
 #[contract]
 pub struct NftComposabilityContract;
@@ -52,7 +52,13 @@ impl NftComposabilityContract {
         id
     }
 
-    pub fn merge(env: Env, owner: Address, token_a: u32, token_b: u32, selections: Vec<TraitSelection>) -> u32 {
+    pub fn merge(
+        env: Env,
+        owner: Address,
+        token_a: u32,
+        token_b: u32,
+        selections: Vec<TraitSelection>,
+    ) -> u32 {
         owner.require_auth();
 
         if token_a == token_b {
@@ -72,7 +78,7 @@ impl NftComposabilityContract {
 
         let req_traits = get_required_traits(&env);
         let mut new_traits: Map<Symbol, Symbol> = Map::new(&env);
-        
+
         // Track which traits have been filled
         let mut filled_keys: Map<Symbol, bool> = Map::new(&env);
 
@@ -119,7 +125,10 @@ impl NftComposabilityContract {
 
         set_token(&env, new_id, &new_nft);
 
-        env.events().publish((symbol_short!("Merged"), symbol_short!("NFTs")), (token_a, token_b, new_id, owner));
+        env.events().publish(
+            (symbol_short!("Merged"), symbol_short!("NFTs")),
+            (token_a, token_b, new_id, owner),
+        );
 
         new_id
     }
@@ -138,7 +147,7 @@ impl NftComposabilityContract {
         if token_id == 0 {
             return;
         }
-        
+
         let token_opt = get_token(env, token_id);
         if let Some(token) = token_opt {
             lineage.push_back(token_id);

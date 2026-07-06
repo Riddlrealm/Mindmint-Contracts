@@ -30,7 +30,9 @@
 
 extern crate alloc;
 
-use soroban_sdk::{contract, contractimpl, contracttype, contractevent, Address, Env, Map, String, Vec};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Map, String, Vec,
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -198,19 +200,25 @@ pub struct TraitEvolutionRule {
 #[derive(Clone, Debug)]
 pub struct TriggerRule {
     pub id: u64,
-    pub trigger_type: String,        // "metric" | "ownership_count" | "time"
-    pub metric_key: String,         // metric name for "metric"
+    pub trigger_type: String, // "metric" | "ownership_count" | "time"
+    pub metric_key: String,   // metric name for "metric"
     pub threshold: u64,
-    pub action_type: String,         // "add_trait" | "add_numeric_trait" | "bump_level"
-    pub action_param: String,        // trait name (string or numeric)
-    pub action_value: String,        // trait value or numeric amount
+    pub action_type: String, // "add_trait" | "add_numeric_trait" | "bump_level"
+    pub action_param: String, // trait name (string or numeric)
+    pub action_value: String, // trait value or numeric amount
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // EVENTS
 // ════════════════════════════════════════════════════════════════════════════
+// EVENTS
+//
+// Plain `#[derive(Clone, Debug)]` data carriers. We emit them via
+// `env.events().publish((symbol_short!(...),), (...))` rather than the
+// `#[contractevent]/publish_event` path because that macro was not added
+// until Soroban SDK 25.x; the workspace is pinned to 21.x.
+// ════════════════════════════════════════════════════════════════════════════
 
-#[contractevent]
 #[derive(Clone, Debug)]
 pub struct MetadataUpdated {
     pub token_id: u32,
@@ -218,7 +226,6 @@ pub struct MetadataUpdated {
     pub by: Address,
 }
 
-#[contractevent]
 #[derive(Clone, Debug)]
 pub struct TraitEvolved {
     pub token_id: u32,
@@ -227,7 +234,6 @@ pub struct TraitEvolved {
     pub new_level: u32,
 }
 
-#[contractevent]
 #[derive(Clone, Debug)]
 pub struct MetadataFrozen {
     pub token_id: u32,
@@ -235,7 +241,6 @@ pub struct MetadataFrozen {
     pub frozen: bool,
 }
 
-#[contractevent]
 #[derive(Clone, Debug)]
 pub struct TokenTransferred {
     pub token_id: u32,
@@ -243,7 +248,6 @@ pub struct TokenTransferred {
     pub to: Address,
 }
 
-#[contractevent]
 #[derive(Clone, Debug)]
 pub struct TokenMinted {
     pub token_id: u32,
@@ -251,11 +255,25 @@ pub struct TokenMinted {
     pub minter: Address,
 }
 
-#[contractevent]
 #[derive(Clone, Debug)]
 pub struct TokenBurned {
     pub token_id: u32,
     pub owner: Address,
+}
+
+/// Inputs for a metadata migration. Bundled into a single argument so
+/// `migrate_metadata` stays under Soroban's 10-parameter-per-function cap.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct MigrationParams {
+    pub new_name: String,
+    pub new_description: String,
+    pub new_image_id: u32,
+    pub new_external_uri: String,
+    pub new_string_traits: Map<String, String>,
+    pub new_numeric_traits: Map<String, u32>,
+    pub level_override: u32,
+    pub rarity_override: u32,
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -301,7 +319,9 @@ impl DynamicMetadataContract {
         };
 
         env.storage().instance().set(&DataKey::Config, &config);
-        env.storage().instance().set(&DataKey::Admin(admin.clone()), &true);
+        env.storage()
+            .instance()
+            .set(&DataKey::Admin(admin.clone()), &true);
         env.storage()
             .instance()
             .set(&DataKey::Migrator(config.migrator.clone()), &true);
@@ -309,8 +329,12 @@ impl DynamicMetadataContract {
             .instance()
             .set(&DataKey::Oracle(config.oracle.clone()), &true);
         env.storage().instance().set(&DataKey::NextTokenId, &1u32);
-        env.storage().instance().set(&DataKey::NextTraitRuleId, &1u64);
-        env.storage().instance().set(&DataKey::NextTriggerRuleId, &1u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextTraitRuleId, &1u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextTriggerRuleId, &1u64);
         env.storage().instance().set(&DataKey::GlobalPaused, &false);
     }
 
@@ -331,7 +355,9 @@ impl DynamicMetadataContract {
     pub fn set_paused(env: Env, admin: Address, paused: bool) {
         Self::assert_admin(&env, &admin);
         admin.require_auth();
-        env.storage().instance().set(&DataKey::GlobalPaused, &paused);
+        env.storage()
+            .instance()
+            .set(&DataKey::GlobalPaused, &paused);
     }
 
     pub fn update_image_base_uri(env: Env, admin: Address, new_base_uri: String) {
@@ -404,8 +430,7 @@ impl DynamicMetadataContract {
         Self::assert_not_paused(&env);
         minter.require_auth();
 
-        if string_traits.len() > MAX_TRAITS_PER_TOKEN
-            || numeric_traits.len() > MAX_TRAITS_PER_TOKEN
+        if string_traits.len() > MAX_TRAITS_PER_TOKEN || numeric_traits.len() > MAX_TRAITS_PER_TOKEN
         {
             panic!("TooManyTraits");
         }
@@ -483,11 +508,8 @@ impl DynamicMetadataContract {
         // Eagerly compute the image URI to cache and emit mint event.
         Self::compute_and_cache_image_uri(&env, &metadata);
 
-        env.events().publish_event(&TokenMinted {
-            token_id,
-            owner,
-            minter,
-        });
+        env.events()
+            .publish((symbol_short!("minted"),), (token_id, owner, minter));
         token_id
     }
 
@@ -552,11 +574,8 @@ impl DynamicMetadataContract {
             .persistent()
             .set(&DataKey::OwnerTokenIndex(to.clone()), &to_list);
 
-        env.events().publish_event(&TokenTransferred {
-            token_id,
-            from,
-            to,
-        });
+        env.events()
+            .publish((symbol_short!("xfer"),), (token_id, from, to));
     }
 
     /// Burn a token. The token record remains on-chain for audit; the burn
@@ -598,10 +617,8 @@ impl DynamicMetadataContract {
             .persistent()
             .set(&DataKey::TokenMetadata(token_id), &metadata);
 
-        env.events().publish_event(&TokenBurned {
-            token_id,
-            owner: caller,
-        });
+        env.events()
+            .publish((symbol_short!("burned"),), (token_id, caller));
     }
 
     /// Returns true iff the most recent ownership event for `token_id` is
@@ -615,7 +632,10 @@ impl DynamicMetadataContract {
             .unwrap_or_else(|| Vec::new(&env));
         match history.len() {
             0 => false,
-            n => history.get(n - 1).map(|r| r.event == OwnershipEvent::Burn).unwrap_or(false),
+            n => history
+                .get(n - 1)
+                .map(|r| r.event == OwnershipEvent::Burn)
+                .unwrap_or(false),
         }
     }
 
@@ -658,11 +678,10 @@ impl DynamicMetadataContract {
         metadata.updated_at = env.ledger().timestamp();
         Self::write_metadata(&env, &metadata);
         Self::snapshot_version(&env, &metadata, &caller, "update");
-        env.events().publish_event(&MetadataUpdated {
-            token_id,
-            version: Self::current_version(&env, token_id),
-            by: caller,
-        });
+        env.events().publish(
+            (symbol_short!("md_upd"),),
+            (token_id, Self::current_version(&env, token_id), caller),
+        );
         Self::current_version(&env, token_id)
     }
 
@@ -870,9 +889,7 @@ impl DynamicMetadataContract {
             .get(&DataKey::TraitRules)
             .unwrap_or_else(|| Map::new(&env));
         rules.set(id, rule);
-        env.storage()
-            .persistent()
-            .set(&DataKey::TraitRules, &rules);
+        env.storage().persistent().set(&DataKey::TraitRules, &rules);
         env.storage()
             .instance()
             .set(&DataKey::NextTraitRuleId, &(id + 1));
@@ -891,9 +908,7 @@ impl DynamicMetadataContract {
             panic!("RuleNotFound");
         }
         rules.remove(rule_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::TraitRules, &rules);
+        env.storage().persistent().set(&DataKey::TraitRules, &rules);
     }
 
     pub fn get_trait_rules(env: Env) -> Map<u64, TraitEvolutionRule> {
@@ -1019,11 +1034,8 @@ impl DynamicMetadataContract {
         metadata.updated_at = env.ledger().timestamp();
         Self::write_metadata(&env, &metadata);
         Self::snapshot_version(&env, &metadata, &caller, "freeze");
-        env.events().publish_event(&MetadataFrozen {
-            token_id,
-            by: caller,
-            frozen: true,
-        });
+        env.events()
+            .publish((symbol_short!("frozen"),), (token_id, caller, true));
     }
 
     pub fn unfreeze_metadata(env: Env, caller: Address, token_id: u32) {
@@ -1036,11 +1048,8 @@ impl DynamicMetadataContract {
         metadata.updated_at = env.ledger().timestamp();
         Self::write_metadata(&env, &metadata);
         Self::snapshot_version(&env, &metadata, &caller, "unfreeze");
-        env.events().publish_event(&MetadataFrozen {
-            token_id,
-            by: caller,
-            frozen: false,
-        });
+        env.events()
+            .publish((symbol_short!("frozen"),), (token_id, caller, false));
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -1050,20 +1059,14 @@ impl DynamicMetadataContract {
     /// Migrate a token's metadata to a newer schema version. Pre-state is
     /// snapshotted into version history under reason "migrate", then the
     /// new state is stored and re-snapshotted under reason
-    /// "migrated:{old}->{new}".
+    /// "migrated:{old}->{new}". Inputs are bundled into a `MigrationParams`
+    /// struct to stay under Soroban's 10-argument-per-function cap.
     pub fn migrate_metadata(
         env: Env,
         migrator: Address,
         token_id: u32,
         new_version: u32,
-        new_name: String,
-        new_description: String,
-        new_image_id: u32,
-        new_external_uri: String,
-        new_string_traits: Map<String, String>,
-        new_numeric_traits: Map<String, u32>,
-        level_override: u32,
-        rarity_override: u32,
+        params: MigrationParams,
     ) -> u32 {
         Self::assert_migrator(&env, &migrator);
         migrator.require_auth();
@@ -1074,8 +1077,8 @@ impl DynamicMetadataContract {
         if new_version < config.schema_version {
             panic!("CannotDowngradeVersion");
         }
-        if new_string_traits.len() > MAX_TRAITS_PER_TOKEN
-            || new_numeric_traits.len() > MAX_TRAITS_PER_TOKEN
+        if params.new_string_traits.len() > MAX_TRAITS_PER_TOKEN
+            || params.new_numeric_traits.len() > MAX_TRAITS_PER_TOKEN
         {
             panic!("TooManyTraits");
         }
@@ -1086,19 +1089,19 @@ impl DynamicMetadataContract {
         // Snapshot pre-migration state.
         Self::snapshot_version(&env, &metadata, &migrator, "migrate");
 
-        metadata.name = new_name;
-        metadata.description = new_description;
-        if new_image_id > 0 {
-            metadata.image_id = new_image_id;
+        metadata.name = params.new_name;
+        metadata.description = params.new_description;
+        if params.new_image_id > 0 {
+            metadata.image_id = params.new_image_id;
         }
-        metadata.external_uri = new_external_uri;
-        metadata.string_traits = new_string_traits;
-        metadata.numeric_traits = new_numeric_traits;
-        if level_override > 0 {
-            metadata.level = level_override;
+        metadata.external_uri = params.new_external_uri;
+        metadata.string_traits = params.new_string_traits;
+        metadata.numeric_traits = params.new_numeric_traits;
+        if params.level_override > 0 {
+            metadata.level = params.level_override;
         }
-        if rarity_override > 0 {
-            metadata.rarity = rarity_override;
+        if params.rarity_override > 0 {
+            metadata.rarity = params.rarity_override;
         }
         metadata.schema_version = new_version;
         metadata.updated_at = env.ledger().timestamp();
@@ -1122,11 +1125,10 @@ impl DynamicMetadataContract {
             .persistent()
             .set(&DataKey::VersionHistory(token_id), &versions);
 
-        env.events().publish_event(&MetadataUpdated {
-            token_id,
-            version: Self::current_version(&env, token_id),
-            by: migrator,
-        });
+        env.events().publish(
+            (symbol_short!("md_upd"),),
+            (token_id, Self::current_version(&env, token_id), migrator),
+        );
         Self::current_version(&env, token_id)
     }
 
@@ -1201,12 +1203,7 @@ impl DynamicMetadataContract {
             .remove(&DataKey::GeneratedImageUri(metadata.token_id));
     }
 
-    fn snapshot_version(
-        env: &Env,
-        metadata: &TokenMetadata,
-        by: &Address,
-        reason: &str,
-    ) {
+    fn snapshot_version(env: &Env, metadata: &TokenMetadata, by: &Address, reason: &str) {
         let mut versions: Vec<MetadataVersion> = env
             .storage()
             .persistent()
@@ -1214,7 +1211,7 @@ impl DynamicMetadataContract {
             .unwrap_or_else(|| Vec::new(env));
         let latest = versions.len();
         versions.push_back(MetadataVersion {
-            version: (latest + 1) as u32,
+            version: (latest + 1),
             snapshot: metadata.clone(),
             changed_by: by.clone(),
             reason: String::from_str(env, reason),
@@ -1231,7 +1228,7 @@ impl DynamicMetadataContract {
             .persistent()
             .get(&DataKey::VersionHistory(token_id))
             .unwrap_or_else(|| Vec::new(env));
-        versions.len() as u32
+        versions.len()
     }
 
     fn recompute_performance_score(env: &Env, token_id: u32, delta: u64) {
@@ -1273,9 +1270,10 @@ impl DynamicMetadataContract {
             return 0;
         }
         let rule = best.unwrap();
-        metadata
-            .string_traits
-            .set(rule.target_trait_name.clone(), rule.target_trait_value.clone());
+        metadata.string_traits.set(
+            rule.target_trait_name.clone(),
+            rule.target_trait_value.clone(),
+        );
         if rule.new_rarity > metadata.rarity {
             metadata.rarity = rule.new_rarity;
         }
@@ -1284,12 +1282,15 @@ impl DynamicMetadataContract {
         }
         metadata.updated_at = env.ledger().timestamp();
         Self::write_metadata(env, &metadata);
-        env.events().publish_event(&TraitEvolved {
-            token_id,
-            trait_name: rule.target_trait_name.clone(),
-            new_value: rule.target_trait_value.clone(),
-            new_level: metadata.level,
-        });
+        env.events().publish(
+            (symbol_short!("evolved"),),
+            (
+                token_id,
+                rule.target_trait_name.clone(),
+                rule.target_trait_value.clone(),
+                metadata.level,
+            ),
+        );
         Self::snapshot_version(
             env,
             &metadata,
@@ -1358,7 +1359,12 @@ impl DynamicMetadataContract {
         if applied > 0 {
             metadata.updated_at = env.ledger().timestamp();
             Self::write_metadata(env, &metadata);
-            Self::snapshot_version(env, &metadata, &env.current_contract_address(), "trigger_apply");
+            Self::snapshot_version(
+                env,
+                &metadata,
+                &env.current_contract_address(),
+                "trigger_apply",
+            );
         }
         applied
     }
@@ -1396,7 +1402,7 @@ impl DynamicMetadataContract {
         buf[idx..idx + p4.len()].copy_from_slice(p4);
         idx += p4.len();
         // Convert to Soroban String
-        let uri = String::from_bytes(env, &buf[..idx]).unwrap();
+        let uri = String::from_bytes(env, &buf[..idx]);
         env.storage()
             .persistent()
             .set(&DataKey::GeneratedImageUri(metadata.token_id), &uri);
@@ -1566,6 +1572,5 @@ fn make_migration_reason(env: &Env, old: u32, new: u32) -> String {
     buf[idx..idx + p.len()].copy_from_slice(p);
     idx += p.len();
     idx = append_u32_bytes(&mut buf, idx, new);
-    String::from_bytes(env, &buf[..idx]).unwrap()
+    String::from_bytes(env, &buf[..idx])
 }
-

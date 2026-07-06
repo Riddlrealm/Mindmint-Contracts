@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Vec, u32};
+use soroban_sdk::{contracttype, Address, Vec};
 
 /// Status of a co-creation collaboration
 #[contracttype]

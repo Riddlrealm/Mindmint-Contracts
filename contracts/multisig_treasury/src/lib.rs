@@ -1,6 +1,8 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Val, Vec, symbol_short, FromVal, IntoVal};
 use soroban_sdk::token::Client as TokenClient;
+use soroban_sdk::{
+    contract, contractimpl, symbol_short, Address, Env, FromVal, IntoVal, String, Symbol, Val, Vec,
+};
 
 mod storage;
 pub mod types;
@@ -75,22 +77,19 @@ impl MultisigTreasury {
         set_members(&env, &members);
 
         // Initialize transaction ID counter
-        env.storage().instance().set(&DataKey::NextTransactionId, &0u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::NextTransactionId, &0u64);
     }
 
     // ==================== MEMBER MANAGEMENT ====================
 
     /// Add a new member to the treasury (Admin/Owner only)
-    pub fn add_member(
-        env: Env,
-        caller: Address,
-        new_member: Address,
-        role: Role,
-    ) {
+    pub fn add_member(env: Env, caller: Address, new_member: Address, role: Role) {
         caller.require_auth();
-        
+
         let caller_member = get_member(&env, &caller).expect("Caller not a member");
-        
+
         // Only Admin or Owner can add members
         if caller_member.role != Role::Admin && caller_member.role != Role::Owner {
             panic!("Insufficient role to add members");
@@ -134,11 +133,7 @@ impl MultisigTreasury {
     }
 
     /// Remove a member from the treasury (Owner only for Signers/Admins, cannot remove last Owner)
-    pub fn remove_member(
-        env: Env,
-        caller: Address,
-        member_to_remove: Address,
-    ) {
+    pub fn remove_member(env: Env, caller: Address, member_to_remove: Address) {
         caller.require_auth();
 
         let caller_member = get_member(&env, &caller).expect("Caller not a member");
@@ -147,10 +142,15 @@ impl MultisigTreasury {
         // Cannot remove self if you're the last owner
         if caller == member_to_remove && target_member.role == Role::Owner {
             let members = get_members(&env);
-            let owner_count = members.iter().filter(|m| {
-                get_member(&env, m).map(|mem| mem.role == Role::Owner && mem.active).unwrap_or(false)
-            }).count();
-            
+            let owner_count = members
+                .iter()
+                .filter(|m| {
+                    get_member(&env, m)
+                        .map(|mem| mem.role == Role::Owner && mem.active)
+                        .unwrap_or(false)
+                })
+                .count();
+
             if owner_count <= 1 {
                 panic!("Cannot remove last owner");
             }
@@ -184,42 +184,42 @@ impl MultisigTreasury {
         // Update config
         let mut config = get_config(&env).expect("Not initialized");
         config.total_signers -= 1;
-        
+
         // Ensure threshold is still valid
         if config.threshold > config.total_signers {
             config.threshold = config.total_signers;
         }
-        
+
         set_config(&env, &config);
 
         env.events().publish((MEMBER_REMOVED,), (member_to_remove,));
     }
 
     /// Update member role (Owner only)
-    pub fn update_member_role(
-        env: Env,
-        caller: Address,
-        member_address: Address,
-        new_role: Role,
-    ) {
+    pub fn update_member_role(env: Env, caller: Address, member_address: Address, new_role: Role) {
         caller.require_auth();
 
         let caller_member = get_member(&env, &caller).expect("Caller not a member");
-        
+
         // Only Owner can update roles
         if caller_member.role != Role::Owner {
             panic!("Only Owner can update member roles");
         }
 
         let mut target_member = get_member(&env, &member_address).expect("Member not found");
-        
+
         // If demoting from Owner, ensure not the last owner
         if target_member.role == Role::Owner && new_role != Role::Owner {
             let members = get_members(&env);
-            let owner_count = members.iter().filter(|m| {
-                get_member(&env, m).map(|mem| mem.role == Role::Owner && mem.active).unwrap_or(false)
-            }).count();
-            
+            let owner_count = members
+                .iter()
+                .filter(|m| {
+                    get_member(&env, m)
+                        .map(|mem| mem.role == Role::Owner && mem.active)
+                        .unwrap_or(false)
+                })
+                .count();
+
             if owner_count <= 1 {
                 panic!("Cannot demote last owner");
             }
@@ -228,7 +228,8 @@ impl MultisigTreasury {
         target_member.role = new_role.clone();
         set_member(&env, &member_address, &target_member);
 
-        env.events().publish((MEMBER_UPDATED,), (member_address, new_role));
+        env.events()
+            .publish((MEMBER_UPDATED,), (member_address, new_role));
     }
 
     /// Update configuration (Owner only)
@@ -247,7 +248,7 @@ impl MultisigTreasury {
         }
 
         let mut config = get_config(&env).expect("Not initialized");
-        
+
         // Validate threshold
         if threshold == 0 || threshold > config.total_signers {
             panic!("Invalid threshold");
@@ -332,7 +333,7 @@ impl MultisigTreasury {
         description: String,
     ) -> u64 {
         proposer.require_auth();
-        
+
         let proposer_member = get_member(&env, &proposer).expect("Proposer not a member");
         if proposer_member.role != Role::Admin && proposer_member.role != Role::Owner {
             panic!("Only Admin or Owner can propose signer management");
@@ -365,15 +366,11 @@ impl MultisigTreasury {
     // ==================== SIGNING & EXECUTION ====================
 
     /// Sign a pending transaction
-    pub fn sign_transaction(
-        env: Env,
-        signer: Address,
-        tx_id: u64,
-    ) {
+    pub fn sign_transaction(env: Env, signer: Address, tx_id: u64) {
         signer.require_auth();
 
         let mut tx = get_transaction(&env, tx_id).expect("Transaction not found");
-        
+
         // Check if already executed or rejected
         if tx.status != TransactionStatus::Pending {
             panic!("Transaction not pending");
@@ -414,7 +411,7 @@ impl MultisigTreasury {
 
         // Check if threshold reached
         let config = get_config(&env).expect("Not initialized");
-        if tx.signatures.len() as u32 >= config.threshold {
+        if tx.signatures.len() >= config.threshold {
             tx.status = TransactionStatus::Approved;
         }
 
@@ -423,11 +420,7 @@ impl MultisigTreasury {
     }
 
     /// Execute an approved transaction
-    pub fn execute_transaction(
-        env: Env,
-        executor: Address,
-        tx_id: u64,
-    ) -> Option<Val> {
+    pub fn execute_transaction(env: Env, executor: Address, tx_id: u64) -> Option<Val> {
         executor.require_auth();
         Self::require_signer(&env, &executor);
 
@@ -441,7 +434,7 @@ impl MultisigTreasury {
         // Check threshold for pending transactions
         if tx.status == TransactionStatus::Pending {
             let config = get_config(&env).expect("Not initialized");
-            if (tx.signatures.len() as u32) < config.threshold {
+            if (tx.signatures.len()) < config.threshold {
                 panic!("Threshold not reached");
             }
             tx.status = TransactionStatus::Approved;
@@ -453,7 +446,7 @@ impl MultisigTreasury {
                 let token = tx.target.as_ref().expect("No token specified");
                 let dest = tx.destination.as_ref().expect("No destination specified");
                 let amount = tx.amount.expect("No amount specified");
-                
+
                 let token_client = TokenClient::new(&env, token);
                 token_client.transfer(&env.current_contract_address(), dest, &amount);
                 None
@@ -462,7 +455,7 @@ impl MultisigTreasury {
                 let contract = tx.target.as_ref().expect("No contract specified");
                 let function = tx.function.as_ref().expect("No function specified");
                 let args = tx.args.clone().unwrap_or_else(|| Vec::new(&env));
-                
+
                 let res: Val = env.invoke_contract(contract, function, args);
                 Some(res)
             }
@@ -471,7 +464,7 @@ impl MultisigTreasury {
                 let args = tx.args.as_ref().expect("No args");
                 let action: Symbol = args.get(0).expect("Missing action").into_val(&env);
                 let target: Address = args.get(1).expect("Missing target").into_val(&env);
-                
+
                 if action == Symbol::new(&env, "add") {
                     let role: Role = args.get(2).expect("Missing role").into_val(&env);
                     Self::add_member(env.clone(), executor.clone(), target, role);
@@ -517,17 +510,14 @@ impl MultisigTreasury {
         set_transaction_history(&env, tx_id, &record);
         increment_transaction_count(&env);
 
-        env.events().publish((TX_EXECUTED,), (tx_id, executor, result.clone()));
+        env.events()
+            .publish((TX_EXECUTED,), (tx_id, executor, result));
 
         result
     }
 
     /// Reject a pending transaction (any signer can reject their own proposal)
-    pub fn reject_transaction(
-        env: Env,
-        rejector: Address,
-        tx_id: u64,
-    ) {
+    pub fn reject_transaction(env: Env, rejector: Address, tx_id: u64) {
         rejector.require_auth();
 
         let mut tx = get_transaction(&env, tx_id).expect("Transaction not found");
@@ -560,11 +550,7 @@ impl MultisigTreasury {
     // ==================== EMERGENCY RECOVERY ====================
 
     /// Activate emergency recovery mode (Owner only)
-    pub fn activate_emergency_recovery(
-        env: Env,
-        caller: Address,
-        reason: String,
-    ) {
+    pub fn activate_emergency_recovery(env: Env, caller: Address, reason: String) {
         caller.require_auth();
 
         let caller_member = get_member(&env, &caller).expect("Caller not a member");
@@ -595,15 +581,12 @@ impl MultisigTreasury {
         set_emergency_state(&env, &emergency_state);
         set_last_emergency_at(&env, current_time);
 
-        env.events().publish((EMERGENCY_ACTIVATED,), (caller, reason));
+        env.events()
+            .publish((EMERGENCY_ACTIVATED,), (caller, reason));
     }
 
     /// Execute emergency recovery - transfers ownership to a new address (requires 2/3 of Owners)
-    pub fn execute_emergency_recovery(
-        env: Env,
-        caller: Address,
-        new_owner: Address,
-    ) {
+    pub fn execute_emergency_recovery(env: Env, caller: Address, new_owner: Address) {
         caller.require_auth();
 
         let emergency_state = get_emergency_state(&env).expect("Emergency not activated");
@@ -650,7 +633,7 @@ impl MultisigTreasury {
                 active: true,
             };
             set_member(&env, &new_owner, &member);
-            
+
             let mut members = get_members(&env);
             members.push_back(new_owner.clone());
             set_members(&env, &members);
@@ -672,10 +655,7 @@ impl MultisigTreasury {
     }
 
     /// Cancel emergency recovery (original activator or any Owner)
-    pub fn cancel_emergency_recovery(
-        env: Env,
-        caller: Address,
-    ) {
+    pub fn cancel_emergency_recovery(env: Env, caller: Address) {
         caller.require_auth();
 
         let emergency_state = get_emergency_state(&env).expect("Emergency not activated");
@@ -684,7 +664,7 @@ impl MultisigTreasury {
         }
 
         let caller_member = get_member(&env, &caller).expect("Caller not a member");
-        
+
         // Only activator or any Owner can cancel
         if caller != emergency_state.activated_by && caller_member.role != Role::Owner {
             panic!("Unauthorized to cancel emergency");
@@ -757,10 +737,10 @@ impl MultisigTreasury {
         required_role: Role,
     ) -> u64 {
         let config = get_config(env).expect("Not initialized");
-        
+
         // Check pending transaction limit
         let pending = get_pending_transactions(env);
-        if pending.len() >= config.max_pending_proposals as u32 {
+        if pending.len() >= config.max_pending_proposals {
             panic!("Too many pending proposals");
         }
 
@@ -792,7 +772,10 @@ impl MultisigTreasury {
         pending.push_back(tx_id);
         set_pending_transactions(env, &pending);
 
-        env.events().publish((TX_PROPOSED,), (tx_id, transaction.transaction_type.clone()));
+        env.events().publish(
+            (TX_PROPOSED,),
+            (tx_id, transaction.transaction_type.clone()),
+        );
 
         tx_id
     }
@@ -818,4 +801,3 @@ impl MultisigTreasury {
         }
     }
 }
-

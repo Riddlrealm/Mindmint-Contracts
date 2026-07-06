@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol, Vec,
+};
 
 const MAX_BPS: u32 = 10_000;
 
@@ -80,13 +82,21 @@ impl TokenBurn {
             panic!("burn_rate_exceeds_100_pct");
         }
 
-        let config = BurnConfig { admin, token, burn_rate_bps, enabled: true };
+        let config = BurnConfig {
+            admin,
+            token,
+            burn_rate_bps,
+            enabled: true,
+        };
         env.storage().instance().set(&DataKey::Config, &config);
-        env.storage().instance().set(&DataKey::Stats, &BurnStats {
-            total_burned_voluntary: 0,
-            total_burned_fee: 0,
-            total_burned_event: 0,
-        });
+        env.storage().instance().set(
+            &DataKey::Stats,
+            &BurnStats {
+                total_burned_voluntary: 0,
+                total_burned_fee: 0,
+                total_burned_event: 0,
+            },
+        );
         env.storage().instance().set(&DataKey::HistoryCount, &0u64);
     }
 
@@ -146,9 +156,17 @@ impl TokenBurn {
         let config = Self::load_config(&env);
         token::Client::new(&env, &config.token).burn(&caller, &amount);
 
-        Self::record(&env, amount, &caller, symbol_short!("voluntary"), false, false);
+        Self::record(
+            &env,
+            amount,
+            &caller,
+            symbol_short!("voluntary"),
+            false,
+            false,
+        );
 
-        env.events().publish((symbol_short!("burn_vol"), caller), amount);
+        env.events()
+            .publish((symbol_short!("burn_vol"), caller), amount);
         amount
     }
 
@@ -177,7 +195,8 @@ impl TokenBurn {
         token::Client::new(&env, &config.token).burn(&caller, &fee);
         Self::record(&env, fee, &caller, symbol_short!("fee"), true, false);
 
-        env.events().publish((symbol_short!("burn_fee"), caller), fee);
+        env.events()
+            .publish((symbol_short!("burn_fee"), caller), fee);
         fee
     }
 
@@ -205,7 +224,10 @@ impl TokenBurn {
         token::Client::new(&env, &config.token).burn(&distributor, &amount);
         Self::record(&env, amount, &distributor, event_name.clone(), false, true);
 
-        env.events().publish((symbol_short!("burn_evt"), distributor), (event_name, amount));
+        env.events().publish(
+            (symbol_short!("burn_evt"), distributor),
+            (event_name, amount),
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -214,11 +236,14 @@ impl TokenBurn {
 
     /// Returns cumulative burn totals broken down by burn type.
     pub fn get_stats(env: Env) -> BurnStats {
-        env.storage().instance().get(&DataKey::Stats).unwrap_or(BurnStats {
-            total_burned_voluntary: 0,
-            total_burned_fee: 0,
-            total_burned_event: 0,
-        })
+        env.storage()
+            .instance()
+            .get(&DataKey::Stats)
+            .unwrap_or(BurnStats {
+                total_burned_voluntary: 0,
+                total_burned_fee: 0,
+                total_burned_event: 0,
+            })
     }
 
     /// Returns the combined total of all tokens burned by this contract.
@@ -269,17 +294,24 @@ impl TokenBurn {
     }
 
     /// Update stats and append a history entry.
-    fn record(env: &Env, amount: i128, source: &Address, reason: Symbol, is_fee: bool, is_event: bool) {
+    fn record(
+        env: &Env,
+        amount: i128,
+        source: &Address,
+        reason: Symbol,
+        is_fee: bool,
+        is_event: bool,
+    ) {
         // Update cumulative stats.
-        let mut stats: BurnStats = env
-            .storage()
-            .instance()
-            .get(&DataKey::Stats)
-            .unwrap_or(BurnStats {
-                total_burned_voluntary: 0,
-                total_burned_fee: 0,
-                total_burned_event: 0,
-            });
+        let mut stats: BurnStats =
+            env.storage()
+                .instance()
+                .get(&DataKey::Stats)
+                .unwrap_or(BurnStats {
+                    total_burned_voluntary: 0,
+                    total_burned_fee: 0,
+                    total_burned_event: 0,
+                });
 
         if is_fee {
             stats.total_burned_fee += amount;
@@ -318,4 +350,3 @@ impl TokenBurn {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-

@@ -86,7 +86,7 @@ impl EventTicketContract {
             token_id,
             event_id,
             holder: recipient.clone(),
-            tier: tier.clone(),
+            tier,
             transferable: true,
             attended: false,
             issued_at: env.ledger().timestamp(),
@@ -99,8 +99,10 @@ impl EventTicketContract {
         Storage::set_config(&env, &config);
         Storage::add_ticket_to_holder(&env, &recipient, token_id);
 
-        env.events()
-            .publish((symbol_short!("tkt_issu"),), (token_id, event_id, recipient, tier));
+        env.events().publish(
+            (symbol_short!("tkt_issu"),),
+            (token_id, event_id, recipient, tier),
+        );
 
         Ok(token_id)
     }
@@ -131,8 +133,10 @@ impl EventTicketContract {
         Storage::remove_ticket_from_holder(&env, &old_holder, token_id);
         Storage::add_ticket_to_holder(&env, &new_holder, token_id);
 
-        env.events()
-            .publish((symbol_short!("tkt_tran"),), (token_id, old_holder, new_holder));
+        env.events().publish(
+            (symbol_short!("tkt_tran"),),
+            (token_id, old_holder, new_holder),
+        );
 
         Ok(())
     }
@@ -163,11 +167,10 @@ impl EventTicketContract {
         Storage::set_ticket(&env, token_id, &ticket);
         Storage::increment_attendance(&env, ticket.event_id);
 
-        env.events()
-            .publish(
-                (symbol_short!("attend"),),
-                (ticket.event_id, token_id, ticket.holder.clone()),
-            );
+        env.events().publish(
+            (symbol_short!("attend"),),
+            (ticket.event_id, token_id, ticket.holder.clone()),
+        );
 
         Ok(())
     }

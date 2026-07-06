@@ -86,7 +86,11 @@ impl PredictionMarket {
         assert!(outcomes.len() >= 2, "Need at least 2 outcomes");
         assert!(resolution_time > env.ledger().timestamp(), "Invalid time");
 
-        let market_id: u64 = env.storage().instance().get(&DataKey::MarketCounter).unwrap_or(0);
+        let market_id: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MarketCounter)
+            .unwrap_or(0);
         let new_id = market_id + 1;
 
         let market = Market {
@@ -102,8 +106,12 @@ impl PredictionMarket {
             liquidity_amount: 0,
         };
 
-        env.storage().instance().set(&DataKey::Market(new_id), &market);
-        env.storage().instance().set(&DataKey::MarketCounter, &new_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(new_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::MarketCounter, &new_id);
 
         let mut outcome_pools = Vec::new(&env);
         for i in 0..outcomes.len() {
@@ -112,12 +120,12 @@ impl PredictionMarket {
                 total_amount: 0,
             });
         }
-        env.storage().instance().set(&DataKey::Bets(new_id), &outcome_pools);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bets(new_id), &outcome_pools);
 
-        env.events().publish(
-            (String::from_str(&env, "market_created"), new_id),
-            creator,
-        );
+        env.events()
+            .publish((String::from_str(&env, "market_created"), new_id), creator);
 
         new_id
     }
@@ -133,10 +141,20 @@ impl PredictionMarket {
         user.require_auth();
         assert!(amount > 0, "Amount must be positive");
 
-        let mut market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
+        let mut market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
         assert!(market.status == MarketStatus::Open, "Market not open");
-        assert!(env.ledger().timestamp() < market.resolution_time, "Market closed");
-        assert!((outcome_index as usize) < market.outcomes.len() as usize, "Invalid outcome");
+        assert!(
+            env.ledger().timestamp() < market.resolution_time,
+            "Market closed"
+        );
+        assert!(
+            (outcome_index as usize) < market.outcomes.len() as usize,
+            "Invalid outcome"
+        );
 
         token::Client::new(&env, &token).transfer(&user, &env.current_contract_address(), &amount);
 
@@ -153,35 +171,65 @@ impl PredictionMarket {
         user_bets.push_back(bet);
         env.storage().instance().set(&key, &user_bets);
 
-        let mut outcome_pools: Vec<OutcomePool> = env.storage().instance().get(&DataKey::Bets(market_id)).unwrap();
+        let mut outcome_pools: Vec<OutcomePool> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Bets(market_id))
+            .unwrap();
         let mut pool = outcome_pools.get(outcome_index).unwrap();
         pool.total_amount += amount;
         outcome_pools.set(outcome_index, pool);
-        env.storage().instance().set(&DataKey::Bets(market_id), &outcome_pools);
+        env.storage()
+            .instance()
+            .set(&DataKey::Bets(market_id), &outcome_pools);
 
         market.total_pool += amount;
-        env.storage().instance().set(&DataKey::Market(market_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(market_id), &market);
 
         env.events().publish(
-            (String::from_str(&env, "bet_placed"), market_id, outcome_index),
+            (
+                String::from_str(&env, "bet_placed"),
+                market_id,
+                outcome_index,
+            ),
             (user, amount),
         );
     }
 
-    pub fn add_liquidity(env: Env, provider: Address, market_id: u64, amount: i128, token: Address) {
+    pub fn add_liquidity(
+        env: Env,
+        provider: Address,
+        market_id: u64,
+        amount: i128,
+        token: Address,
+    ) {
         provider.require_auth();
         assert!(amount > 0, "Amount must be positive");
 
-        let mut market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
+        let mut market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
         assert!(market.status == MarketStatus::Open, "Market not open");
 
-        token::Client::new(&env, &token).transfer(&provider, &env.current_contract_address(), &amount);
+        token::Client::new(&env, &token).transfer(
+            &provider,
+            &env.current_contract_address(),
+            &amount,
+        );
 
         market.liquidity_provider = Some(provider.clone());
         market.liquidity_amount += amount;
-        env.storage().instance().set(&DataKey::Market(market_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(market_id), &market);
 
-        env.storage().instance().set(&DataKey::LiquidityPool(market_id), &amount);
+        env.storage()
+            .instance()
+            .set(&DataKey::LiquidityPool(market_id), &amount);
 
         env.events().publish(
             (String::from_str(&env, "liquidity_added"), market_id),
@@ -194,13 +242,25 @@ impl PredictionMarket {
         let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         assert!(admin == stored_admin, "Unauthorized");
 
-        let mut market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
-        assert!(market.status == MarketStatus::Open || market.status == MarketStatus::Closed, "Invalid status");
-        assert!((winning_outcome as usize) < market.outcomes.len() as usize, "Invalid outcome");
+        let mut market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
+        assert!(
+            market.status == MarketStatus::Open || market.status == MarketStatus::Closed,
+            "Invalid status"
+        );
+        assert!(
+            (winning_outcome as usize) < market.outcomes.len() as usize,
+            "Invalid outcome"
+        );
 
         market.status = MarketStatus::Resolved;
         market.winning_outcome = Some(winning_outcome);
-        env.storage().instance().set(&DataKey::Market(market_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(market_id), &market);
 
         env.events().publish(
             (String::from_str(&env, "market_resolved"), market_id),
@@ -211,14 +271,25 @@ impl PredictionMarket {
     pub fn claim_winnings(env: Env, user: Address, market_id: u64, token: Address) -> i128 {
         user.require_auth();
 
-        let market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
-        assert!(market.status == MarketStatus::Resolved, "Market not resolved");
+        let market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
+        assert!(
+            market.status == MarketStatus::Resolved,
+            "Market not resolved"
+        );
 
         let winning_outcome = market.winning_outcome.unwrap();
         let key = DataKey::UserBets(user.clone(), market_id);
         let mut user_bets: Vec<Bet> = env.storage().instance().get(&key).unwrap_or(Vec::new(&env));
 
-        let outcome_pools: Vec<OutcomePool> = env.storage().instance().get(&DataKey::Bets(market_id)).unwrap();
+        let outcome_pools: Vec<OutcomePool> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Bets(market_id))
+            .unwrap();
         let winning_pool = outcome_pools.get(winning_outcome).unwrap();
 
         let mut total_payout = 0i128;
@@ -235,7 +306,11 @@ impl PredictionMarket {
         assert!(total_payout > 0, "No winnings to claim");
 
         env.storage().instance().set(&key, &user_bets);
-        token::Client::new(&env, &token).transfer(&env.current_contract_address(), &user, &total_payout);
+        token::Client::new(&env, &token).transfer(
+            &env.current_contract_address(),
+            &user,
+            &total_payout,
+        );
 
         env.events().publish(
             (String::from_str(&env, "winnings_claimed"), market_id),
@@ -245,10 +320,20 @@ impl PredictionMarket {
         total_payout
     }
 
-    pub fn partial_cashout(env: Env, user: Address, market_id: u64, bet_index: u32, token: Address) -> i128 {
+    pub fn partial_cashout(
+        env: Env,
+        user: Address,
+        market_id: u64,
+        bet_index: u32,
+        token: Address,
+    ) -> i128 {
         user.require_auth();
 
-        let market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
+        let market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
         assert!(market.status == MarketStatus::Open, "Market not open");
 
         let key = DataKey::UserBets(user.clone(), market_id);
@@ -261,7 +346,11 @@ impl PredictionMarket {
         user_bets.set(bet_index, bet);
         env.storage().instance().set(&key, &user_bets);
 
-        token::Client::new(&env, &token).transfer(&env.current_contract_address(), &user, &cashout_amount);
+        token::Client::new(&env, &token).transfer(
+            &env.current_contract_address(),
+            &user,
+            &cashout_amount,
+        );
 
         env.events().publish(
             (String::from_str(&env, "partial_cashout"), market_id),
@@ -274,11 +363,20 @@ impl PredictionMarket {
     pub fn raise_dispute(env: Env, user: Address, market_id: u64, reason: String) {
         user.require_auth();
 
-        let mut market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
-        assert!(market.status == MarketStatus::Resolved, "Market not resolved");
+        let mut market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
+        assert!(
+            market.status == MarketStatus::Resolved,
+            "Market not resolved"
+        );
 
         market.status = MarketStatus::Disputed;
-        env.storage().instance().set(&DataKey::Market(market_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(market_id), &market);
 
         let dispute = Dispute {
             market_id,
@@ -288,12 +386,12 @@ impl PredictionMarket {
             resolved: false,
         };
 
-        env.storage().instance().set(&DataKey::Dispute(market_id), &dispute);
+        env.storage()
+            .instance()
+            .set(&DataKey::Dispute(market_id), &dispute);
 
-        env.events().publish(
-            (String::from_str(&env, "dispute_raised"), market_id),
-            user,
-        );
+        env.events()
+            .publish((String::from_str(&env, "dispute_raised"), market_id), user);
     }
 
     pub fn resolve_dispute(env: Env, admin: Address, market_id: u64, new_outcome: Option<u32>) {
@@ -301,18 +399,30 @@ impl PredictionMarket {
         let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         assert!(admin == stored_admin, "Unauthorized");
 
-        let mut market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
+        let mut market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
         assert!(market.status == MarketStatus::Disputed, "No dispute");
 
-        let mut dispute: Dispute = env.storage().instance().get(&DataKey::Dispute(market_id)).unwrap();
+        let mut dispute: Dispute = env
+            .storage()
+            .instance()
+            .get(&DataKey::Dispute(market_id))
+            .unwrap();
         dispute.resolved = true;
-        env.storage().instance().set(&DataKey::Dispute(market_id), &dispute);
+        env.storage()
+            .instance()
+            .set(&DataKey::Dispute(market_id), &dispute);
 
         if let Some(outcome) = new_outcome {
             market.winning_outcome = Some(outcome);
         }
         market.status = MarketStatus::Resolved;
-        env.storage().instance().set(&DataKey::Market(market_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(market_id), &market);
 
         env.events().publish(
             (String::from_str(&env, "dispute_resolved"), market_id),
@@ -325,23 +435,38 @@ impl PredictionMarket {
         let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         assert!(admin == stored_admin, "Unauthorized");
 
-        let mut market: Market = env.storage().instance().get(&DataKey::Market(market_id)).unwrap();
+        let mut market: Market = env
+            .storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap();
         assert!(market.status == MarketStatus::Open, "Market not open");
 
         market.status = MarketStatus::Closed;
-        env.storage().instance().set(&DataKey::Market(market_id), &market);
+        env.storage()
+            .instance()
+            .set(&DataKey::Market(market_id), &market);
     }
 
     pub fn get_market(env: Env, market_id: u64) -> Market {
-        env.storage().instance().get(&DataKey::Market(market_id)).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::Market(market_id))
+            .unwrap()
     }
 
     pub fn get_outcome_pools(env: Env, market_id: u64) -> Vec<OutcomePool> {
-        env.storage().instance().get(&DataKey::Bets(market_id)).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::Bets(market_id))
+            .unwrap()
     }
 
     pub fn get_user_bets(env: Env, user: Address, market_id: u64) -> Vec<Bet> {
-        env.storage().instance().get(&DataKey::UserBets(user, market_id)).unwrap_or(Vec::new(&env))
+        env.storage()
+            .instance()
+            .get(&DataKey::UserBets(user, market_id))
+            .unwrap_or(Vec::new(&env))
     }
 }
 

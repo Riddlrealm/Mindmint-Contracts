@@ -1,9 +1,6 @@
 #![no_std]
 
-
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, Symbol, Vec, String,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String, Symbol, Vec};
 
 // ─────────────────────────────────────────────────────────
 // TIME CONSTANTS
@@ -110,7 +107,9 @@ impl PuzzleSubscriptionTierContract {
             panic!("already initialized");
         }
         env.storage().persistent().set(&DataKey::Admin, &admin);
-        env.storage().persistent().set(&DataKey::PaymentToken, &payment_token);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PaymentToken, &payment_token);
         env.storage().persistent().set(&DataKey::NextId, &1u64);
     }
 
@@ -143,7 +142,9 @@ impl PuzzleSubscriptionTierContract {
             puzzle_access_level,
             feature_flags,
         };
-        env.storage().persistent().set(&DataKey::TierConfig(tier), &cfg);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TierConfig(tier), &cfg);
     }
 
     // ──────────────── SUBSCRIBE ────────────────

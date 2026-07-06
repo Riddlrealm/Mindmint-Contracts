@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, Symbol,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Symbol};
 
 const BASIS_POINTS: i128 = 10_000;
 
@@ -42,10 +40,19 @@ impl TokenSwapContract {
         if env.storage().persistent().has(&DataKey::Config) {
             panic!("Already initialized");
         }
-        env.storage().persistent().set(&DataKey::Config, &Config { admin });
+        env.storage()
+            .persistent()
+            .set(&DataKey::Config, &Config { admin });
     }
 
-    pub fn create_pool(env: Env, admin: Address, pool_id: u32, token_a: Address, token_b: Address, fee_bps: u32) {
+    pub fn create_pool(
+        env: Env,
+        admin: Address,
+        pool_id: u32,
+        token_a: Address,
+        token_b: Address,
+        fee_bps: u32,
+    ) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
@@ -70,7 +77,9 @@ impl TokenSwapContract {
             fees_b: 0,
         };
 
-        env.storage().persistent().set(&DataKey::Pool(pool_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pool(pool_id), &pool);
     }
 
     pub fn add_liquidity(env: Env, admin: Address, pool_id: u32, amount_a: i128, amount_b: i128) {
@@ -91,7 +100,9 @@ impl TokenSwapContract {
         pool.reserve_a += amount_a;
         pool.reserve_b += amount_b;
 
-        env.storage().persistent().set(&DataKey::Pool(pool_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pool(pool_id), &pool);
 
         env.events().publish(
             (Symbol::new(&env, "LiquidityAdded"), pool_id),
@@ -111,7 +122,13 @@ impl TokenSwapContract {
         gross_out - fee
     }
 
-    pub fn swap(env: Env, player: Address, pool_id: u32, token_in: Address, amount_in: i128) -> i128 {
+    pub fn swap(
+        env: Env,
+        player: Address,
+        pool_id: u32,
+        token_in: Address,
+        amount_in: i128,
+    ) -> i128 {
         player.require_auth();
         if amount_in <= 0 {
             panic!("Amount must be positive");
@@ -153,7 +170,13 @@ impl TokenSwapContract {
 
             env.events().publish(
                 (Symbol::new(&env, "Swapped"), pool_id),
-                (player, pool.token_a.clone(), amount_in, pool.token_b.clone(), amount_out),
+                (
+                    player,
+                    pool.token_a.clone(),
+                    amount_in,
+                    pool.token_b.clone(),
+                    amount_out,
+                ),
             );
         } else {
             if amount_out_gross > pool.reserve_a {
@@ -172,17 +195,31 @@ impl TokenSwapContract {
 
             env.events().publish(
                 (Symbol::new(&env, "Swapped"), pool_id),
-                (player, pool.token_b.clone(), amount_in, pool.token_a.clone(), amount_out),
+                (
+                    player,
+                    pool.token_b.clone(),
+                    amount_in,
+                    pool.token_a.clone(),
+                    amount_out,
+                ),
             );
         }
 
         pool.total_swaps += 1;
-        env.storage().persistent().set(&DataKey::Pool(pool_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pool(pool_id), &pool);
 
         amount_out
     }
 
-    pub fn remove_liquidity(env: Env, admin: Address, pool_id: u32, amount_a: i128, amount_b: i128) {
+    pub fn remove_liquidity(
+        env: Env,
+        admin: Address,
+        pool_id: u32,
+        amount_a: i128,
+        amount_b: i128,
+    ) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
         if amount_a < 0 || amount_b < 0 {
@@ -210,7 +247,9 @@ impl TokenSwapContract {
             pool.reserve_b -= amount_b;
         }
 
-        env.storage().persistent().set(&DataKey::Pool(pool_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pool(pool_id), &pool);
     }
 
     pub fn claim_fees(env: Env, admin: Address, pool_id: u32) -> (i128, i128) {
@@ -239,7 +278,9 @@ impl TokenSwapContract {
             pool.fees_b = 0;
         }
 
-        env.storage().persistent().set(&DataKey::Pool(pool_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Pool(pool_id), &pool);
 
         env.events().publish(
             (Symbol::new(&env, "FeesClaimed"), pool_id),

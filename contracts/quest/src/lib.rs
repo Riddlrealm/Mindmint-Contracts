@@ -12,7 +12,6 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Ve
 
 mod events;
 
-
 //
 // ──────────────────────────────────────────────────────────
 // DATA STRUCTURES

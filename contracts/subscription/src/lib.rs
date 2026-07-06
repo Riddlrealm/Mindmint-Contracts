@@ -42,10 +42,10 @@ pub enum SubscriptionTier {
 pub enum DataKey {
     Config,
     Subscription(Address),
-    GroupSubscription(u64),    // group_id -> GroupSubscription
-    GroupMembers(u64),          // group_id -> Vec<Address>
+    GroupSubscription(u64), // group_id -> GroupSubscription
+    GroupMembers(u64),      // group_id -> Vec<Address>
     NextGroupId,
-    UserGroup(Address),         // user -> group_id
+    UserGroup(Address), // user -> group_id
     TotalSubscribers,
     TierPrice(SubscriptionTier),
 }
@@ -132,7 +132,9 @@ impl SubscriptionContract {
         };
 
         env.storage().persistent().set(&DataKey::Config, &config);
-        env.storage().persistent().set(&DataKey::TotalSubscribers, &0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalSubscribers, &0u64);
         env.storage().persistent().set(&DataKey::NextGroupId, &1u64);
     }
 
@@ -195,7 +197,7 @@ impl SubscriptionContract {
 
         let config: Config = env.storage().persistent().get(&DataKey::Config).unwrap();
         let price = Self::get_tier_price(&tier, &config);
-        
+
         // Transfer payment
         let token_client = token::Client::new(&env, &config.payment_token);
         token_client.transfer(&user, &env.current_contract_address(), &price);
@@ -214,11 +216,19 @@ impl SubscriptionContract {
             gifted_by: None,
         };
 
-        env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(user.clone()), &subscription);
 
         // Update total subscribers
-        let total: u64 = env.storage().persistent().get(&DataKey::TotalSubscribers).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalSubscribers, &(total + 1));
+        let total: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalSubscribers)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalSubscribers, &(total + 1));
     }
 
     /// Auto-renew subscription (requires user authorization)
@@ -227,7 +237,9 @@ impl SubscriptionContract {
         Self::assert_not_paused(&env);
 
         let config: Config = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let mut subscription: Subscription = env.storage().persistent()
+        let mut subscription: Subscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::Subscription(user.clone()))
             .expect("No subscription found");
 
@@ -240,7 +252,7 @@ impl SubscriptionContract {
         }
 
         let current_time = env.ledger().timestamp();
-        
+
         // Check if within renewal window (expired but within grace period)
         if current_time < subscription.expiry_time {
             panic!("Not yet time to renew");
@@ -249,7 +261,9 @@ impl SubscriptionContract {
         if current_time > subscription.expiry_time + GRACE_PERIOD_SECONDS {
             // Beyond grace period, deactivate subscription
             subscription.is_active = false;
-            env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Subscription(user.clone()), &subscription);
             panic!("Subscription expired beyond grace period");
         }
 
@@ -261,7 +275,9 @@ impl SubscriptionContract {
         // Renew subscription
         subscription.expiry_time = current_time + MONTH_IN_SECONDS;
         subscription.total_renewals += 1;
-        env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(user.clone()), &subscription);
     }
 
     // ───────────── SUBSCRIPTION MANAGEMENT ─────────────
@@ -270,24 +286,32 @@ impl SubscriptionContract {
     pub fn cancel_subscription(env: Env, user: Address) {
         user.require_auth();
 
-        let mut subscription: Subscription = env.storage().persistent()
+        let mut subscription: Subscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::Subscription(user.clone()))
             .expect("No subscription found");
 
         subscription.auto_renew = false;
-        env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(user.clone()), &subscription);
     }
 
     /// Toggle auto-renewal
     pub fn set_auto_renew(env: Env, user: Address, auto_renew: bool) {
         user.require_auth();
 
-        let mut subscription: Subscription = env.storage().persistent()
+        let mut subscription: Subscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::Subscription(user.clone()))
             .expect("No subscription found");
 
         subscription.auto_renew = auto_renew;
-        env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(user.clone()), &subscription);
     }
 
     /// Upgrade subscription tier
@@ -295,7 +319,9 @@ impl SubscriptionContract {
         user.require_auth();
         Self::assert_not_paused(&env);
 
-        let mut subscription: Subscription = env.storage().persistent()
+        let mut subscription: Subscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::Subscription(user.clone()))
             .expect("No subscription found");
 
@@ -322,7 +348,9 @@ impl SubscriptionContract {
         }
 
         subscription.tier = new_tier;
-        env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(user.clone()), &subscription);
     }
 
     // ───────────── BENEFITS TRACKING ─────────────
@@ -331,7 +359,9 @@ impl SubscriptionContract {
     pub fn use_benefit(env: Env, user: Address) {
         user.require_auth();
 
-        let mut subscription: Subscription = env.storage().persistent()
+        let mut subscription: Subscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::Subscription(user.clone()))
             .expect("No subscription found");
 
@@ -340,7 +370,9 @@ impl SubscriptionContract {
         }
 
         subscription.benefits_used += 1;
-        env.storage().persistent().set(&DataKey::Subscription(user.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(user.clone()), &subscription);
     }
 
     /// Get benefit limits based on tier
@@ -379,8 +411,14 @@ impl SubscriptionContract {
         token_client.transfer(&owner, &env.current_contract_address(), &total_price);
 
         // Get next group ID
-        let group_id: u64 = env.storage().persistent().get(&DataKey::NextGroupId).unwrap_or(1);
-        env.storage().persistent().set(&DataKey::NextGroupId, &(group_id + 1));
+        let group_id: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::NextGroupId)
+            .unwrap_or(1);
+        env.storage()
+            .persistent()
+            .set(&DataKey::NextGroupId, &(group_id + 1));
 
         // Create group subscription
         let current_time = env.ledger().timestamp();
@@ -395,13 +433,19 @@ impl SubscriptionContract {
             total_renewals: 0,
         };
 
-        env.storage().persistent().set(&DataKey::GroupSubscription(group_id), &group_sub);
+        env.storage()
+            .persistent()
+            .set(&DataKey::GroupSubscription(group_id), &group_sub);
 
         // Initialize members list with owner
         let mut members = Vec::new(&env);
         members.push_back(owner.clone());
-        env.storage().persistent().set(&DataKey::GroupMembers(group_id), &members);
-        env.storage().persistent().set(&DataKey::UserGroup(owner.clone()), &group_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::GroupMembers(group_id), &members);
+        env.storage()
+            .persistent()
+            .set(&DataKey::UserGroup(owner.clone()), &group_id);
 
         group_id
     }
@@ -410,7 +454,9 @@ impl SubscriptionContract {
     pub fn add_group_member(env: Env, owner: Address, group_id: u64, member: Address) {
         owner.require_auth();
 
-        let group_sub: GroupSubscription = env.storage().persistent()
+        let group_sub: GroupSubscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::GroupSubscription(group_id))
             .expect("Group not found");
 
@@ -422,7 +468,9 @@ impl SubscriptionContract {
             panic!("Group subscription not active");
         }
 
-        let mut members: Vec<Address> = env.storage().persistent()
+        let mut members: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&DataKey::GroupMembers(group_id))
             .unwrap_or(Vec::new(&env));
 
@@ -435,15 +483,21 @@ impl SubscriptionContract {
         }
 
         members.push_back(member.clone());
-        env.storage().persistent().set(&DataKey::GroupMembers(group_id), &members);
-        env.storage().persistent().set(&DataKey::UserGroup(member.clone()), &group_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::GroupMembers(group_id), &members);
+        env.storage()
+            .persistent()
+            .set(&DataKey::UserGroup(member.clone()), &group_id);
     }
 
     /// Remove member from group subscription
     pub fn remove_group_member(env: Env, owner: Address, group_id: u64, member: Address) {
         owner.require_auth();
 
-        let group_sub: GroupSubscription = env.storage().persistent()
+        let group_sub: GroupSubscription = env
+            .storage()
+            .persistent()
             .get(&DataKey::GroupSubscription(group_id))
             .expect("Group not found");
 
@@ -455,7 +509,9 @@ impl SubscriptionContract {
             panic!("Cannot remove owner");
         }
 
-        let members: Vec<Address> = env.storage().persistent()
+        let members: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&DataKey::GroupMembers(group_id))
             .unwrap_or(Vec::new(&env));
 
@@ -474,8 +530,12 @@ impl SubscriptionContract {
             panic!("Member not found");
         }
 
-        env.storage().persistent().set(&DataKey::GroupMembers(group_id), &new_members);
-        env.storage().persistent().remove(&DataKey::UserGroup(member));
+        env.storage()
+            .persistent()
+            .set(&DataKey::GroupMembers(group_id), &new_members);
+        env.storage()
+            .persistent()
+            .remove(&DataKey::UserGroup(member));
     }
 
     // ───────────── SUBSCRIPTION GIFTING ─────────────
@@ -515,11 +575,19 @@ impl SubscriptionContract {
             gifted_by: Some(gifter),
         };
 
-        env.storage().persistent().set(&DataKey::Subscription(recipient.clone()), &subscription);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Subscription(recipient.clone()), &subscription);
 
         // Update total subscribers
-        let total: u64 = env.storage().persistent().get(&DataKey::TotalSubscribers).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalSubscribers, &(total + 1));
+        let total: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalSubscribers)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalSubscribers, &(total + 1));
     }
 
     // ───────────── VIEW FUNCTIONS ─────────────
@@ -534,8 +602,16 @@ impl SubscriptionContract {
         }
 
         // Check group membership
-        if let Some(group_id) = env.storage().persistent().get::<DataKey, u64>(&DataKey::UserGroup(user.clone())) {
-            if let Some(group_sub) = env.storage().persistent().get::<DataKey, GroupSubscription>(&DataKey::GroupSubscription(group_id)) {
+        if let Some(group_id) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, u64>(&DataKey::UserGroup(user.clone()))
+        {
+            if let Some(group_sub) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, GroupSubscription>(&DataKey::GroupSubscription(group_id))
+            {
                 if Self::is_group_subscription_valid(&env, &group_sub) {
                     return true;
                 }
@@ -560,8 +636,16 @@ impl SubscriptionContract {
         }
 
         // Check group membership
-        if let Some(group_id) = env.storage().persistent().get::<DataKey, u64>(&DataKey::UserGroup(user.clone())) {
-            if let Some(group_sub) = env.storage().persistent().get::<DataKey, GroupSubscription>(&DataKey::GroupSubscription(group_id)) {
+        if let Some(group_id) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, u64>(&DataKey::UserGroup(user.clone()))
+        {
+            if let Some(group_sub) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, GroupSubscription>(&DataKey::GroupSubscription(group_id))
+            {
                 if Self::is_group_subscription_valid(&env, &group_sub) {
                     return Some(group_sub.tier);
                 }
@@ -573,17 +657,25 @@ impl SubscriptionContract {
 
     /// Get group subscription details
     pub fn get_group_subscription(env: Env, group_id: u64) -> Option<GroupSubscription> {
-        env.storage().persistent().get(&DataKey::GroupSubscription(group_id))
+        env.storage()
+            .persistent()
+            .get(&DataKey::GroupSubscription(group_id))
     }
 
     /// Get group members
     pub fn get_group_members(env: Env, group_id: u64) -> Vec<Address> {
-        env.storage().persistent().get(&DataKey::GroupMembers(group_id)).unwrap_or(Vec::new(&env))
+        env.storage()
+            .persistent()
+            .get(&DataKey::GroupMembers(group_id))
+            .unwrap_or(Vec::new(&env))
     }
 
     /// Get total active subscribers
     pub fn get_total_subscribers(env: Env) -> u64 {
-        env.storage().persistent().get(&DataKey::TotalSubscribers).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalSubscribers)
+            .unwrap_or(0)
     }
 
     /// Get configuration
@@ -595,7 +687,7 @@ impl SubscriptionContract {
     pub fn is_in_grace_period(env: Env, user: Address) -> bool {
         if let Some(sub) = Self::get_subscription(env.clone(), user) {
             let current_time = env.ledger().timestamp();
-            current_time > sub.expiry_time 
+            current_time > sub.expiry_time
                 && current_time <= sub.expiry_time + GRACE_PERIOD_SECONDS
                 && sub.is_active
         } else {
@@ -625,7 +717,7 @@ impl SubscriptionContract {
         }
 
         let current_time = env.ledger().timestamp();
-        
+
         // Valid if within expiry time or within grace period
         current_time <= subscription.expiry_time + GRACE_PERIOD_SECONDS
     }

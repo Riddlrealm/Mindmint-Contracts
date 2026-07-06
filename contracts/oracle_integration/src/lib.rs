@@ -3,10 +3,7 @@
 mod storage;
 mod types;
 
-use soroban_sdk::{
-    contract, contractimpl, xdr::ToXdr, Address, BytesN, Env, Map, Symbol, Vec,
-};
-
+use soroban_sdk::{contract, contractimpl, xdr::ToXdr, Address, BytesN, Env, Map, Symbol, Vec};
 
 use storage::Storage;
 use types::{
@@ -233,7 +230,6 @@ impl OracleIntegration {
 
         for src in sources_cfg.sources.iter() {
             if let Some(snap) = Self::self_try_fetch_validate(&env, &cfg, &src, &asset) {
-
                 valid_prices.push_back(snap.price);
                 latest_snapshot = Some(snap);
             }
@@ -244,7 +240,6 @@ impl OracleIntegration {
         }
 
         let agg = Self::self_median(&env, &valid_prices);
-
 
         // timestamp/round_id: take from most recent successful snapshot
         let snap = latest_snapshot.unwrap();
@@ -263,40 +258,29 @@ impl OracleIntegration {
     ) -> Option<PriceSnapshot> {
         // For median feed we use pair_id; for signed ed25519 we use asset.
         let _res: Result<PriceSnapshot, IntegrationError> = match src {
-
-
             OracleSource::SignedEd25519(oracle_contract, src_asset) => {
-
                 if src_asset != asset {
                     return None;
                 }
 
-
                 // NOTE: In Soroban, cross-contract calls require a contract client.
                 // This placeholder implementation treats the source as unavailable.
                 Err(IntegrationError::SourceFetchFailed)
-
             }
             OracleSource::MedianFeed(_, _) => {
-
                 // NOTE: Cross-contract calls require a contract client.
                 // Placeholder: treat source as unavailable.
                 Err(IntegrationError::SourceFetchFailed)
             }
-
-
         };
 
         match _res {
-
             Ok(snap) => {
-
                 if snap.price <= 0 {
                     return None;
                 }
                 // staleness based on fetched timestamp
                 if Self::self_validate_stale(env, cfg, snap.timestamp).is_err() {
-
                     return None;
                 }
 
@@ -363,4 +347,3 @@ impl OracleIntegration {
         }
     }
 }
-

@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Env, String, Symbol,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Symbol};
 
 const USERNAME_MIN: u32 = 3;
 const USERNAME_MAX: u32 = 20;
@@ -53,17 +51,27 @@ impl IdentityContract {
         if env.storage().persistent().has(&DataKey::Config) {
             panic!("Already initialized");
         }
-        env.storage().persistent().set(&DataKey::Config, &Config { admin });
+        env.storage()
+            .persistent()
+            .set(&DataKey::Config, &Config { admin });
     }
 
     pub fn register(env: Env, caller: Address, username: String) {
         caller.require_auth();
         Self::validate_username(&username);
 
-        if env.storage().persistent().has(&DataKey::Username(username.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::Username(username.clone()))
+        {
             panic!("Username already taken");
         }
-        if env.storage().persistent().has(&DataKey::Address(caller.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::Address(caller.clone()))
+        {
             panic!("Address already has identity");
         }
 
@@ -177,9 +185,10 @@ impl IdentityContract {
             .set(&DataKey::Address(new_owner.clone()), &identity);
 
         // Record cooldown timestamp for the new owner to prevent immediate re-transfer
-        env.storage()
-            .persistent()
-            .set(&DataKey::TransferCooldown(new_owner.clone()), &env.ledger().timestamp());
+        env.storage().persistent().set(
+            &DataKey::TransferCooldown(new_owner.clone()),
+            &env.ledger().timestamp(),
+        );
 
         env.events().publish(
             (Symbol::new(&env, "UsernameTransferred"), caller.clone()),

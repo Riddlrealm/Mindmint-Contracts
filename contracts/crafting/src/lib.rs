@@ -1,6 +1,6 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec, IntoVal,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, IntoVal, String, Vec,
 };
 
 #[contracttype]
@@ -38,12 +38,12 @@ pub enum Rarity {
 
 #[contracttype]
 pub enum DataKey {
-    Recipe(u32),              // Persistent: Recipe data
-    NextRecipeId,             // Instance: Counter for recipe IDs
-    Admin,                    // Instance: Contract administrator
-    PlayerCooldown(Address),  // Persistent: Last crafting time per player
-    RecipeCount,              // Instance: Total recipes
-    NftContract,              // Instance: Address of the NFT contract to use
+    Recipe(u32),             // Persistent: Recipe data
+    NextRecipeId,            // Instance: Counter for recipe IDs
+    Admin,                   // Instance: Contract administrator
+    PlayerCooldown(Address), // Persistent: Last crafting time per player
+    RecipeCount,             // Instance: Total recipes
+    NftContract,             // Instance: Address of the NFT contract to use
 }
 
 #[contract]
@@ -57,7 +57,9 @@ impl CraftingContract {
             panic!("Already initialized");
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::NftContract, &nft_contract);
+        env.storage()
+            .instance()
+            .set(&DataKey::NftContract, &nft_contract);
         env.storage().instance().set(&DataKey::NextRecipeId, &1u32);
         env.storage().instance().set(&DataKey::RecipeCount, &0u32);
     }
@@ -90,7 +92,11 @@ impl CraftingContract {
             _ => panic!("Invalid rarity value"),
         };
 
-        let recipe_id: u32 = env.storage().instance().get(&DataKey::NextRecipeId).unwrap();
+        let recipe_id: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::NextRecipeId)
+            .unwrap();
 
         let recipe = Recipe {
             id: recipe_id,
@@ -105,14 +111,27 @@ impl CraftingContract {
             enabled: true,
         };
 
-        env.storage().persistent().set(&DataKey::Recipe(recipe_id), &recipe);
-        env.storage().persistent().extend_ttl(&DataKey::Recipe(recipe_id), 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Recipe(recipe_id), &recipe);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Recipe(recipe_id), 100_000, 500_000);
 
-        env.storage().instance().set(&DataKey::NextRecipeId, &(recipe_id + 1));
-        let count: u32 = env.storage().instance().get(&DataKey::RecipeCount).unwrap_or(0);
-        env.storage().instance().set(&DataKey::RecipeCount, &(count + 1));
+        env.storage()
+            .instance()
+            .set(&DataKey::NextRecipeId, &(recipe_id + 1));
+        let count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::RecipeCount)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::RecipeCount, &(count + 1));
 
-        env.events().publish((symbol_short!("recipe"), recipe_id), ());
+        env.events()
+            .publish((symbol_short!("recipe"), recipe_id), ());
 
         recipe_id
     }
@@ -127,7 +146,11 @@ impl CraftingContract {
 
     /// Get all recipe IDs.
     pub fn get_all_recipes(env: Env) -> Vec<u32> {
-        let count: u32 = env.storage().instance().get(&DataKey::RecipeCount).unwrap_or(0);
+        let count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::RecipeCount)
+            .unwrap_or(0);
         let mut recipes = Vec::new(&env);
         for i in 1..=count {
             recipes.push_back(i);
@@ -192,8 +215,14 @@ impl CraftingContract {
         }
 
         // Update cooldown
-        env.storage().persistent().set(&DataKey::PlayerCooldown(player.clone()), &current_time);
-        env.storage().persistent().extend_ttl(&DataKey::PlayerCooldown(player.clone()), 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PlayerCooldown(player.clone()), &current_time);
+        env.storage().persistent().extend_ttl(
+            &DataKey::PlayerCooldown(player.clone()),
+            100_000,
+            500_000,
+        );
 
         // Determine success
         let random_seed: u64 = env.prng().gen_range(0..100);
@@ -218,18 +247,23 @@ impl CraftingContract {
             let output_id: u32 = env.invoke_contract(
                 &recipe.output_token_address,
                 &symbol_short!("craftmint"),
-                Vec::from_array(&env, [
-                    player.into_val(&env),
-                    recipe.output_token_id.into(),
-                    String::from_str(&env, "Crafted achievement").into_val(&env),
-                ]),
+                Vec::from_array(
+                    &env,
+                    [
+                        player.into_val(&env),
+                        recipe.output_token_id.into(),
+                        String::from_str(&env, "Crafted achievement").into_val(&env),
+                    ],
+                ),
             );
 
-            env.events().publish((symbol_short!("success"), &player, recipe_id), output_id);
+            env.events()
+                .publish((symbol_short!("success"), &player, recipe_id), output_id);
             output_id
         } else {
             // Handle failure - emit failure event
-            env.events().publish((symbol_short!("failure"), &player, recipe_id), 0u32);
+            env.events()
+                .publish((symbol_short!("failure"), &player, recipe_id), 0u32);
             panic!("craft_failed")
         }
     }
@@ -249,7 +283,9 @@ impl CraftingContract {
 
         let mut recipe = Self::get_recipe(env.clone(), recipe_id);
         recipe.enabled = enabled;
-        env.storage().persistent().set(&DataKey::Recipe(recipe_id), &recipe);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Recipe(recipe_id), &recipe);
     }
 }
 
@@ -305,7 +341,7 @@ mod test {
             &nft_contract,
             &100,
             &80,
-            &3, // Epic
+            &3,    // Epic
             &3600, // 1 hour cooldown
         );
 
@@ -400,7 +436,7 @@ mod test {
                 &nft_contract,
                 &100,
                 &80,
-                &(i as u32 % 5),
+                &(                i % 5),
                 &3600,
             );
         }

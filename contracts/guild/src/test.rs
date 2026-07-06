@@ -2,17 +2,17 @@
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger}, 
-    Address, Env, String, Symbol,
-    token::StellarAssetClient,
+    testutils::{Address as _, Ledger},
     token::Client as TokenClient,
+    token::StellarAssetClient,
+    Address, Env, String, Symbol,
 };
 
 fn create_token_contract<'a>(env: &Env, admin: &Address) -> (Address, TokenClient<'a>) {
     // register_stellar_asset_contract_v2 returns a helper object
     let sac = env.register_stellar_asset_contract_v2(admin.clone());
     let address = sac.address(); // Extract the Address from the SAC object
-    
+
     (address.clone(), TokenClient::new(env, &address))
 }
 
@@ -57,12 +57,12 @@ fn test_guild_lifecycle() {
     // 7. Test Voting
     env.ledger().set_timestamp(1000);
     let proposal_id = client.create_proposal(&officer, &2000);
-    
+
     client.vote(&member, &proposal_id, &true);
-    
+
     // 8. Test Disband
     token_admin_client.mint(&contract_id, &200); // Total 1200
-    
+
     // Total members: 3 (Leader, Officer, Member)
     client.disband(&leader);
 
@@ -86,6 +86,6 @@ fn test_unauthorized_resource_addition() {
     let client = GuildContractClient::new(&env, &contract_id);
 
     client.initialize(&leader, &String::from_str(&env, "DAO"), &token_addr);
-    
+
     client.add_resource(&stranger, &Symbol::new(&env, "Iron"), &100);
 }

@@ -3,9 +3,9 @@
 mod storage;
 pub mod types;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Val, Vec};
 use crate::storage::*;
 use crate::types::*;
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Val, Vec};
 
 #[contract]
 pub struct GovernanceToken;
@@ -130,13 +130,7 @@ impl GovernanceToken {
     }
 
     /// Transfer using an allowance.
-    pub fn transfer_from(
-        env: Env,
-        spender: Address,
-        from: Address,
-        to: Address,
-        amount: i128,
-    ) {
+    pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
         if amount <= 0 {
             panic!("Amount must be positive");
@@ -332,7 +326,14 @@ impl GovernanceToken {
                 panic!("No voting power");
             }
             // Use current power as weight
-            Self::_apply_vote(&env, &mut proposal, &voter, proposal_id, &vote_type, current);
+            Self::_apply_vote(
+                &env,
+                &mut proposal,
+                &voter,
+                proposal_id,
+                &vote_type,
+                current,
+            );
         } else {
             Self::_apply_vote(&env, &mut proposal, &voter, proposal_id, &vote_type, weight);
         }
@@ -348,9 +349,7 @@ impl GovernanceToken {
         }
 
         // Must be Pending/Active — first resolve final status
-        if proposal.status != ProposalStatus::Pending
-            && proposal.status != ProposalStatus::Active
-        {
+        if proposal.status != ProposalStatus::Pending && proposal.status != ProposalStatus::Active {
             panic!("Proposal not in voteable state");
         }
 
@@ -443,12 +442,7 @@ impl GovernanceToken {
 
     /// Move `amount` of voting power from `src` to `dst`. Either can be
     /// `None` for mint (dst only) / burn (src only) scenarios.
-    fn _move_voting_power(
-        env: &Env,
-        src: Option<&Address>,
-        dst: Option<&Address>,
-        amount: i128,
-    ) {
+    fn _move_voting_power(env: &Env, src: Option<&Address>, dst: Option<&Address>, amount: i128) {
         if amount == 0 {
             return;
         }
@@ -480,10 +474,13 @@ impl GovernanceToken {
             let last = ckpts.get(last_idx).unwrap();
             if last.sequence == seq {
                 // Same block — overwrite
-                ckpts.set(last_idx, Checkpoint {
-                    sequence: seq,
-                    votes: new_votes,
-                });
+                ckpts.set(
+                    last_idx,
+                    Checkpoint {
+                        sequence: seq,
+                        votes: new_votes,
+                    },
+                );
                 set_checkpoints(env, account, &ckpts);
                 return;
             }
@@ -523,7 +520,7 @@ impl GovernanceToken {
         let mut low: u32 = 0;
         let mut high: u32 = len - 1;
         while low < high {
-            let mid = low + (high - low + 1) / 2;
+            let mid = low + (high - low).div_ceil(2);
             let cp = ckpts.get(mid).unwrap();
             if cp.sequence <= sequence {
                 low = mid;
@@ -566,4 +563,3 @@ impl GovernanceToken {
         );
     }
 }
-

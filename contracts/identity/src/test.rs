@@ -99,7 +99,8 @@ fn test_invalid_username_too_long() {
     let client = IdentityContractClient::new(&env, &contract_id);
 
     client.initialize(&admin);
-    client.register(&user, &String::from_str(&env, "abcdefghijklmnopqrstuvwxyz")); // too long
+    client.register(&user, &String::from_str(&env, "abcdefghijklmnopqrstuvwxyz"));
+    // too long
 }
 
 #[test]
@@ -147,9 +148,18 @@ fn test_update_profile() {
     let identity = client.resolve_address(&user).unwrap();
     assert_eq!(identity.avatar_hash, Some(avatar));
     assert_eq!(identity.bio_hash, Some(bio));
-    assert_eq!(identity.social_links.twitter, Some(String::from_str(&env, "@dave")));
-    assert_eq!(identity.social_links.discord, Some(String::from_str(&env, "dave#1234")));
-    assert_eq!(identity.social_links.github, Some(String::from_str(&env, "davegh")));
+    assert_eq!(
+        identity.social_links.twitter,
+        Some(String::from_str(&env, "@dave"))
+    );
+    assert_eq!(
+        identity.social_links.discord,
+        Some(String::from_str(&env, "dave#1234"))
+    );
+    assert_eq!(
+        identity.social_links.github,
+        Some(String::from_str(&env, "davegh"))
+    );
 }
 
 #[test]

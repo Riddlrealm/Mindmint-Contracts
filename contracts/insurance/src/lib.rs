@@ -10,16 +10,16 @@ use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Str
 
 #[contracttype]
 pub enum DataKey {
-    Config,                    // InsuranceConfig
-    Policy(Address),           // InsurancePolicy for user
-    PolicyList,                // Vec<Address> of all policyholders
-    Claim(u64),                // Claim by ID
-    ClaimCounter,              // u64 counter for generating claim IDs
-    UserClaims(Address),       // Vec<u64> of user's claim IDs
-    PremiumPool,               // i128 total premium pool
-    TotalPolicies,             // u64 counter
-    TotalClaims,               // u64 counter
-    FraudFlags(Address),       // FraudMetrics per user
+    Config,              // InsuranceConfig
+    Policy(Address),     // InsurancePolicy for user
+    PolicyList,          // Vec<Address> of all policyholders
+    Claim(u64),          // Claim by ID
+    ClaimCounter,        // u64 counter for generating claim IDs
+    UserClaims(Address), // Vec<u64> of user's claim IDs
+    PremiumPool,         // i128 total premium pool
+    TotalPolicies,       // u64 counter
+    TotalClaims,         // u64 counter
+    FraudFlags(Address), // FraudMetrics per user
 }
 
 //
@@ -71,17 +71,17 @@ pub enum AssetType {
 #[derive(Clone, Debug)]
 pub struct InsuranceConfig {
     pub admin: Address,
-    pub payment_token: Address,        // Token used for premiums/payouts
-    pub base_premium_rate: u32,        // In basis points (100 = 1%)
-    pub nft_multiplier: u32,           // Rate multiplier for NFT coverage
-    pub token_multiplier: u32,         // Rate multiplier for token coverage
-    pub combined_multiplier: u32,      // Rate multiplier for combined coverage
-    pub min_coverage_period: u64,      // Minimum coverage period in seconds
-    pub max_coverage_period: u64,      // Maximum coverage period in seconds
-    pub max_coverage_amount: i128,     // Maximum coverage amount
-    pub claim_review_period: u64,      // Time for admin to review claims
-    pub max_claims_per_period: u32,    // Fraud detection: max claims per 30 days
-    pub claim_cooldown: u64,           // Fraud detection: time between claims
+    pub payment_token: Address,     // Token used for premiums/payouts
+    pub base_premium_rate: u32,     // In basis points (100 = 1%)
+    pub nft_multiplier: u32,        // Rate multiplier for NFT coverage
+    pub token_multiplier: u32,      // Rate multiplier for token coverage
+    pub combined_multiplier: u32,   // Rate multiplier for combined coverage
+    pub min_coverage_period: u64,   // Minimum coverage period in seconds
+    pub max_coverage_period: u64,   // Maximum coverage period in seconds
+    pub max_coverage_amount: i128,  // Maximum coverage amount
+    pub claim_review_period: u64,   // Time for admin to review claims
+    pub max_claims_per_period: u32, // Fraud detection: max claims per 30 days
+    pub claim_cooldown: u64,        // Fraud detection: time between claims
     pub paused: bool,
 }
 
@@ -95,7 +95,7 @@ pub struct InsurancePolicy {
     pub start_time: u64,
     pub end_time: u64,
     pub status: PolicyStatus,
-    pub asset_address: Address,        // NFT contract or token address
+    pub asset_address: Address, // NFT contract or token address
 }
 
 #[contracttype]
@@ -104,21 +104,21 @@ pub struct Claim {
     pub claim_id: u64,
     pub policy_owner: Address,
     pub asset_type: AssetType,
-    pub asset_address: Address,        // Contract address of lost asset
+    pub asset_address: Address, // Contract address of lost asset
     pub claim_amount: i128,
-    pub description: String,           // Max 200 chars
+    pub description: String, // Max 200 chars
     pub submission_time: u64,
     pub status: ClaimStatus,
-    pub review_notes: String,          // Review notes from admin
+    pub review_notes: String, // Review notes from admin
     pub payout_amount: i128,
-    pub payout_time: u64,              // 0 if not paid yet
+    pub payout_time: u64, // 0 if not paid yet
 }
 
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct FraudMetrics {
     pub total_claims: u32,
-    pub recent_claims: Vec<u64>,       // Claim IDs in last 30 days
+    pub recent_claims: Vec<u64>, // Claim IDs in last 30 days
     pub last_claim_time: u64,
     pub flagged: bool,
     pub flag_reason: String,
@@ -153,12 +153,7 @@ impl InsuranceContract {
     /// * `admin` - Contract administrator
     /// * `payment_token` - Token address for premiums and payouts
     /// * `base_premium_rate` - Base premium rate in basis points (e.g., 100 = 1%)
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-        payment_token: Address,
-        base_premium_rate: u32,
-    ) {
+    pub fn initialize(env: Env, admin: Address, payment_token: Address, base_premium_rate: u32) {
         admin.require_auth();
 
         if env.storage().persistent().has(&DataKey::Config) {
@@ -169,22 +164,28 @@ impl InsuranceContract {
             admin,
             payment_token,
             base_premium_rate,
-            nft_multiplier: 150,              // 1.5x for NFT coverage
-            token_multiplier: 100,            // 1.0x for token coverage
-            combined_multiplier: 180,         // 1.8x for combined coverage
-            min_coverage_period: 7 * SECONDS_PER_DAY,     // 7 days minimum
-            max_coverage_period: 365 * SECONDS_PER_DAY,   // 1 year maximum
-            max_coverage_amount: 1_000_000_000_000,       // 1M tokens max
-            claim_review_period: 7 * SECONDS_PER_DAY,     // 7 days review time
-            max_claims_per_period: 3,         // Max 3 claims per 30 days
-            claim_cooldown: 7 * SECONDS_PER_DAY,          // 7 days between claims
+            nft_multiplier: 150,                        // 1.5x for NFT coverage
+            token_multiplier: 100,                      // 1.0x for token coverage
+            combined_multiplier: 180,                   // 1.8x for combined coverage
+            min_coverage_period: 7 * SECONDS_PER_DAY,   // 7 days minimum
+            max_coverage_period: 365 * SECONDS_PER_DAY, // 1 year maximum
+            max_coverage_amount: 1_000_000_000_000,     // 1M tokens max
+            claim_review_period: 7 * SECONDS_PER_DAY,   // 7 days review time
+            max_claims_per_period: 3,                   // Max 3 claims per 30 days
+            claim_cooldown: 7 * SECONDS_PER_DAY,        // 7 days between claims
             paused: false,
         };
 
         env.storage().persistent().set(&DataKey::Config, &config);
-        env.storage().persistent().set(&DataKey::PremiumPool, &0i128);
-        env.storage().persistent().set(&DataKey::ClaimCounter, &0u64);
-        env.storage().persistent().set(&DataKey::TotalPolicies, &0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &0i128);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ClaimCounter, &0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalPolicies, &0u64);
         env.storage().persistent().set(&DataKey::TotalClaims, &0u64);
     }
 
@@ -216,7 +217,9 @@ impl InsuranceContract {
             panic!("Invalid coverage amount");
         }
 
-        if coverage_period < config.min_coverage_period || coverage_period > config.max_coverage_period {
+        if coverage_period < config.min_coverage_period
+            || coverage_period > config.max_coverage_period
+        {
             panic!("Invalid coverage period");
         }
 
@@ -256,18 +259,32 @@ impl InsuranceContract {
         };
 
         // Store policy
-        env.storage().persistent().set(&DataKey::Policy(owner.clone()), &policy);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Policy(owner.clone()), &policy);
 
         // Add to policy list
         Self::add_to_policy_list(&env, owner);
 
         // Update premium pool
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool + premium));
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool + premium));
 
         // Increment total policies
-        let total: u64 = env.storage().persistent().get(&DataKey::TotalPolicies).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalPolicies, &(total + 1));
+        let total: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalPolicies)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalPolicies, &(total + 1));
     }
 
     /// Renew an existing policy
@@ -280,7 +297,9 @@ impl InsuranceContract {
         Self::assert_not_paused(&env);
 
         let config: InsuranceConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let mut policy: InsurancePolicy = env.storage().persistent()
+        let mut policy: InsurancePolicy = env
+            .storage()
+            .persistent()
             .get(&DataKey::Policy(owner.clone()))
             .expect("Policy not found");
 
@@ -319,11 +338,19 @@ impl InsuranceContract {
         policy.premium_paid += additional_premium;
         policy.status = PolicyStatus::Active;
 
-        env.storage().persistent().set(&DataKey::Policy(owner), &policy);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Policy(owner), &policy);
 
         // Update premium pool
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool + additional_premium));
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool + additional_premium));
     }
 
     /// Cancel a policy and receive prorated refund
@@ -333,7 +360,9 @@ impl InsuranceContract {
     pub fn cancel_policy(env: Env, owner: Address) {
         owner.require_auth();
 
-        let mut policy: InsurancePolicy = env.storage().persistent()
+        let mut policy: InsurancePolicy = env
+            .storage()
+            .persistent()
             .get(&DataKey::Policy(owner.clone()))
             .expect("Policy not found");
 
@@ -361,7 +390,9 @@ impl InsuranceContract {
 
         // Update policy status
         policy.status = PolicyStatus::Cancelled;
-        env.storage().persistent().set(&DataKey::Policy(owner.clone()), &policy);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Policy(owner.clone()), &policy);
 
         // Process refund if applicable
         if refund > 0 {
@@ -369,8 +400,14 @@ impl InsuranceContract {
             token_client.transfer(&env.current_contract_address(), &owner, &refund);
 
             // Update premium pool
-            let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-            env.storage().persistent().set(&DataKey::PremiumPool, &(pool - refund));
+            let pool: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::PremiumPool)
+                .unwrap_or(0);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PremiumPool, &(pool - refund));
         }
     }
 
@@ -399,7 +436,9 @@ impl InsuranceContract {
         Self::assert_not_paused(&env);
 
         // Get policy
-        let policy: InsurancePolicy = env.storage().persistent()
+        let policy: InsurancePolicy = env
+            .storage()
+            .persistent()
             .get(&DataKey::Policy(claimant.clone()))
             .expect("No active policy found");
 
@@ -432,9 +471,15 @@ impl InsuranceContract {
         Self::check_fraud(&env, &claimant);
 
         // Generate claim ID
-        let claim_id: u64 = env.storage().persistent().get(&DataKey::ClaimCounter).unwrap_or(0);
+        let claim_id: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ClaimCounter)
+            .unwrap_or(0);
         let new_claim_id = claim_id + 1;
-        env.storage().persistent().set(&DataKey::ClaimCounter, &new_claim_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ClaimCounter, &new_claim_id);
 
         // Create claim
         let claim = Claim {
@@ -452,7 +497,9 @@ impl InsuranceContract {
         };
 
         // Store claim
-        env.storage().persistent().set(&DataKey::Claim(new_claim_id), &claim);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(new_claim_id), &claim);
 
         // Add to user's claims list
         Self::add_to_user_claims(&env, claimant.clone(), new_claim_id);
@@ -461,8 +508,14 @@ impl InsuranceContract {
         Self::update_fraud_metrics(&env, claimant, new_claim_id, current_time);
 
         // Increment total claims
-        let total: u64 = env.storage().persistent().get(&DataKey::TotalClaims).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalClaims, &(total + 1));
+        let total: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalClaims)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalClaims, &(total + 1));
 
         new_claim_id
     }
@@ -486,7 +539,9 @@ impl InsuranceContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let mut claim: Claim = env.storage().persistent()
+        let mut claim: Claim = env
+            .storage()
+            .persistent()
             .get(&DataKey::Claim(claim_id))
             .expect("Claim not found");
 
@@ -507,7 +562,9 @@ impl InsuranceContract {
 
         claim.review_notes = review_notes;
 
-        env.storage().persistent().set(&DataKey::Claim(claim_id), &claim);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(claim_id), &claim);
     }
 
     /// Process payout for an approved claim (admin only)
@@ -519,7 +576,9 @@ impl InsuranceContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let mut claim: Claim = env.storage().persistent()
+        let mut claim: Claim = env
+            .storage()
+            .persistent()
             .get(&DataKey::Claim(claim_id))
             .expect("Claim not found");
 
@@ -528,7 +587,11 @@ impl InsuranceContract {
         }
 
         let config: InsuranceConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
 
         // Check pool has sufficient funds
         if pool < claim.payout_amount {
@@ -546,10 +609,14 @@ impl InsuranceContract {
         // Update claim
         claim.status = ClaimStatus::Paid;
         claim.payout_time = env.ledger().timestamp();
-        env.storage().persistent().set(&DataKey::Claim(claim_id), &claim);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(claim_id), &claim);
 
         // Update premium pool
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool - claim.payout_amount));
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool - claim.payout_amount));
     }
 
     // ───────────── PREMIUM POOL MANAGEMENT ─────────────
@@ -572,8 +639,14 @@ impl InsuranceContract {
 
         token_client.transfer(&admin, &env.current_contract_address(), &amount);
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool + amount));
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool + amount));
     }
 
     /// Withdraw from premium pool (admin only)
@@ -589,7 +662,11 @@ impl InsuranceContract {
             panic!("Amount must be positive");
         }
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
 
         if pool < amount {
             panic!("Insufficient pool balance");
@@ -600,7 +677,9 @@ impl InsuranceContract {
 
         token_client.transfer(&env.current_contract_address(), &admin, &amount);
 
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool - amount));
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool - amount));
     }
 
     // ───────────── FRAUD MANAGEMENT ─────────────
@@ -615,8 +694,8 @@ impl InsuranceContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let mut metrics = Self::get_fraud_metrics(env.clone(), user.clone())
-            .unwrap_or(FraudMetrics {
+        let mut metrics =
+            Self::get_fraud_metrics(env.clone(), user.clone()).unwrap_or(FraudMetrics {
                 total_claims: 0,
                 recent_claims: Vec::new(&env),
                 last_claim_time: 0,
@@ -627,7 +706,9 @@ impl InsuranceContract {
         metrics.flagged = true;
         metrics.flag_reason = reason;
 
-        env.storage().persistent().set(&DataKey::FraudFlags(user), &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::FraudFlags(user), &metrics);
     }
 
     /// Unflag a user (admin only)
@@ -642,7 +723,9 @@ impl InsuranceContract {
         if let Some(mut metrics) = Self::get_fraud_metrics(env.clone(), user.clone()) {
             metrics.flagged = false;
             metrics.flag_reason = String::from_str(&env, "");
-            env.storage().persistent().set(&DataKey::FraudFlags(user), &metrics);
+            env.storage()
+                .persistent()
+                .set(&DataKey::FraudFlags(user), &metrics);
         }
     }
 
@@ -660,34 +743,42 @@ impl InsuranceContract {
 
     /// Get user's claim history
     pub fn get_user_claims(env: Env, user: Address) -> Vec<u64> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&DataKey::UserClaims(user))
             .unwrap_or(Vec::new(&env))
     }
 
     /// Get all policies
     pub fn get_all_policies(env: Env) -> Vec<Address> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&DataKey::PolicyList)
             .unwrap_or(Vec::new(&env))
     }
 
     /// Get total policies count
     pub fn get_total_policies(env: Env) -> u64 {
-        env.storage().persistent().get(&DataKey::TotalPolicies).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalPolicies)
+            .unwrap_or(0)
     }
 
     /// Get total claims count
     pub fn get_total_claims(env: Env) -> u64 {
-        env.storage().persistent().get(&DataKey::TotalClaims).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalClaims)
+            .unwrap_or(0)
     }
 
     /// Check if policy is active
     pub fn is_policy_active(env: Env, user: Address) -> bool {
         if let Some(policy) = Self::get_policy(env.clone(), user) {
             let current_time = env.ledger().timestamp();
-            policy.status == PolicyStatus::Active 
-                && current_time >= policy.start_time 
+            policy.status == PolicyStatus::Active
+                && current_time >= policy.start_time
                 && current_time <= policy.end_time
         } else {
             false
@@ -696,7 +787,10 @@ impl InsuranceContract {
 
     /// Get premium pool balance
     pub fn get_premium_pool(env: Env) -> i128 {
-        env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0)
     }
 
     /// Get configuration
@@ -717,7 +811,13 @@ impl InsuranceContract {
         coverage_period: u64,
     ) -> i128 {
         let config: InsuranceConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        Self::calculate_premium_internal(&env, &config, coverage_type, coverage_amount, coverage_period)
+        Self::calculate_premium_internal(
+            &env,
+            &config,
+            coverage_type,
+            coverage_amount,
+            coverage_period,
+        )
     }
 
     // ───────────── ADMIN FUNCTIONS ─────────────
@@ -765,12 +865,7 @@ impl InsuranceContract {
     }
 
     /// Update fraud detection parameters (admin only)
-    pub fn update_fraud_params(
-        env: Env,
-        admin: Address,
-        max_claims: u32,
-        cooldown: u64,
-    ) {
+    pub fn update_fraud_params(env: Env, admin: Address, max_claims: u32, cooldown: u64) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
@@ -797,7 +892,11 @@ impl InsuranceContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
 
         if pool > 0 {
             let config: InsuranceConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
@@ -805,7 +904,9 @@ impl InsuranceContract {
 
             token_client.transfer(&env.current_contract_address(), &admin, &pool);
 
-            env.storage().persistent().set(&DataKey::PremiumPool, &0i128);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PremiumPool, &0i128);
         }
 
         pool
@@ -832,8 +933,8 @@ impl InsuranceContract {
         let annual_rate = (config.base_premium_rate as i128 * multiplier as i128) / 100; // Divide by 100 for multiplier percentage
 
         // Premium = coverage_amount * annual_rate * (coverage_days / 365) / BASIS_POINTS
-        let premium = (coverage_amount * annual_rate * coverage_days as i128) 
-            / (365 * BASIS_POINTS as i128);
+        let premium =
+            (coverage_amount * annual_rate * coverage_days as i128) / (365 * BASIS_POINTS as i128);
 
         // Ensure minimum premium of 1
         if premium < 1 {
@@ -848,7 +949,9 @@ impl InsuranceContract {
         let current_time = env.ledger().timestamp();
 
         // Get or create fraud metrics
-        let metrics = env.storage().persistent()
+        let metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, FraudMetrics>(&DataKey::FraudFlags(user.clone()))
             .unwrap_or(FraudMetrics {
                 total_claims: 0,
@@ -880,7 +983,11 @@ impl InsuranceContract {
 
         let mut recent_count = 0u32;
         for claim_id in metrics.recent_claims.iter() {
-            if let Some(claim) = env.storage().persistent().get::<DataKey, Claim>(&DataKey::Claim(claim_id)) {
+            if let Some(claim) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, Claim>(&DataKey::Claim(claim_id))
+            {
                 if claim.submission_time >= lookback_time {
                     recent_count += 1;
                 }
@@ -893,7 +1000,9 @@ impl InsuranceContract {
     }
 
     fn update_fraud_metrics(env: &Env, user: Address, claim_id: u64, current_time: u64) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, FraudMetrics>(&DataKey::FraudFlags(user.clone()))
             .unwrap_or(FraudMetrics {
                 total_claims: 0,
@@ -915,7 +1024,11 @@ impl InsuranceContract {
 
         let mut new_recent: Vec<u64> = Vec::new(env);
         for id in metrics.recent_claims.iter() {
-            if let Some(claim) = env.storage().persistent().get::<DataKey, Claim>(&DataKey::Claim(id)) {
+            if let Some(claim) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, Claim>(&DataKey::Claim(id))
+            {
                 if claim.submission_time >= lookback_time {
                     new_recent.push_back(id);
                 }
@@ -925,27 +1038,37 @@ impl InsuranceContract {
 
         metrics.recent_claims = new_recent;
 
-        env.storage().persistent().set(&DataKey::FraudFlags(user), &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::FraudFlags(user), &metrics);
     }
 
     fn add_to_policy_list(env: &Env, user: Address) {
-        let mut policies: Vec<Address> = env.storage().persistent()
+        let mut policies: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&DataKey::PolicyList)
             .unwrap_or(Vec::new(env));
 
         if !policies.contains(&user) {
             policies.push_back(user);
-            env.storage().persistent().set(&DataKey::PolicyList, &policies);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PolicyList, &policies);
         }
     }
 
     fn add_to_user_claims(env: &Env, user: Address, claim_id: u64) {
-        let mut claims: Vec<u64> = env.storage().persistent()
+        let mut claims: Vec<u64> = env
+            .storage()
+            .persistent()
             .get(&DataKey::UserClaims(user.clone()))
             .unwrap_or(Vec::new(env));
 
         claims.push_back(claim_id);
-        env.storage().persistent().set(&DataKey::UserClaims(user), &claims);
+        env.storage()
+            .persistent()
+            .set(&DataKey::UserClaims(user), &claims);
     }
 
     fn assert_admin(env: &Env, user: &Address) {
@@ -962,4 +1085,3 @@ impl InsuranceContract {
         }
     }
 }
-

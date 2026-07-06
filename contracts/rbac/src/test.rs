@@ -567,10 +567,7 @@ fn test_transfer_emergency_admin() {
     let (_env, _admin, _emergency_admin, client) = setup();
     let new_emergency_admin = Address::generate(&_env);
     client.transfer_emergency_admin(&new_emergency_admin);
-    assert_eq!(
-        client.get_emergency_admin_address(),
-        new_emergency_admin
-    );
+    assert_eq!(client.get_emergency_admin_address(), new_emergency_admin);
 }
 
 // ==================== Edge Cases ====================

@@ -192,8 +192,8 @@ pub struct AgreementStats {
 pub struct Dispute {
     pub raised_by: Address,
     pub raised_at: u64,
-    pub evidence_hash: Option<soroban_sdk::BytesN<32>>,
-    pub resolution: Option<DisputeResolution>,
+    pub evidence_hash: Vec<soroban_sdk::BytesN<32>>, // SDK 21.x: Option<&contracttype> cannot derive TryFromVal; empty=None, single=Some
+    pub resolution: Vec<DisputeResolution>,          // SDK 21.x: Option<&contracttype> workaround
     pub resolved_at: Option<u64>,
 }
 
@@ -221,7 +221,7 @@ pub struct Agreement {
     pub settlement_count: u32,
     pub clawback_count: u32,
     pub dispute_count: u32,
-    pub dispute: Option<Dispute>,
+    pub dispute: Vec<Dispute>, // SDK 21.x: Option<&contracttype> workaround
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ impl RevenueShareContract {
             settlement_count: 0,
             clawback_count: 0,
             dispute_count: 0,
-            dispute: None,
+            dispute: Vec::new(&env),
         };
 
         env.storage()
@@ -644,10 +644,8 @@ impl RevenueShareContract {
             },
         );
 
-        env.events().publish(
-            (symbol_short!("rs_cb"),),
-            (agreement_id, owner, amount),
-        );
+        env.events()
+            .publish((symbol_short!("rs_cb"),), (agreement_id, owner, amount));
         Ok(amount)
     }
 
@@ -676,17 +674,16 @@ impl RevenueShareContract {
         if agreement.state != AgreementState::Active {
             return Err(RevenueError::InvalidState);
         }
-        if agreement.dispute.is_some() {
+        if !agreement.dispute.is_empty() {
             return Err(RevenueError::AlreadyDisputed);
         }
 
         // Party check: only the owner or a current beneficiary may dispute.
-        let mut allowed =
-            if caller == agreement.owner {
-                true
-            } else {
-                false
-            };
+        let mut allowed = if caller == agreement.owner {
+            true
+        } else {
+            false
+        };
         if !allowed {
             let mut i: u32 = 0;
             while i < agreement.beneficiaries.len() {
@@ -701,13 +698,17 @@ impl RevenueShareContract {
         }
 
         let now = env.ledger().timestamp();
-        agreement.dispute = Some(Dispute {
+        let mut evidence_vec = Vec::new(&env);
+        evidence_vec.push_back(evidence_hash.clone());
+        let mut dispute_vec = Vec::new(&env);
+        dispute_vec.push_back(Dispute {
             raised_by: caller.clone(),
             raised_at: now,
-            evidence_hash: Some(evidence_hash.clone()),
-            resolution: None,
+            evidence_hash: evidence_vec,
+            resolution: Vec::new(&env),
             resolved_at: None,
         });
+        agreement.dispute = dispute_vec;
         agreement.state = AgreementState::Disputed;
         agreement.dispute_count += 1;
         env.storage()
@@ -780,10 +781,14 @@ impl RevenueShareContract {
 
         // Stamp the dispute record.
         let now = env.ledger().timestamp();
-        let mut dispute = agreement.dispute.clone().unwrap();
-        dispute.resolution = Some(resolution.clone());
+        let mut dispute = agreement.dispute.get(0).unwrap();
+        let mut res_vec = Vec::new(&env);
+        res_vec.push_back(resolution.clone());
+        dispute.resolution = res_vec;
         dispute.resolved_at = Some(now);
-        agreement.dispute = Some(dispute);
+        let mut disp_vec = Vec::new(&env);
+        disp_vec.push_back(dispute);
+        agreement.dispute = disp_vec;
         env.storage()
             .persistent()
             .set(&DataKey::Agreement(agreement_id), &agreement);
@@ -819,11 +824,7 @@ impl RevenueShareContract {
     // =======================================================================
 
     /// Forcibly pause a healthy agreement (admin only).
-    pub fn pause(
-        env: Env,
-        admin: Address,
-        agreement_id: u64,
-    ) -> Result<(), RevenueError> {
+    pub fn pause(env: Env, admin: Address, agreement_id: u64) -> Result<(), RevenueError> {
         Self::require_admin(&env, &admin)?;
 
         let mut agreement: Agreement = env
@@ -852,16 +853,13 @@ impl RevenueShareContract {
                 note: 0,
             },
         );
-        env.events().publish((symbol_short!("rs_pa"),), (agreement_id, admin));
+        env.events()
+            .publish((symbol_short!("rs_pa"),), (agreement_id, admin));
         Ok(())
     }
 
     /// Unpause a paused agreement.
-    pub fn unpause(
-        env: Env,
-        admin: Address,
-        agreement_id: u64,
-    ) -> Result<(), RevenueError> {
+    pub fn unpause(env: Env, admin: Address, agreement_id: u64) -> Result<(), RevenueError> {
         Self::require_admin(&env, &admin)?;
 
         let mut agreement: Agreement = env
@@ -890,7 +888,8 @@ impl RevenueShareContract {
                 note: 0,
             },
         );
-        env.events().publish((symbol_short!("rs_up"),), (agreement_id, admin));
+        env.events()
+            .publish((symbol_short!("rs_up"),), (agreement_id, admin));
         Ok(())
     }
 
@@ -1032,11 +1031,7 @@ impl RevenueShareContract {
 
     /// Return the running lifetime-received total for the
     /// `index`-th beneficiary of an agreement.
-    pub fn get_beneficiary_total(
-        env: Env,
-        agreement_id: u64,
-        index: u32,
-    ) -> i128 {
+    pub fn get_beneficiary_total(env: Env, agreement_id: u64, index: u32) -> i128 {
         env.storage()
             .persistent()
             .get(&DataKey::BeneficiaryTotal(agreement_id, index))
@@ -1095,11 +1090,11 @@ impl RevenueShareContract {
         let end = offset.saturating_add(limit).min(len);
         let mut i = offset;
         while i < end {
-            let entry: HistoryEntry =
-                env.storage()
-                    .persistent()
-                    .get(&DataKey::History(agreement_id, i))
-                    .unwrap();
+            let entry: HistoryEntry = env
+                .storage()
+                .persistent()
+                .get(&DataKey::History(agreement_id, i))
+                .unwrap();
             out.push_back(entry);
             i += 1;
         }
@@ -1134,10 +1129,7 @@ impl RevenueShareContract {
     /// totals and history, and zero out `unsettled_amount`.  Used by
     /// both `deposit_revenue` (immediate mode), `settle_distribution`,
     /// and `modify_agreement`.
-    fn settle_in_place(
-        env: &Env,
-        agreement: &mut Agreement,
-    ) -> Result<(), RevenueError> {
+    fn settle_in_place(env: &Env, agreement: &mut Agreement) -> Result<(), RevenueError> {
         if agreement.unsettled_amount <= 0 {
             return Ok(());
         }
@@ -1159,7 +1151,11 @@ impl RevenueShareContract {
         while i < agreement.beneficiaries.len() {
             let share = shares.get(i).unwrap();
             if share > 0 {
-                token_client.transfer(&contract_addr, &agreement.beneficiaries.get(i).unwrap().address, &share);
+                token_client.transfer(
+                    &contract_addr,
+                    &agreement.beneficiaries.get(i).unwrap().address,
+                    &share,
+                );
                 distributed_to_beneficiaries += share;
                 // Update running per-beneficiary total.
                 let prev: i128 = env
@@ -1333,8 +1329,8 @@ mod tests {
         what: &str,
     ) {
         match result {
-            Err(_) => {}                     // SDK-level (panic/host error)
-            Ok(Err(_)) => {}                 // Contract returned an Err
+            Err(_) => {}     // SDK-level (panic/host error)
+            Ok(Err(_)) => {} // Contract returned an Err
             Ok(Ok(_)) => panic!("expected error in `{}`, but got success", what),
         }
     }
@@ -1370,14 +1366,7 @@ mod tests {
             basis_points: 10_000,
         });
         assert_call_err(
-            &client.try_create_agreement(
-                &owner,
-                &token_addr,
-                &benes,
-                &0u64,
-                &false,
-                &0u64,
-            ),
+            &client.try_create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64),
             "create before init",
         );
     }
@@ -1406,14 +1395,7 @@ mod tests {
             basis_points: 4_000,
         });
 
-        let id = client.create_agreement(
-            &owner,
-            &token_addr,
-            &benes,
-            &7u64,
-            &true,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner, &token_addr, &benes, &7u64, &true, &0u64);
         let a = client.get_agreement(&id).unwrap();
         assert_eq!(a.id, 1);
         assert_eq!(a.owner, owner);
@@ -1438,14 +1420,7 @@ mod tests {
             address: b.clone(),
             basis_points: 2_500, // 25% beneficiary, 75% owner residual
         });
-        let id = client.create_agreement(
-            &owner,
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64);
         let a = client.get_agreement(&id).unwrap();
         assert_eq!(a.owner_basis_points, 7_500);
     }
@@ -1484,14 +1459,7 @@ mod tests {
             basis_points: 5_000, // > 10000 total
         });
         assert_call_err(
-            &client.try_create_agreement(
-                &owner,
-                &token_addr,
-                &benes,
-                &0u64,
-                &false,
-                &0u64,
-            ),
+            &client.try_create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64),
             "bps > 10000",
         );
     }
@@ -1511,14 +1479,7 @@ mod tests {
             basis_points: 0,
         });
         assert_call_err(
-            &client.try_create_agreement(
-                &owner,
-                &token_addr,
-                &benes,
-                &0u64,
-                &false,
-                &0u64,
-            ),
+            &client.try_create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64),
             "zero bps entry",
         );
     }
@@ -1542,14 +1503,7 @@ mod tests {
             basis_points: 6_000,
         });
         assert_call_err(
-            &client.try_create_agreement(
-                &owner,
-                &token_addr,
-                &benes,
-                &0u64,
-                &false,
-                &0u64,
-            ),
+            &client.try_create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64),
             "duplicate beneficiary",
         );
     }
@@ -1569,14 +1523,7 @@ mod tests {
             basis_points: 10_000,
         });
         assert_call_err(
-            &client.try_create_agreement(
-                &owner,
-                &token_addr,
-                &benes,
-                &u64::MAX,
-                &false,
-                &0u64,
-            ),
+            &client.try_create_agreement(&owner, &token_addr, &benes, &u64::MAX, &false, &0u64),
             "u64 max period",
         );
     }
@@ -1603,14 +1550,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner,
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64);
 
         stellar.mint(&depositor, &1_000i128);
         client.deposit_revenue(&depositor, &id, &1_000i128);
@@ -1655,14 +1595,7 @@ mod tests {
             basis_points: 3_334,
         });
 
-        let id = client.create_agreement(
-            &owner,
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner, &token_addr, &benes, &0u64, &false, &0u64);
 
         // Use an even amount so we can verify invariants precisely.
         stellar.mint(&depositor, &1_000_000i128);
@@ -1700,14 +1633,7 @@ mod tests {
             basis_points: 2_500, // owner gets 75%
         });
 
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         stellar.mint(&depositor, &1_000_000i128);
         client.deposit_revenue(&depositor, &id, &1_000_000i128);
@@ -1734,14 +1660,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         assert_call_err(
             &client.try_deposit_revenue(&depositor, &id, &0i128),
@@ -1766,14 +1685,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         client.pause(&admin, &id);
 
@@ -1809,14 +1721,8 @@ mod tests {
 
         // 60-second period.
         let now = env.ledger().timestamp();
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id =
+            client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &false, &0u64);
 
         let a0 = client.get_agreement(&id).unwrap();
         assert_eq!(a0.next_settlement_at, now + 60);
@@ -1868,14 +1774,8 @@ mod tests {
             basis_points: 10_000,
         });
         let now = env.ledger().timestamp();
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id =
+            client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &false, &0u64);
 
         stellar.mint(&depositor, &700i128);
         client.deposit_revenue(&depositor, &id, &300i128);
@@ -1909,14 +1809,8 @@ mod tests {
         });
 
         let now = env.ledger().timestamp();
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id =
+            client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &false, &0u64);
         env.ledger().with_timestamp(now + 60);
         assert_call_err(
             &client.try_settle_distribution(&owner, &id),
@@ -1953,7 +1847,7 @@ mod tests {
             &token_addr,
             &benes,
             &60u64,
-            &true,    // clawback enabled
+            &true, // clawback enabled
             &(now + 600),
         );
 
@@ -2061,14 +1955,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &true,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &true, &0u64);
         stellar.mint(&depositor, &100i128);
         client.deposit_revenue(&depositor, &id, &100i128);
 
@@ -2092,14 +1979,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &true,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &true, &0u64);
         assert_call_err(
             &client.try_clawback_unsettled(&owner, &id),
             "clawback with nothing to claw",
@@ -2124,14 +2004,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[7u8; 32]);
         client.raise_dispute(&owner, &id, &evidence);
@@ -2157,14 +2030,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[1u8; 32]);
         client.raise_dispute(&b, &id, &evidence);
@@ -2187,14 +2053,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[1u8; 32]);
         assert_call_err(
@@ -2220,14 +2079,8 @@ mod tests {
             basis_points: 10_000,
         });
         let now = env.ledger().timestamp();
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id =
+            client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[2u8; 32]);
         client.raise_dispute(&owner, &id, &evidence);
@@ -2258,14 +2111,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[3u8; 32]);
         client.raise_dispute(&owner, &id, &evidence);
@@ -2291,14 +2137,8 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id =
+            client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &false, &0u64);
 
         stellar.mint(&depositor, &333i128);
         client.deposit_revenue(&depositor, &id, &333i128);
@@ -2330,14 +2170,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[5u8; 32]);
         client.raise_dispute(&owner, &id, &evidence);
@@ -2374,14 +2207,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[6u8; 32]);
         client.raise_dispute(&owner, &id, &evidence);
@@ -2416,14 +2242,7 @@ mod tests {
             basis_points: 10_000,
         });
         let now = env.ledger().timestamp();
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &old,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &old, &60u64, &false, &0u64);
 
         stellar.mint(&depositor, &500i128);
         client.deposit_revenue(&depositor, &id, &500i128);
@@ -2464,14 +2283,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let mut same: Vec<BeneficiaryShare> = Vec::new(&env);
         same.push_back(BeneficiaryShare {
@@ -2498,14 +2310,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
 
         let evidence = soroban_sdk::BytesN::from_array(&env, &[8u8; 32]);
         client.raise_dispute(&owner, &id, &evidence);
@@ -2578,14 +2383,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
         stellar.mint(&depositor, &300i128);
         client.deposit_revenue(&depositor, &id, &100i128);
         stellar.mint(&depositor, &300i128);
@@ -2622,14 +2420,8 @@ mod tests {
             basis_points: 10_000,
         });
         let now = env.ledger().timestamp();
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &60u64,
-            &false,
-            &0u64,
-        );
+        let id =
+            client.create_agreement(&owner.clone(), &token_addr, &benes, &60u64, &false, &0u64);
 
         stellar.mint(&depositor, &700i128);
         client.deposit_revenue(&depositor, &id, &300i128);
@@ -2709,14 +2501,7 @@ mod tests {
             address: b.clone(),
             basis_points: 10_000,
         });
-        let id = client.create_agreement(
-            &owner.clone(),
-            &token_addr,
-            &benes,
-            &0u64,
-            &false,
-            &0u64,
-        );
+        let id = client.create_agreement(&owner.clone(), &token_addr, &benes, &0u64, &false, &0u64);
         assert_call_err(
             &client.try_settle_distribution(&owner, &id),
             "settle in immediate mode",
@@ -2756,4 +2541,3 @@ mod tests {
         assert_eq!(preview.get(2).unwrap(), 333_400);
     }
 }
-

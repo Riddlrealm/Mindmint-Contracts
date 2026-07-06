@@ -21,7 +21,9 @@ fn setup_token<'a>(
     env: &'a Env,
     admin: &Address,
 ) -> (Address, TokenClient<'a>, StellarAssetClient<'a>) {
-    let contract_address = env.register_stellar_asset_contract_v2(admin.clone()).address();
+    let contract_address = env
+        .register_stellar_asset_contract_v2(admin.clone())
+        .address();
     let token = TokenClient::new(env, &contract_address);
     let token_admin = StellarAssetClient::new(env, &contract_address);
     (contract_address, token, token_admin)
@@ -91,13 +93,8 @@ fn test_start_round_with_rollover() {
 
     client.init(&owner, &token_id);
     let tiers = default_tiers(&env);
-    let round_id = client.start_round_with_rollover(
-        &owner,
-        &50,
-        &ScheduleType::Monthly,
-        &tiers,
-        &1000,
-    );
+    let round_id =
+        client.start_round_with_rollover(&owner, &50, &ScheduleType::Monthly, &tiers, &1000);
 
     assert_eq!(round_id, 1);
     let round = client.get_round(&1);
@@ -147,7 +144,8 @@ fn test_buy_ticket_after_end() {
     let tiers = default_tiers(&env);
     client.start_round(&owner, &100, &ScheduleType::Weekly, &tiers);
 
-    env.ledger().with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
+    env.ledger()
+        .with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
 
     token_admin.mint(&user, &100);
     token.approve(&user, &contract_id, &100, &env.ledger().sequence());
@@ -175,7 +173,8 @@ fn test_draw_winner_and_claim() {
     token.approve(&u2, &contract_id, &200, &env.ledger().sequence());
     client.buy_ticket(&u2, &2);
 
-    env.ledger().with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
+    env.ledger()
+        .with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
     client.draw_winner();
 
     let round = client.get_round(&1);
@@ -254,14 +253,18 @@ fn test_prize_distribution_multiple_tiers() {
     let tiers = default_tiers(&env);
     client.start_round(&owner, &1000, &ScheduleType::Weekly, &tiers);
 
-    for (addr, amount) in [(u1.clone(), 1000i128), (u2.clone(), 1000i128), (u3.clone(), 1000i128)]
-    {
+    for (addr, amount) in [
+        (u1.clone(), 1000i128),
+        (u2.clone(), 1000i128),
+        (u3.clone(), 1000i128),
+    ] {
         token_admin.mint(&addr, &amount);
         token.approve(&addr, &contract_id, &amount, &env.ledger().sequence());
         client.buy_ticket(&addr, &1);
     }
 
-    env.ledger().with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
+    env.ledger()
+        .with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
     client.draw_winner();
 
     let round = client.get_round(&1);
@@ -298,7 +301,8 @@ fn test_guaranteed_single_winner() {
     token.approve(&user, &contract_id, &100, &env.ledger().sequence());
     client.buy_ticket(&user, &1);
 
-    env.ledger().with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
+    env.ledger()
+        .with_mut(|l| l.timestamp += schedule_duration_sec(ScheduleType::Weekly) + 1);
     client.draw_winner();
 
     let round = client.get_round(&1);

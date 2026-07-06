@@ -1,6 +1,0 @@
-# Commits listed here are excluded from `git blame` output.
-# Configure git with:
-#   git config blame.ignoreRevsFile .git-blame-ignore-revs
-# Then run `git blame` as normal; rename / reformat commits will be silently skipped.
-
-# History rewrite / rename / refactor commits go here.

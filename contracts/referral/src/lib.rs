@@ -1,9 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token,
-    Address, Env, String, Symbol, Vec,
-};
+use soroban_sdk::{Address, Env, String, Symbol, Vec, contract, contractimpl, contracttype, token};
 
 //
 // ──────────────────────────────────────────────────────────
@@ -52,9 +49,9 @@ pub struct ReferralStats {
 #[derive(Clone, Debug)]
 pub struct Config {
     pub reward_token: Address,
-    pub referrer_reward: i128,      // Reward for referrer
-    pub referee_reward: i128,       // Reward for referee
-    pub max_referrals_per_user: u32, // Maximum referrals allowed per user
+    pub referrer_reward: i128,         // Reward for referrer
+    pub referee_reward: i128,          // Reward for referee
+    pub max_referrals_per_user: u32,   // Maximum referrals allowed per user
     pub min_referral_code_length: u32, // Minimum length for referral codes
 }
 
@@ -72,7 +69,7 @@ impl ReferralContract {
     // ───────────── INITIALIZATION ─────────────
 
     /// Initialize the referral contract
-    /// 
+    ///
     /// # Arguments
     /// * `admin` - Admin address who can update configuration
     /// * `reward_token` - Address of the reward token contract
@@ -112,7 +109,9 @@ impl ReferralContract {
             total_referrer_rewards: 0,
             total_referee_rewards: 0,
         };
-        env.storage().instance().set(&DataKey::ReferralStats, &stats);
+        env.storage()
+            .instance()
+            .set(&DataKey::ReferralStats, &stats);
 
         env.events().publish(
             (Symbol::new(&env, "init"), Symbol::new(&env, "referral")),
@@ -123,14 +122,18 @@ impl ReferralContract {
     // ───────────── REFERRAL CODE GENERATION ─────────────
 
     /// Generate a unique referral code for a user
-    /// 
+    ///
     /// # Returns
     /// Generated referral code as String
     pub fn generate_referral_code(env: Env, user: Address) -> String {
         user.require_auth();
 
         // Check if user already has a referral code
-        if env.storage().instance().has(&DataKey::ReferralCode(user.clone())) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::ReferralCode(user.clone()))
+        {
             panic!("Referral code already exists");
         }
 
@@ -140,16 +143,16 @@ impl ReferralContract {
             .instance()
             .get(&DataKey::CodeCounter)
             .unwrap_or(0);
-        
+
         // Create code from counter (ensures uniqueness)
         // Use timestamp as additional entropy
         let timestamp = env.ledger().timestamp();
         let timestamp_bytes = timestamp.to_be_bytes();
-        
+
         // Combine counter and timestamp for code generation
         let mut code_bytes = [0u8; 12];
         let counter_bytes = counter.to_be_bytes();
-        
+
         // Mix counter and timestamp
         for i in 0..4 {
             code_bytes[i] = counter_bytes[i];
@@ -160,19 +163,28 @@ impl ReferralContract {
 
         // Convert to base32-like string (simplified for Soroban)
         let code = Self::bytes_to_code(&env, &code_bytes);
-        
+
         counter += 1;
-        env.storage().instance().set(&DataKey::CodeCounter, &counter);
-
-        // Store bidirectional mapping
-        env.storage().instance().set(&DataKey::ReferralCode(user.clone()), &code.clone());
-        env.storage().instance().set(&DataKey::CodeOwner(code.clone()), &user);
-
-        // Initialize referral count
-        env.storage().instance().set(&DataKey::ReferralCount(user.clone()), &0u32);
         env.storage()
             .instance()
-            .set(&DataKey::ReferralsList(user.clone()), &Vec::<Address>::new(&env));
+            .set(&DataKey::CodeCounter, &counter);
+
+        // Store bidirectional mapping
+        env.storage()
+            .instance()
+            .set(&DataKey::ReferralCode(user.clone()), &code.clone());
+        env.storage()
+            .instance()
+            .set(&DataKey::CodeOwner(code.clone()), &user);
+
+        // Initialize referral count
+        env.storage()
+            .instance()
+            .set(&DataKey::ReferralCount(user.clone()), &0u32);
+        env.storage().instance().set(
+            &DataKey::ReferralsList(user.clone()),
+            &Vec::<Address>::new(&env),
+        );
 
         env.events().publish(
             (Symbol::new(&env, "referral_code_generated"), user),
@@ -187,14 +199,14 @@ impl ReferralContract {
         // Simple encoding: convert bytes to alphanumeric string
         // Using alphanumeric characters only
         const CHARS: &[u8] = b"0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-        
+
         // Build string from bytes
         let mut code_bytes = [0u8; 12];
         for i in 0..12 {
             let idx = (bytes[i] as usize) % CHARS.len();
             code_bytes[i] = CHARS[idx];
         }
-        
+
         // Convert bytes to string
         String::from_bytes(env, &code_bytes)
     }
@@ -212,25 +224,33 @@ impl ReferralContract {
     // ───────────── REFERRAL REGISTRATION ─────────────
 
     /// Register as a referee with a referral code
-    /// 
+    ///
     /// # Arguments
     /// * `referee` - Address of the new user (referee)
     /// * `referral_code` - Referral code of the referrer
-    /// 
+    ///
     /// # Returns
     /// Returns true if registration successful and rewards distributed
     pub fn register_with_referral_code(env: Env, referee: Address, referral_code: String) -> bool {
         referee.require_auth();
-        
+
         Self::assert_initialized(&env);
 
         // Anti-gaming: Prevent duplicate registration
-        if env.storage().instance().has(&DataKey::Referral(referee.clone())) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::Referral(referee.clone()))
+        {
             panic!("Already registered with a referral code");
         }
 
         // Validate and get referrer
-        let referrer: Address = match env.storage().instance().get(&DataKey::CodeOwner(referral_code.clone())) {
+        let referrer: Address = match env
+            .storage()
+            .instance()
+            .get(&DataKey::CodeOwner(referral_code.clone()))
+        {
             Some(addr) => addr,
             None => panic!("Invalid referral code"),
         };
@@ -246,7 +266,7 @@ impl ReferralContract {
             .instance()
             .get(&DataKey::ReferralCount(referrer.clone()))
             .unwrap_or(0);
-        
+
         let config: Config = env.storage().instance().get(&DataKey::Config).unwrap();
         if referral_count >= config.max_referrals_per_user {
             panic!("Referrer has reached maximum referral limit");
@@ -283,15 +303,18 @@ impl ReferralContract {
         stats.total_referrals += 1;
 
         // Distribute rewards
-        let rewards_distributed = Self::distribute_rewards(&env, referrer.clone(), referee.clone(), &config);
-        
+        let rewards_distributed =
+            Self::distribute_rewards(&env, referrer.clone(), referee.clone(), &config);
+
         if rewards_distributed {
             stats.total_rewarded_referrals += 1;
             stats.total_referrer_rewards += config.referrer_reward;
             stats.total_referee_rewards += config.referee_reward;
         }
 
-        env.storage().instance().set(&DataKey::ReferralStats, &stats);
+        env.storage()
+            .instance()
+            .set(&DataKey::ReferralStats, &stats);
 
         // Emit event
         env.events().publish(
@@ -311,18 +334,22 @@ impl ReferralContract {
         // For reward_token contract, we need to check balance first
         // The contract should have been funded with tokens via deposit_reward_tokens
         // We'll use the token client to check and transfer
-        
+
         // Try to use token::Client first (for standard token interface)
         // If that doesn't work, we'll need to interact with reward_token directly
         let total_needed = config.referrer_reward + config.referee_reward;
-        
+
         // Check contract balance
-        let contract_balance = Self::get_token_balance(env, &config.reward_token, &env.current_contract_address());
-        
+        let contract_balance =
+            Self::get_token_balance(env, &config.reward_token, &env.current_contract_address());
+
         if contract_balance < total_needed {
             // Insufficient balance - still record referral but don't reward
             env.events().publish(
-                (Symbol::new(env, "reward_failed"), Symbol::new(env, "insufficient_balance")),
+                (
+                    Symbol::new(env, "reward_failed"),
+                    Symbol::new(env, "insufficient_balance"),
+                ),
                 (referrer, referee, total_needed, contract_balance),
             );
             return false;
@@ -330,7 +357,7 @@ impl ReferralContract {
 
         // Transfer rewards using token client
         let token_client = token::Client::new(env, &config.reward_token);
-        
+
         // Transfer to referrer
         if config.referrer_reward > 0 {
             token_client.transfer(
@@ -409,7 +436,7 @@ impl ReferralContract {
         Self::assert_admin(&env, &admin);
 
         let mut config: Config = env.storage().instance().get(&DataKey::Config).unwrap();
-        
+
         if let Some(reward) = referrer_reward {
             config.referrer_reward = reward;
         }
@@ -422,10 +449,8 @@ impl ReferralContract {
 
         env.storage().instance().set(&DataKey::Config, &config);
 
-        env.events().publish(
-            (Symbol::new(&env, "config_updated"), admin),
-            config.clone(),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "config_updated"), admin), config.clone());
     }
 
     /// Deposit reward tokens to contract (admin only)
@@ -439,10 +464,8 @@ impl ReferralContract {
 
         token_client.transfer(&admin, &env.current_contract_address(), &amount);
 
-        env.events().publish(
-            (Symbol::new(&env, "tokens_deposited"), admin),
-            amount,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "tokens_deposited"), admin), amount);
     }
 
     // ───────────── HELPERS ─────────────

@@ -3,9 +3,9 @@
 mod storage;
 pub mod types;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 use crate::storage::*;
 use crate::types::*;
+use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 
 #[contract]
 pub struct EventLoggingContract;
@@ -18,8 +18,10 @@ impl EventLoggingContract {
             panic!("Already initialized");
         }
         set_admin(&env, &admin);
-        
-        let config = Config { max_events_retained };
+
+        let config = Config {
+            max_events_retained,
+        };
         set_config(&env, &config);
     }
 
@@ -29,7 +31,9 @@ impl EventLoggingContract {
         if admin != get_admin(&env) {
             panic!("Not admin");
         }
-        let config = Config { max_events_retained };
+        let config = Config {
+            max_events_retained,
+        };
         set_config(&env, &config);
     }
 
@@ -40,11 +44,17 @@ impl EventLoggingContract {
         let id = increment_event_count(&env);
         let timestamp = env.ledger().timestamp();
 
+        // SDK 21.x: contracttype cannot derive TryFromVal for &Val, so we
+        // wrap the data in a Vec<Val> (round-trippable via ScVec). Empty vec
+        // represents "no payload"; otherwise exactly one element.
+        let mut data_vec: Vec<Val> = Vec::new(&env);
+        data_vec.push_back(data.clone());
+
         let event = Event {
             id,
             source_contract: source_contract.clone(),
             topic: topic.clone(),
-            data: data.clone(),
+            data: data_vec,
             timestamp,
         };
 
@@ -65,7 +75,8 @@ impl EventLoggingContract {
         increment_analytics_topic_count(&env, &topic);
 
         // 5. Emit native Soroban event for off-chain indexing
-        env.events().publish((topic.clone(), source_contract.clone()), data.clone());
+        env.events()
+            .publish((topic.clone(), source_contract.clone()), data.clone());
 
         // 6. Prune if needed (keep it simple: if we exceed limit by a lot, we prune)
         // Here we just prune the oldest event if total count > max_events_retained
@@ -77,7 +88,7 @@ impl EventLoggingContract {
             if id > (config.max_events_retained as u64) {
                 let prune_id = id - (config.max_events_retained as u64);
                 remove_event(&env, prune_id);
-                // Note: We don't remove from topic/contract indices here to save compute, 
+                // Note: We don't remove from topic/contract indices here to save compute,
                 // but queries should handle missing events gracefully.
             }
         }
@@ -97,11 +108,16 @@ impl EventLoggingContract {
     }
 
     /// Fetch events by source contract with pagination.
-    pub fn get_events_by_contract(env: Env, contract: Address, start: u32, limit: u32) -> Vec<Event> {
+    pub fn get_events_by_contract(
+        env: Env,
+        contract: Address,
+        start: u32,
+        limit: u32,
+    ) -> Vec<Event> {
         let index = get_contract_index(&env, &contract);
         Self::paginate_index(&env, index, start, limit)
     }
-    
+
     /// Get analytics for a topic.
     pub fn get_topic_analytics(env: Env, topic: Symbol) -> u64 {
         get_analytics_topic_count(&env, &topic)
@@ -111,12 +127,16 @@ impl EventLoggingContract {
     fn paginate_index(env: &Env, index: Vec<u64>, start: u32, limit: u32) -> Vec<Event> {
         let mut results = Vec::new(env);
         let len = index.len();
-        
+
         if start >= len {
             return results;
         }
 
-        let end = if start + limit > len { len } else { start + limit };
+        let end = if start + limit > len {
+            len
+        } else {
+            start + limit
+        };
 
         for i in start..end {
             if let Some(id) = index.get(i) {
@@ -128,4 +148,3 @@ impl EventLoggingContract {
         results
     }
 }
-

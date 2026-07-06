@@ -1,9 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    Address, Env, Symbol, Vec
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Symbol, Vec};
 
 // ================= STRUCTS =================
 
@@ -43,7 +40,6 @@ pub struct ProgressiveJackpot;
 
 #[contractimpl]
 impl ProgressiveJackpot {
-
     // 🔹 Initialize
     pub fn init(env: Env, admin: Address, oracle: Address) {
         admin.require_auth();
@@ -110,7 +106,8 @@ impl ProgressiveJackpot {
             panic!("Invalid cycle");
         }
 
-        if let JackpotStatus::Active = jackpot.status {} else {
+        if let JackpotStatus::Active = jackpot.status {
+        } else {
             panic!("Not claimable");
         }
 
@@ -130,7 +127,9 @@ impl ProgressiveJackpot {
         env.storage().persistent().set(&claimed_key, &amount);
 
         // Save history
-        env.storage().persistent().set(&DataKey::History(cycle_id), &jackpot);
+        env.storage()
+            .persistent()
+            .set(&DataKey::History(cycle_id), &jackpot);
 
         env.storage().instance().set(&DataKey::Current, &jackpot);
 
@@ -159,7 +158,9 @@ impl ProgressiveJackpot {
 
         jackpot.status = JackpotStatus::Expired;
 
-        env.storage().persistent().set(&DataKey::History(old_cycle), &jackpot);
+        env.storage()
+            .persistent()
+            .set(&DataKey::History(old_cycle), &jackpot);
 
         let new_jackpot = Jackpot {
             cycle_id: old_cycle + 1,
@@ -170,7 +171,9 @@ impl ProgressiveJackpot {
             status: JackpotStatus::Active,
         };
 
-        env.storage().instance().set(&DataKey::Current, &new_jackpot);
+        env.storage()
+            .instance()
+            .set(&DataKey::Current, &new_jackpot);
 
         env.events().publish(
             (Symbol::new(&env, "JackpotRolledOver"),),
@@ -185,7 +188,10 @@ impl ProgressiveJackpot {
 
     // 🔹 Get history (single cycle)
     pub fn get_jackpot_history(env: Env, cycle_id: u64) -> Jackpot {
-        env.storage().persistent().get(&DataKey::History(cycle_id)).unwrap()
+        env.storage()
+            .persistent()
+            .get(&DataKey::History(cycle_id))
+            .unwrap()
     }
 
     // 🔹 Check if player has claimed a jackpot
@@ -195,6 +201,9 @@ impl ProgressiveJackpot {
 
     // 🔹 Get claimed jackpot reward amount for player
     pub fn get_claimed_amount(env: Env, player: Address) -> i128 {
-        env.storage().persistent().get(&DataKey::Claimed(player)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::Claimed(player))
+            .unwrap_or(0)
     }
 }

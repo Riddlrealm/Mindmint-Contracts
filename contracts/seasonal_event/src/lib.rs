@@ -92,7 +92,9 @@ impl SeasonalEventContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        env.storage().persistent().remove(&DataKey::Verifier(verifier));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Verifier(verifier));
     }
 
     pub fn set_paused(env: Env, admin: Address, paused: bool) {
@@ -131,7 +133,11 @@ impl SeasonalEventContract {
             panic!("Invalid event time range");
         }
 
-        let mut next_id: u64 = env.storage().persistent().get(&DataKey::NextEventId).unwrap();
+        let mut next_id: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::NextEventId)
+            .unwrap();
         let bonus = if bonus_multiplier_bps == 0 {
             BPS_BASE
         } else {
@@ -150,9 +156,13 @@ impl SeasonalEventContract {
             cancelled: false,
         };
 
-        env.storage().persistent().set(&DataKey::Event(next_id), &event);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Event(next_id), &event);
         next_id += 1;
-        env.storage().persistent().set(&DataKey::NextEventId, &next_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::NextEventId, &next_id);
 
         event.id
     }
@@ -174,7 +184,9 @@ impl SeasonalEventContract {
         let mut event = Self::get_event_internal(&env, event_id);
         event.start_time = start_time;
         event.end_time = end_time;
-        env.storage().persistent().set(&DataKey::Event(event_id), &event);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Event(event_id), &event);
     }
 
     pub fn update_event_rewards(
@@ -196,21 +208,20 @@ impl SeasonalEventContract {
             bonus_multiplier_bps
         };
         event.nft_metadata = nft_metadata;
-        env.storage().persistent().set(&DataKey::Event(event_id), &event);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Event(event_id), &event);
     }
 
-    pub fn update_event_puzzles(
-        env: Env,
-        admin: Address,
-        event_id: u64,
-        puzzle_ids: Vec<u32>,
-    ) {
+    pub fn update_event_puzzles(env: Env, admin: Address, event_id: u64, puzzle_ids: Vec<u32>) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
         let mut event = Self::get_event_internal(&env, event_id);
         event.puzzle_ids = puzzle_ids;
-        env.storage().persistent().set(&DataKey::Event(event_id), &event);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Event(event_id), &event);
     }
 
     pub fn set_event_cancelled(env: Env, admin: Address, event_id: u64, cancelled: bool) {
@@ -219,7 +230,9 @@ impl SeasonalEventContract {
 
         let mut event = Self::get_event_internal(&env, event_id);
         event.cancelled = cancelled;
-        env.storage().persistent().set(&DataKey::Event(event_id), &event);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Event(event_id), &event);
     }
 
     // ───────────── EVENT PARTICIPATION ─────────────
@@ -276,7 +289,8 @@ impl SeasonalEventContract {
         let reward = Self::apply_bonus(event.reward_amount, event.bonus_multiplier_bps);
 
         env.storage().persistent().set(&claim_key, &true);
-        env.events().publish((symbol_short!("reward"), event_id, user.clone()), reward);
+        env.events()
+            .publish((symbol_short!("reward"), event_id, user.clone()), reward);
 
         reward
     }
@@ -306,11 +320,16 @@ impl SeasonalEventContract {
             minted_at: env.ledger().timestamp(),
         };
 
-        env.storage().persistent().set(&DataKey::EventNft(next_id), &nft);
+        env.storage()
+            .persistent()
+            .set(&DataKey::EventNft(next_id), &nft);
         env.storage().persistent().set(&minted_key, &true);
-        env.storage().persistent().set(&DataKey::NextNftId, &(next_id + 1));
+        env.storage()
+            .persistent()
+            .set(&DataKey::NextNftId, &(next_id + 1));
 
-        env.events().publish((symbol_short!("mint"), event_id, user), next_id);
+        env.events()
+            .publish((symbol_short!("mint"), event_id, user), next_id);
 
         next_id
     }
@@ -438,11 +457,7 @@ impl SeasonalEventContract {
             args.push_back(env.current_contract_address().into_val(env));
             args.push_back(user.clone().into_val(env));
             args.push_back(score.into_val(env));
-            env.invoke_contract::<()>(
-                &leaderboard,
-                &func,
-                args,
-            );
+            env.invoke_contract::<()>(&leaderboard, &func, args);
         }
     }
 }

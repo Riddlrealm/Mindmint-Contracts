@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short,
-    token, Address, Env, Map, String, Vec,
+    contract, contractimpl, contracttype, symbol_short, token, Address, Env, Map, String, Vec,
 };
 
 // ──────────────────────────────────────────────────────────
@@ -89,7 +88,11 @@ impl NftUpgradeContract {
         admin.require_auth();
         env.storage().instance().set(
             &DataKey::Config,
-            &ContractConfig { admin, token, nft_contract },
+            &ContractConfig {
+                admin,
+                token,
+                nft_contract,
+            },
         );
     }
 
@@ -119,9 +122,16 @@ impl NftUpgradeContract {
         let key = DataKey::UpgradeConfig(tier);
         env.storage().persistent().set(
             &key,
-            &UpgradeConfig { tier, cost, success_rate_bps: clamped_bps, attribute_boosts },
+            &UpgradeConfig {
+                tier,
+                cost,
+                success_rate_bps: clamped_bps,
+                attribute_boosts,
+            },
         );
-        env.storage().persistent().extend_ttl(&key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
 
         env.events()
             .publish((symbol_short!("cfg_set"), tier), (cost, clamped_bps));
@@ -201,7 +211,9 @@ impl NftUpgradeContract {
             // Persist updated attributes
             let attr_key = DataKey::NftAttributes(nft_id);
             env.storage().persistent().set(&attr_key, &attributes);
-            env.storage().persistent().extend_ttl(&attr_key, 100_000, 500_000);
+            env.storage()
+                .persistent()
+                .extend_ttl(&attr_key, 100_000, 500_000);
 
             // Best-effort cross-contract notification to the NFT contract
             let meta = String::from_str(&env, "upgraded");
@@ -299,7 +311,9 @@ impl NftUpgradeContract {
         });
 
         env.storage().persistent().set(&key, &history);
-        env.storage().persistent().extend_ttl(&key, 100_000, 500_000);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, 100_000, 500_000);
     }
 }
 

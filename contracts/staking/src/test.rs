@@ -14,7 +14,9 @@ fn create_token_contract<'a>(env: &Env, admin: &Address) -> (Address, TokenClien
     (address.clone(), TokenClient::new(env, &address))
 }
 
-fn setup_staking_contract(env: &Env) -> (
+fn setup_staking_contract(
+    env: &Env,
+) -> (
     StakingContractClient,
     Address,
     Address,
@@ -253,8 +255,16 @@ fn test_rewards_calculation_and_claim() {
     env.mock_all_auths();
     env.ledger().set_timestamp(0);
 
-    let (client, admin, staker, _, _, reward_token_client, staking_admin_client, reward_admin_client) =
-        setup_staking_contract(&env);
+    let (
+        client,
+        admin,
+        staker,
+        _,
+        _,
+        reward_token_client,
+        staking_admin_client,
+        reward_admin_client,
+    ) = setup_staking_contract(&env);
 
     // Mint staking tokens and stake
     staking_admin_client.mint(&staker, &10_000_000_000);
@@ -385,8 +395,7 @@ fn test_update_apy_config() {
 
     // Update APY config
     client.update_apy_config(
-        &admin,
-        &1000u32, // 10% base APY
+        &admin, &1000u32, // 10% base APY
         &200u32,  // 2% bronze bonus
         &400u32,  // 4% silver bonus
         &800u32,  // 8% gold bonus
@@ -450,13 +459,7 @@ fn test_update_config_non_admin() {
     let (client, _, staker, _, _, _, _, _) = setup_staking_contract(&env);
 
     // Try to update APY config as non-admin
-    client.update_apy_config(
-        &staker,
-        &1000u32,
-        &200u32,
-        &400u32,
-        &800u32,
-    );
+    client.update_apy_config(&staker, &1000u32, &200u32, &400u32, &800u32);
 }
 
 #[test]

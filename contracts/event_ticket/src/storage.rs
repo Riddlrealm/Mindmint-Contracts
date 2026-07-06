@@ -73,25 +73,21 @@ impl Storage {
             .persistent()
             .get(&key)
             .unwrap_or_else(|| Vec::new(env));
-        
+
         let mut new_tickets = Vec::new(env);
         for id in tickets.iter() {
             if id != token_id {
                 new_tickets.push_back(id);
             }
         }
-        
+
         env.storage().persistent().set(&key, &new_tickets);
     }
 
     pub fn get_event_attendance(env: &Env, event_id: u64) -> (u64, u64) {
         let key = (symbol_short!("attend"), event_id);
-        let attended: u64 = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(0);
-        
+        let attended: u64 = env.storage().persistent().get(&key).unwrap_or(0);
+
         let event = Self::get_event(env, event_id).unwrap_or_else(|_| Event {
             id: event_id,
             name: symbol_short!(""),
@@ -101,17 +97,13 @@ impl Storage {
             tickets_issued: 0,
             status: crate::types::EventStatus::Upcoming,
         });
-        
+
         (attended, event.tickets_issued)
     }
 
     pub fn increment_attendance(env: &Env, event_id: u64) {
         let key = (symbol_short!("attend"), event_id);
-        let attended: u64 = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or(0);
+        let attended: u64 = env.storage().persistent().get(&key).unwrap_or(0);
         env.storage().persistent().set(&key, &(attended + 1));
     }
 }

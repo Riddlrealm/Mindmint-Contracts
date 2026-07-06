@@ -59,24 +59,14 @@ pub struct VotingConfig {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VotingEvent {
     /// Emitted when a vote is cast
-    VoteCast {
-        voter: Address,
-        puzzle_id: u32,
-        difficulty_score: u32,
-        fun_score: u32,
-        fairness_score: u32,
-        weight: i128,
-    },
+    /// Fields: (voter, puzzle_id, difficulty_score, fun_score, fairness_score, weight)
+    VoteCast(Address, u32, u32, u32, u32, i128),
     /// Emitted when votes are reset for a puzzle
-    VotesReset {
-        puzzle_id: u32,
-        reset_at: u64,
-    },
+    /// Fields: (puzzle_id, reset_at)
+    VotesReset(u32, u64),
     /// Emitted when minimum stake threshold is updated
-    MinStakeThresholdUpdated {
-        new_threshold: i128,
-        updated_at: u64,
-    },
+    /// Fields: (new_threshold, updated_at)
+    MinStakeThresholdUpdated(i128, u64),
 }
 
 /// Storage keys for data access

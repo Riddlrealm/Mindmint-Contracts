@@ -3,10 +3,10 @@
 mod storage;
 pub mod types;
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec, Symbol, Val};
-use soroban_sdk::token::Client as TokenClient;
 use crate::storage::*;
 use crate::types::*;
+use soroban_sdk::token::Client as TokenClient;
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Val, Vec};
 
 #[contract]
 pub struct GovernanceContract;
@@ -25,7 +25,7 @@ impl GovernanceContract {
         if env.storage().instance().has(&DataKey::Config) {
             panic!("Already initialized");
         }
-        
+
         if quorum_percentage > 100 {
             panic!("Invalid quorum percentage");
         }
@@ -49,7 +49,7 @@ impl GovernanceContract {
 
         let config = get_config(&env);
         let token = TokenClient::new(&env, &config.token_address);
-        
+
         // Transfer tokens to this contract
         token.transfer(&from, &env.current_contract_address(), &amount);
 
@@ -99,7 +99,7 @@ impl GovernanceContract {
         }
 
         let balance = get_token_balance(&env, &delegator);
-        
+
         if balance > 0 {
             // Remove power from old delegate
             let old_power = get_voting_power(&env, &current_delegate);
@@ -226,17 +226,17 @@ impl GovernanceContract {
         if current_time <= proposal.end_time {
             panic!("Voting period not ended");
         }
-        
+
         if proposal.status == ProposalStatus::Executed {
             panic!("Already executed");
         }
-        
+
         if proposal.status == ProposalStatus::Canceled {
             panic!("Proposal canceled");
         }
 
         let total_votes = proposal.for_votes + proposal.against_votes + proposal.abstain_votes;
-        
+
         // Check Quorum
         if total_votes < proposal.quorum {
             proposal.status = ProposalStatus::Defeated;
@@ -276,7 +276,7 @@ impl GovernanceContract {
         proposal.status = ProposalStatus::Canceled;
         set_proposal(&env, &proposal);
     }
-    
+
     // Read-only helpers
     pub fn get_proposal_info(env: Env, proposal_id: u64) -> Proposal {
         get_proposal(&env, proposal_id).expect("Proposal not found")
@@ -285,7 +285,7 @@ impl GovernanceContract {
     pub fn get_user_voting_power(env: Env, user: Address) -> i128 {
         get_voting_power(&env, &user)
     }
-    
+
     pub fn get_user_deposited_balance(env: Env, user: Address) -> i128 {
         get_token_balance(&env, &user)
     }

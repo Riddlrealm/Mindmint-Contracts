@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Env, String, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Symbol, Vec};
 
 const MAX_ENTRIES: u32 = 100;
 
@@ -59,13 +57,13 @@ impl ImmutableLeaderboard {
         config.oracle.require_auth();
 
         let mut period = Self::must_get_period(&env, period_id);
-        
+
         if period.finalized {
             panic!("Period is finalized");
         }
 
         let now = env.ledger().timestamp();
-        
+
         // Check if player already has an entry
         let mut existing_index = None;
         for (i, entry) in period.entries.iter().enumerate() {
@@ -119,7 +117,8 @@ impl ImmutableLeaderboard {
             .entries
             .iter()
             .position(|entry| entry.player == player)
-            .unwrap() as u32 + 1;
+            .unwrap() as u32
+            + 1;
 
         env.events().publish(
             (Symbol::new(&env, "ScoreSubmitted"), period_id),
@@ -132,7 +131,7 @@ impl ImmutableLeaderboard {
         Self::assert_admin(&env, &admin);
 
         let mut period = Self::must_get_period(&env, period_id);
-        
+
         if period.finalized {
             panic!("Already finalized");
         }
@@ -184,13 +183,13 @@ impl ImmutableLeaderboard {
 
     pub fn get_player_rank(env: Env, period_id: u32, player: Address) -> Option<(u32, u64)> {
         let period = Self::must_get_period(&env, period_id);
-        
+
         for (i, entry) in period.entries.iter().enumerate() {
             if entry.player == player {
                 return Some((i as u32 + 1, entry.score));
             }
         }
-        
+
         None
     }
 

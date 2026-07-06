@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, BytesN, Env, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, Env, Symbol, Vec};
 
 const BASIS_POINTS: i128 = 10_000;
 
@@ -41,7 +39,9 @@ impl AirdropMerkleClaimContract {
         }
         admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::CampaignCounter, &0u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::CampaignCounter, &0u32);
     }
 
     /// Require authentication from the admin
@@ -116,8 +116,17 @@ impl AirdropMerkleClaimContract {
 
         // Emit CampaignCreated event
         env.events().publish(
-            (Symbol::new(&env, "airdrop"), Symbol::new(&env, "campaign_created")),
-            (campaign_id, merkle_root, token, total_allocation, deadline),
+            (
+                Symbol::new(&env, "airdrop"),
+                Symbol::new(&env, "campaign_created"),
+            ),
+            (
+                campaign_id,
+                campaign.merkle_root.clone(),
+                campaign.token.clone(),
+                total_allocation,
+                deadline,
+            ),
         );
 
         campaign_id
@@ -200,13 +209,22 @@ impl AirdropMerkleClaimContract {
 
         // Emit TokensClaimed event
         env.events().publish(
-            (Symbol::new(&env, "airdrop"), Symbol::new(&env, "tokens_claimed")),
+            (
+                Symbol::new(&env, "airdrop"),
+                Symbol::new(&env, "tokens_claimed"),
+            ),
             (campaign_id, claimer, amount),
         );
     }
 
-    /// Verify a merkle proof for eligibility
-    /// Leaf is: sha256(address || amount)
+    /// Verify a merkle proof for eligibility.
+    ///
+    /// Leaf is: `sha256(address_strkey_bytes || amount_be_bytes)`. Each proof
+    /// step concatenates the current 32-byte hash with the sibling element
+    /// and rehashes. Rewritten for Soroban SDK 21.x: `Address::to_xdr` /
+    /// `i128::to_xdr` / `Hash<32>::to_xdr` / `Hash<32> == BytesN<32>` are not
+    /// available, so we serialize by `to_string()` + `i128::to_be_bytes()`
+    /// and compare via byte arrays.
     pub fn verify_proof(
         env: Env,
         campaign_id: u32,
@@ -220,53 +238,68 @@ impl AirdropMerkleClaimContract {
             .get(&DataKey::Campaign(campaign_id))
             .expect("campaign not found");
 
-        // Construct the leaf: hash(address || amount)
-        let mut leaf_input = Vec::new(&env);
-        // Serialize address bytes (typically 32 bytes)
-        let address_bytes = address.to_xdr(&env);
-        leaf_input.push_back(address_bytes);
-        // Serialize amount as i128 (16 bytes)
-        let amount_bytes = amount.to_xdr(&env);
-        leaf_input.push_back(amount_bytes);
+        // Build the leaf input: address strkey bytes || amount big-endian bytes.
+        //
+        // Bounds-check the strkey length (Stellar G-address strkeys are 56
+        // chars / 56 bytes); panic if an unexpected address format appears
+        // rather than silently producing a wrong leaf hash.
+        let mut leaf_input: soroban_sdk::Bytes = soroban_sdk::Bytes::new(&env);
+        let addr_str = address.to_string();
+        let addr_len = addr_str.len() as usize;
+        let mut addr_buf = [0u8; 64];
+        if addr_len == 0 || addr_len > 64 {
+            panic!("address strkey length out of expected range");
+        }
+        addr_str.copy_into_slice(&mut addr_buf[..addr_len]);
+        let mut k = 0usize;
+        while k < addr_len {
+            leaf_input.push_back(addr_buf[k]);
+            k += 1;
+        }
+        let amount_be: [u8; 16] = amount.to_be_bytes();
+        let mut k = 0usize;
+        while k < amount_be.len() {
+            leaf_input.push_back(amount_be[k]);
+            k += 1;
+        }
+        let mut current_hash = env.crypto().sha256(&leaf_input);
 
-        // Hash the leaf
-        let combined = Self::combine_bytes(&env, leaf_input);
-        let mut current_hash = env.crypto().sha256(&combined);
-
-        // Verify proof by hashing up the tree
+        // Walk the proof, hashing `cur_hash || sibling` (canonical
+        // concatenated scheme, NOT byte-interleaved).
         let mut i = 0;
         while i < merkle_proof.len() {
             let proof_element = merkle_proof.get(i).unwrap();
-
-            // Combine current hash with proof element
-            let mut combined_input = Vec::new(&env);
-            combined_input.push_back(current_hash.to_xdr(&env));
-            combined_input.push_back(proof_element.to_xdr(&env));
-
-            let combined_bytes = Self::combine_bytes(&env, combined_input);
-            current_hash = env.crypto().sha256(&combined_bytes).into();
-
-            i += 1;
-        }
-
-        // Compare with merkle root
-        current_hash == campaign.merkle_root
-    }
-
-    /// Helper function to combine byte arrays
-    fn combine_bytes(env: &Env, byte_vecs: Vec<soroban_sdk::Bytes>) -> soroban_sdk::Bytes {
-        let mut result = soroban_sdk::Bytes::new(env);
-        let mut i = 0;
-        while i < byte_vecs.len() {
-            let bytes = byte_vecs.get(i).unwrap();
-            let mut j = 0;
-            while j < bytes.len() {
-                result.push_back(bytes.get(j).unwrap());
-                j += 1;
+            let mut combined_input: soroban_sdk::Bytes = soroban_sdk::Bytes::new(&env);
+            // Soroban SDK 21.x: `Hash<32>` has no `copy_into_slice`; convert
+            // to `BytesN<32>` (which does) via `From<Hash<32>>` first.
+            let cur_bytes: BytesN<32> = BytesN::<32>::from(current_hash.clone());
+            let mut cur_arr = [0u8; 32];
+            cur_bytes.copy_into_slice(&mut cur_arr);
+            let mut m = 0usize;
+            while m < 32 {
+                combined_input.push_back(cur_arr[m]);
+                m += 1;
             }
+            let mut elem_arr = [0u8; 32];
+            proof_element.copy_into_slice(&mut elem_arr);
+            m = 0usize;
+            while m < 32 {
+                combined_input.push_back(elem_arr[m]);
+                m += 1;
+            }
+            current_hash = env.crypto().sha256(&combined_input);
             i += 1;
         }
-        result
+
+        // Compare final hash with the campaign's merkle root via byte arrays
+        // (Hash<32> and BytesN<32> don't implement PartialEq in SDK 21.x;
+        // and Hash<32> has no copy_into_slice; convert via From<Hash<32>>).
+        let cur_bytes: BytesN<32> = BytesN::<32>::from(current_hash);
+        let mut cur = [0u8; 32];
+        let mut root = [0u8; 32];
+        cur_bytes.copy_into_slice(&mut cur);
+        campaign.merkle_root.copy_into_slice(&mut root);
+        cur == root
     }
 
     /// Get campaign details
@@ -315,19 +348,17 @@ impl AirdropMerkleClaimContract {
 
         // Transfer unclaimed tokens back to admin
         let token_client = token::Client::new(&env, &campaign.token);
-        token_client.transfer(
-            &env.current_contract_address(),
-            &admin,
-            &unclaimed,
-        );
+        token_client.transfer(&env.current_contract_address(), &admin, &unclaimed);
 
         // Emit UnclaimedReclaimed event
         env.events().publish(
-            (Symbol::new(&env, "airdrop"), Symbol::new(&env, "unclaimed_reclaimed")),
+            (
+                Symbol::new(&env, "airdrop"),
+                Symbol::new(&env, "unclaimed_reclaimed"),
+            ),
             (campaign_id, unclaimed),
         );
 
         unclaimed
     }
 }
-

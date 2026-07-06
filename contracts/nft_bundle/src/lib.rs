@@ -129,7 +129,9 @@ impl NftBundleContract {
             status: BundleStatus::Active,
         };
 
-        env.storage().persistent().set(&DataKey::Bundle(id), &bundle);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Bundle(id), &bundle);
 
         env.events().publish(
             (symbol_short!("BndlCrtd"), id),
@@ -191,13 +193,13 @@ impl NftBundleContract {
         // Auto-close when the last pack is sold.
         if bundle.packs_remaining == 0 {
             bundle.status = BundleStatus::Closed;
-            env.events().publish(
-                (symbol_short!("BndlClsd"), bundle_id),
-                (bundle_id,),
-            );
+            env.events()
+                .publish((symbol_short!("BndlClsd"), bundle_id), (bundle_id,));
         }
 
-        env.storage().persistent().set(&DataKey::Bundle(bundle_id), &bundle);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Bundle(bundle_id), &bundle);
 
         // Emit PackPurchased event.
         env.events().publish(
@@ -228,12 +230,12 @@ impl NftBundleContract {
         }
 
         bundle.status = BundleStatus::Cancelled;
-        env.storage().persistent().set(&DataKey::Bundle(bundle_id), &bundle);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Bundle(bundle_id), &bundle);
 
-        env.events().publish(
-            (symbol_short!("BndlClsd"), bundle_id),
-            (bundle_id,),
-        );
+        env.events()
+            .publish((symbol_short!("BndlClsd"), bundle_id), (bundle_id,));
     }
 
     // ── withdraw_unsold ──────────────────────────────────────────────────────
@@ -271,7 +273,9 @@ impl NftBundleContract {
         }
 
         bundle.nft_pool = Vec::new(&env);
-        env.storage().persistent().set(&DataKey::Bundle(bundle_id), &bundle);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Bundle(bundle_id), &bundle);
     }
 
     // ── withdraw_proceeds ────────────────────────────────────────────────────
@@ -422,7 +426,10 @@ impl NftBundleContract {
             to.clone().into_val(env),
             token_id.into_val(env),
         ];
-        env.invoke_contract::<()>(nft_contract, &soroban_sdk::Symbol::new(env, "transfer"), args);
+        env.invoke_contract::<()>(
+            nft_contract,
+            &soroban_sdk::Symbol::new(env, "transfer"),
+            args,
+        );
     }
 }
-

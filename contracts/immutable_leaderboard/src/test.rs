@@ -352,7 +352,8 @@ fn test_unauthorized_create_period() {
     let client = ImmutableLeaderboardClient::new(&env, &contract_id);
 
     client.initialize(&admin, &oracle);
-    client.create_period(&unauthorized, &1, &String::from_str(&env, "season_1_xp")); // should panic
+    client.create_period(&unauthorized, &1, &String::from_str(&env, "season_1_xp"));
+    // should panic
 }
 
 #[test]

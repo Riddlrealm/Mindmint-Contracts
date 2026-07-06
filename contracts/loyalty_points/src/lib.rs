@@ -88,11 +88,7 @@ pub struct LoyaltyPointsContract;
 #[contractimpl]
 impl LoyaltyPointsContract {
     /// Initialize the contract with an admin and an oracle address.
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-        oracle: Address,
-    ) -> Result<(), LoyaltyError> {
+    pub fn initialize(env: Env, admin: Address, oracle: Address) -> Result<(), LoyaltyError> {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(LoyaltyError::AlreadyInitialized);
         }
@@ -103,7 +99,9 @@ impl LoyaltyPointsContract {
         env.storage().instance().set(&DataKey::NextOptionId, &0u32);
 
         let empty_players: Vec<Address> = Vec::new(&env);
-        env.storage().instance().set(&DataKey::AllPlayers, &empty_players);
+        env.storage()
+            .instance()
+            .set(&DataKey::AllPlayers, &empty_players);
 
         Ok(())
     }
@@ -156,10 +154,8 @@ impl LoyaltyPointsContract {
 
         env.storage().persistent().set(&key, &balance);
 
-        env.events().publish(
-            (symbol_short!("awarded"), player.clone()),
-            (amount, reason),
-        );
+        env.events()
+            .publish((symbol_short!("awarded"), player.clone()), (amount, reason));
 
         Ok(balance.current_balance)
     }
@@ -167,11 +163,7 @@ impl LoyaltyPointsContract {
     // ───────────── PLAYER FUNCTIONS ─────────────
 
     /// Redeem points for a reward option. Caller must be the player.
-    pub fn redeem(
-        env: Env,
-        player: Address,
-        option_id: u32,
-    ) -> Result<u64, LoyaltyError> {
+    pub fn redeem(env: Env, player: Address, option_id: u32) -> Result<u64, LoyaltyError> {
         player.require_auth();
 
         let option = Self::get_option_or_err(&env, option_id)?;
@@ -215,10 +207,7 @@ impl LoyaltyPointsContract {
 
     /// Expire a player's points if inactive for more than 12 months.
     /// Callable by anyone.
-    pub fn expire_stale_points(
-        env: Env,
-        player: Address,
-    ) -> Result<u64, LoyaltyError> {
+    pub fn expire_stale_points(env: Env, player: Address) -> Result<u64, LoyaltyError> {
         let now = env.ledger().timestamp();
         let key = DataKey::PointsBalance(player.clone());
 
@@ -238,10 +227,8 @@ impl LoyaltyPointsContract {
 
         env.storage().persistent().set(&key, &balance);
 
-        env.events().publish(
-            (symbol_short!("expired"), player.clone()),
-            expired_amount,
-        );
+        env.events()
+            .publish((symbol_short!("expired"), player.clone()), expired_amount);
 
         Ok(0)
     }

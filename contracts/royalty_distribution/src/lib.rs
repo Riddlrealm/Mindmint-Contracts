@@ -97,7 +97,7 @@ pub struct Config {
     pub total_distributed: i128,
     pub distribution_count: u32,
     pub emergency_withdrawal_requested: bool,
-    pub emergency_withdrawal_requested_at: u64,
+    pub emergency_requested_at: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -152,11 +152,13 @@ impl RoyaltyDistributionContract {
             total_distributed: 0,
             distribution_count: 0,
             emergency_withdrawal_requested: false,
-            emergency_withdrawal_requested_at: 0,
+            emergency_requested_at: 0,
         };
 
         env.storage().instance().set(&DataKey::Config, &config);
-        env.storage().instance().set(&DataKey::Recipients, &Vec::<Recipient>::new(&env));
+        env.storage()
+            .instance()
+            .set(&DataKey::Recipients, &Vec::<Recipient>::new(&env));
         env.storage()
             .instance()
             .set(&DataKey::DistributionHistoryLen, &0u32);
@@ -181,7 +183,7 @@ impl RoyaltyDistributionContract {
         basis_points: u32,
     ) -> Result<(), RoyaltyError> {
         Self::require_admin(&env, &admin)?;
-        
+
         if basis_points == 0 || basis_points > BPS_DENOMINATOR {
             return Err(RoyaltyError::InvalidPercentage);
         }
@@ -197,7 +199,11 @@ impl RoyaltyDistributionContract {
         }
 
         // Check for duplicate recipient
-        if env.storage().instance().has(&DataKey::RecipientIndex(recipient_address.clone())) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::RecipientIndex(recipient_address.clone()))
+        {
             return Err(RoyaltyError::DuplicateRecipient);
         }
 
@@ -226,7 +232,7 @@ impl RoyaltyDistributionContract {
             .set(&DataKey::Recipients, &recipients);
         env.storage().instance().set(
             &DataKey::RecipientIndex(recipient_address.clone()),
-            &recipients.len() - 1,
+            &(recipients.len() - 1),
         );
         env.storage()
             .instance()
@@ -235,8 +241,10 @@ impl RoyaltyDistributionContract {
             .instance()
             .set(&DataKey::TotalWithdrawn(recipient_address.clone()), &0i128);
 
-        env.events()
-            .publish((symbol_short!("rd_add"),), (recipient_address, basis_points));
+        env.events().publish(
+            (symbol_short!("rd_add"),),
+            (recipient_address, basis_points),
+        );
         Ok(())
     }
 
@@ -255,11 +263,8 @@ impl RoyaltyDistributionContract {
 
         let index = index_opt.ok_or(RoyaltyError::RecipientNotFound)?;
 
-        let mut recipients: Vec<Recipient> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Recipients)
-            .unwrap();
+        let mut recipients: Vec<Recipient> =
+            env.storage().instance().get(&DataKey::Recipients).unwrap();
 
         // Check if recipient has pending balance
         let pending: i128 = env
@@ -322,11 +327,8 @@ impl RoyaltyDistributionContract {
 
         let index = index_opt.ok_or(RoyaltyError::RecipientNotFound)?;
 
-        let mut recipients: Vec<Recipient> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Recipients)
-            .unwrap();
+        let mut recipients: Vec<Recipient> =
+            env.storage().instance().get(&DataKey::Recipients).unwrap();
 
         let old_bps = recipients.get(index).unwrap().basis_points;
 
@@ -363,21 +365,14 @@ impl RoyaltyDistributionContract {
     // =======================================================================
 
     /// Distribute royalties among recipients proportionally
-    pub fn distribute(
-        env: Env,
-        from: Address,
-        amount: i128,
-    ) -> Result<(), RoyaltyError> {
+    pub fn distribute(env: Env, from: Address, amount: i128) -> Result<(), RoyaltyError> {
         if amount <= 0 {
             return Err(RoyaltyError::ZeroAmount);
         }
         from.require_auth();
 
-        let recipients: Vec<Recipient> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Recipients)
-            .unwrap();
+        let recipients: Vec<Recipient> =
+            env.storage().instance().get(&DataKey::Recipients).unwrap();
 
         if recipients.is_empty() {
             return Err(RoyaltyError::NoRecipients);
@@ -411,7 +406,7 @@ impl RoyaltyDistributionContract {
         let mut i = 0;
         while i < recipients.len() {
             let recipient = recipients.get(i).unwrap();
-            
+
             // Calculate share with rounding
             let share = if i == recipients.len() - 1 {
                 // Last recipient gets remainder to ensure no dust is lost
@@ -429,9 +424,10 @@ impl RoyaltyDistributionContract {
                     .get(&DataKey::PendingBalance(recipient.address.clone()))
                     .unwrap_or(0);
                 pending += share;
-                env.storage()
-                    .instance()
-                    .set(&DataKey::PendingBalance(recipient.address.clone()), &pending);
+                env.storage().instance().set(
+                    &DataKey::PendingBalance(recipient.address.clone()),
+                    &pending,
+                );
             }
 
             distributed += share;
@@ -478,11 +474,7 @@ impl RoyaltyDistributionContract {
     }
 
     /// Withdraw a specific amount
-    pub fn withdraw_amount(
-        env: Env,
-        recipient: Address,
-        amount: i128,
-    ) -> Result<(), RoyaltyError> {
+    pub fn withdraw_amount(env: Env, recipient: Address, amount: i128) -> Result<(), RoyaltyError> {
         if amount <= 0 {
             return Err(RoyaltyError::ZeroAmount);
         }
@@ -505,7 +497,11 @@ impl RoyaltyDistributionContract {
         Ok(())
     }
 
-    fn withdraw_to_recipient(env: &Env, recipient: &Address, amount: i128) -> Result<(), RoyaltyError> {
+    fn withdraw_to_recipient(
+        env: &Env,
+        recipient: &Address,
+        amount: i128,
+    ) -> Result<(), RoyaltyError> {
         let config: Config = env
             .storage()
             .instance()
@@ -537,9 +533,10 @@ impl RoyaltyDistributionContract {
             .get(&DataKey::TotalWithdrawn(recipient.clone()))
             .unwrap_or(0);
         total_withdrawn += amount;
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalWithdrawn(recipient.clone()), &total_withdrawn);
+        env.storage().instance().set(
+            &DataKey::TotalWithdrawn(recipient.clone()),
+            &total_withdrawn,
+        );
 
         // Record withdrawal history
         Self::record_withdrawal(env, amount, recipient.clone());
@@ -566,12 +563,11 @@ impl RoyaltyDistributionContract {
         }
 
         config.emergency_withdrawal_requested = true;
-        config.emergency_withdrawal_requested_at = env.ledger().timestamp();
+        config.emergency_requested_at = env.ledger().timestamp();
 
         env.storage().instance().set(&DataKey::Config, &config);
 
-        env.events()
-            .publish((symbol_short!("rd_ew_req"),), admin);
+        env.events().publish((symbol_short!("rd_ew_req"),), admin);
         Ok(())
     }
 
@@ -594,7 +590,7 @@ impl RoyaltyDistributionContract {
         }
 
         let now = env.ledger().timestamp();
-        if now < config.emergency_withdrawal_requested_at + EMERGENCY_TIMELOCK {
+        if now < config.emergency_requested_at + EMERGENCY_TIMELOCK {
             return Err(RoyaltyError::EmergencyNotActive);
         }
 
@@ -610,7 +606,7 @@ impl RoyaltyDistributionContract {
 
         // Reset emergency state
         config.emergency_withdrawal_requested = false;
-        config.emergency_withdrawal_requested_at = 0;
+        config.emergency_requested_at = 0;
         env.storage().instance().set(&DataKey::Config, &config);
 
         env.events()
@@ -629,12 +625,11 @@ impl RoyaltyDistributionContract {
             .expect("config not set");
 
         config.emergency_withdrawal_requested = false;
-        config.emergency_withdrawal_requested_at = 0;
+        config.emergency_requested_at = 0;
 
         env.storage().instance().set(&DataKey::Config, &config);
 
-        env.events()
-            .publish((symbol_short!("rd_ew_can"),), admin);
+        env.events().publish((symbol_short!("rd_ew_can"),), admin);
         Ok(())
     }
 
@@ -684,7 +679,7 @@ impl RoyaltyDistributionContract {
 
         let mut result = Vec::new(&env);
         let mut i = offset;
-        let end = std::cmp::min(offset + limit, history_len);
+        let end = core::cmp::min(offset + limit, history_len);
 
         while i < end {
             if let Some(entry) = env
@@ -710,14 +705,10 @@ impl RoyaltyDistributionContract {
 
         let mut result = Vec::new(&env);
         let mut i = offset;
-        let end = std::cmp::min(offset + limit, history_len);
+        let end = core::cmp::min(offset + limit, history_len);
 
         while i < end {
-            if let Some(record) = env
-                .storage()
-                .instance()
-                .get(&DataKey::WithdrawalHistory(i))
-            {
+            if let Some(record) = env.storage().instance().get(&DataKey::WithdrawalHistory(i)) {
                 result.push_back(record);
             }
             i += 1;
@@ -746,11 +737,11 @@ impl RoyaltyDistributionContract {
             .instance()
             .get(&DataKey::Config)
             .ok_or(RoyaltyError::NotInitialized)?;
-        
+
         if config.admin != *admin {
             return Err(RoyaltyError::NotAuthorized);
         }
-        
+
         admin.require_auth();
         Ok(())
     }
@@ -828,4 +819,3 @@ impl RoyaltyDistributionContract {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-

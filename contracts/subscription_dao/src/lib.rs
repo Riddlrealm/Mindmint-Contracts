@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, token, Address, Env, Vec, Symbol};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, token, Address, Env, Symbol, Vec,
+};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -58,8 +60,12 @@ impl SubscriptionDao {
         }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::GovernanceToken, &governance_token);
-        env.storage().instance().set(&DataKey::CurrentPeriodId, &1u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::GovernanceToken, &governance_token);
+        env.storage()
+            .instance()
+            .set(&DataKey::CurrentPeriodId, &1u64);
         env.storage().instance().set(&DataKey::Initialized, &true);
 
         // Initialize first period
@@ -70,7 +76,9 @@ impl SubscriptionDao {
             distributed: false,
             snapshot_at: 0,
         };
-        env.storage().persistent().set(&DataKey::RevenuePool(1), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RevenuePool(1), &pool);
     }
 
     /// Deposit revenue to current period (callable by platform fee oracle)
@@ -82,47 +90,70 @@ impl SubscriptionDao {
             panic!("Invalid amount");
         }
 
-        let current_period_id = env.storage().instance().get::<_, u64>(&DataKey::CurrentPeriodId).unwrap();
-        let mut pool = env.storage().persistent().get::<_, RevenuePool>(&DataKey::RevenuePool(current_period_id)).unwrap();
+        let current_period_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::CurrentPeriodId)
+            .unwrap();
+        let mut pool = env
+            .storage()
+            .persistent()
+            .get::<_, RevenuePool>(&DataKey::RevenuePool(current_period_id))
+            .unwrap();
 
         if pool.distributed {
             panic!("Period already distributed");
         }
 
         pool.balance += amount;
-        env.storage().persistent().set(&DataKey::RevenuePool(current_period_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RevenuePool(current_period_id), &pool);
 
-        env.events().publish(
-            (Symbol::short("rev_dep"), current_period_id),
-            amount,
-        );
+        env.events()
+            .publish((Symbol::short("rev_dep"), current_period_id), amount);
     }
 
     /// Record player participation for current period (oracle function)
     pub fn record_participation(env: Env, player: Address) {
         Self::require_init(&env);
 
-        let current_period_id = env.storage().instance().get::<_, u64>(&DataKey::CurrentPeriodId).unwrap();
-        let mut pool = env.storage().persistent().get::<_, RevenuePool>(&DataKey::RevenuePool(current_period_id)).unwrap();
+        let current_period_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::CurrentPeriodId)
+            .unwrap();
+        let mut pool = env
+            .storage()
+            .persistent()
+            .get::<_, RevenuePool>(&DataKey::RevenuePool(current_period_id))
+            .unwrap();
 
         if pool.distributed {
             panic!("Period already distributed");
         }
 
         // Check if already recorded
-        if env.storage().persistent().has(&DataKey::Participation(current_period_id, player.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::Participation(current_period_id, player.clone()))
+        {
             return;
         }
 
         // Record participation
-        env.storage().persistent().set(&DataKey::Participation(current_period_id, player.clone()), &true);
-        pool.eligible_participants.push_back(player.clone());
-        env.storage().persistent().set(&DataKey::RevenuePool(current_period_id), &pool);
-
-        env.events().publish(
-            (Symbol::short("part_rec"), current_period_id),
-            player,
+        env.storage().persistent().set(
+            &DataKey::Participation(current_period_id, player.clone()),
+            &true,
         );
+        pool.eligible_participants.push_back(player.clone());
+        env.storage()
+            .persistent()
+            .set(&DataKey::RevenuePool(current_period_id), &pool);
+
+        env.events()
+            .publish((Symbol::short("part_rec"), current_period_id), player);
     }
 
     /// Close current period and take snapshot (admin only)
@@ -130,8 +161,16 @@ impl SubscriptionDao {
         admin.require_auth();
         Self::require_admin(&env);
 
-        let current_period_id = env.storage().instance().get::<_, u64>(&DataKey::CurrentPeriodId).unwrap();
-        let mut pool = env.storage().persistent().get::<_, RevenuePool>(&DataKey::RevenuePool(current_period_id)).unwrap();
+        let current_period_id = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::CurrentPeriodId)
+            .unwrap();
+        let mut pool = env
+            .storage()
+            .persistent()
+            .get::<_, RevenuePool>(&DataKey::RevenuePool(current_period_id))
+            .unwrap();
 
         if pool.distributed {
             panic!("Period already distributed");
@@ -140,7 +179,9 @@ impl SubscriptionDao {
         // Take snapshot
         pool.snapshot_at = env.ledger().timestamp();
         pool.distributed = true;
-        env.storage().persistent().set(&DataKey::RevenuePool(current_period_id), &pool);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RevenuePool(current_period_id), &pool);
 
         // Create next period
         let next_period_id = current_period_id + 1;
@@ -151,8 +192,12 @@ impl SubscriptionDao {
             distributed: false,
             snapshot_at: 0,
         };
-        env.storage().persistent().set(&DataKey::RevenuePool(next_period_id), &next_pool);
-        env.storage().instance().set(&DataKey::CurrentPeriodId, &next_period_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RevenuePool(next_period_id), &next_pool);
+        env.storage()
+            .instance()
+            .set(&DataKey::CurrentPeriodId, &next_period_id);
 
         env.events().publish(
             (Symbol::short("per_cls"), current_period_id),
@@ -166,7 +211,10 @@ impl SubscriptionDao {
         player.require_auth();
         Self::require_init(&env);
 
-        let pool = env.storage().persistent().get::<_, RevenuePool>(&DataKey::RevenuePool(period_id))
+        let pool = env
+            .storage()
+            .persistent()
+            .get::<_, RevenuePool>(&DataKey::RevenuePool(period_id))
             .expect("Period not found");
 
         if !pool.distributed {
@@ -174,17 +222,28 @@ impl SubscriptionDao {
         }
 
         // Check if already claimed
-        if env.storage().persistent().has(&DataKey::Claim(period_id, player.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::Claim(period_id, player.clone()))
+        {
             panic!("Already claimed");
         }
 
         // Check eligibility: must have participated AND hold governance tokens at snapshot
-        let participated = env.storage().persistent().has(&DataKey::Participation(period_id, player.clone()));
+        let participated = env
+            .storage()
+            .persistent()
+            .has(&DataKey::Participation(period_id, player.clone()));
         if !participated {
             panic!("Not eligible: did not participate");
         }
 
-        let token_address = env.storage().instance().get::<_, Address>(&DataKey::GovernanceToken).unwrap();
+        let token_address = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::GovernanceToken)
+            .unwrap();
         let token_client = token::Client::new(&env, &token_address);
         let balance = token_client.balance(&player);
 
@@ -201,29 +260,40 @@ impl SubscriptionDao {
         let share = pool.balance / participant_count as i128;
 
         // Mark as claimed
-        env.storage().persistent().set(&DataKey::Claim(period_id, player.clone()), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(period_id, player.clone()), &true);
 
-        env.events().publish(
-            (Symbol::short("shr_claim"), period_id, player),
-            share,
-        );
+        env.events()
+            .publish((Symbol::short("shr_claim"), period_id, player), share);
 
         share
     }
 
     /// Get period information
     pub fn get_period(env: Env, period_id: u64) -> RevenuePool {
-        env.storage().persistent().get::<_, RevenuePool>(&DataKey::RevenuePool(period_id))
+        env.storage()
+            .persistent()
+            .get::<_, RevenuePool>(&DataKey::RevenuePool(period_id))
             .expect("Period not found")
     }
 
     /// Get player eligibility for a period
     pub fn get_player_eligibility(env: Env, period_id: u64, player: Address) -> EligibilityInfo {
-        let pool = env.storage().persistent().get::<_, RevenuePool>(&DataKey::RevenuePool(period_id))
+        let pool = env
+            .storage()
+            .persistent()
+            .get::<_, RevenuePool>(&DataKey::RevenuePool(period_id))
             .expect("Period not found");
 
-        let participated = env.storage().persistent().has(&DataKey::Participation(period_id, player.clone()));
-        let already_claimed = env.storage().persistent().has(&DataKey::Claim(period_id, player.clone()));
+        let participated = env
+            .storage()
+            .persistent()
+            .has(&DataKey::Participation(period_id, player.clone()));
+        let already_claimed = env
+            .storage()
+            .persistent()
+            .has(&DataKey::Claim(period_id, player.clone()));
 
         if !participated || already_claimed || !pool.distributed {
             return EligibilityInfo {
@@ -232,7 +302,11 @@ impl SubscriptionDao {
             };
         }
 
-        let token_address = env.storage().instance().get::<_, Address>(&DataKey::GovernanceToken).unwrap();
+        let token_address = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::GovernanceToken)
+            .unwrap();
         let token_client = token::Client::new(&env, &token_address);
         let balance = token_client.balance(&player);
 
@@ -265,8 +339,11 @@ impl SubscriptionDao {
     }
 
     fn require_admin(env: &Env) {
-        let admin = env.storage().instance().get::<_, Address>(&DataKey::Admin).unwrap();
+        let admin = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::Admin)
+            .unwrap();
         admin.require_auth();
     }
 }
-

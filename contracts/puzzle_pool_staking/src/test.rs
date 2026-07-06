@@ -14,7 +14,9 @@ fn create_token_contract<'a>(env: &Env, admin: &Address) -> (Address, TokenClien
     (address.clone(), TokenClient::new(env, &address))
 }
 
-fn setup_contract(env: &Env) -> (
+fn setup_contract(
+    env: &Env,
+) -> (
     PuzzlePoolStakingClient,
     Address,
     Address,
@@ -241,7 +243,8 @@ fn test_close_epoch() {
     env.mock_all_auths();
     env.ledger().set_timestamp(0);
 
-    let (client, admin, _, _, _, reward_token_client, _, reward_admin_client) = setup_contract(&env);
+    let (client, admin, _, _, _, reward_token_client, _, reward_admin_client) =
+        setup_contract(&env);
 
     // Fast forward past epoch end (7 days + 1 second)
     env.ledger().set_timestamp(7 * 24 * 60 * 60 + 1);
@@ -313,8 +316,16 @@ fn test_claim_staker_reward() {
     env.mock_all_auths();
     env.ledger().set_timestamp(0);
 
-    let (client, admin, staker, _, _, reward_token_client, staking_admin_client, reward_admin_client) =
-        setup_contract(&env);
+    let (
+        client,
+        admin,
+        staker,
+        _,
+        _,
+        reward_token_client,
+        staking_admin_client,
+        reward_admin_client,
+    ) = setup_contract(&env);
 
     // Stake tokens
     staking_admin_client.mint(&staker, &10_000_000_000);
@@ -340,8 +351,16 @@ fn test_claim_combined_reward() {
     env.mock_all_auths();
     env.ledger().set_timestamp(0);
 
-    let (client, admin, staker, oracle, _, reward_token_client, staking_admin_client, reward_admin_client) =
-        setup_contract(&env);
+    let (
+        client,
+        admin,
+        staker,
+        oracle,
+        _,
+        reward_token_client,
+        staking_admin_client,
+        reward_admin_client,
+    ) = setup_contract(&env);
 
     // Stake tokens
     staking_admin_client.mint(&staker, &10_000_000_000);
@@ -368,8 +387,7 @@ fn test_claim_idempotent() {
     env.mock_all_auths();
     env.ledger().set_timestamp(0);
 
-    let (client, admin, _, oracle, _, _, _, reward_admin_client) =
-        setup_contract(&env);
+    let (client, admin, _, oracle, _, _, _, reward_admin_client) = setup_contract(&env);
 
     let player = Address::generate(&env);
 
@@ -395,8 +413,7 @@ fn test_proportional_reward_distribution() {
     env.mock_all_auths();
     env.ledger().set_timestamp(0);
 
-    let (client, admin, _, oracle, _, _, _, reward_admin_client) =
-        setup_contract(&env);
+    let (client, admin, _, oracle, _, _, _, reward_admin_client) = setup_contract(&env);
 
     let player1 = Address::generate(&env);
     let player2 = Address::generate(&env);
@@ -608,7 +625,8 @@ fn test_full_lifecycle() {
     assert_eq!(claimed, 1_000_000_000_000);
 
     // 5. Unstake after lock period
-    env.ledger().set_timestamp(7 * 24 * 60 * 60 + 1 + 7 * 24 * 60 * 60 + 1);
+    env.ledger()
+        .set_timestamp(7 * 24 * 60 * 60 + 1 + 7 * 24 * 60 * 60 + 1);
     client.unstake(&staker, &50_000_000_000);
 
     // Verify balances

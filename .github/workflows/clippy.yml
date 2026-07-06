@@ -26,4 +26,8 @@ jobs:
         # Only deny high-confidence correctness/suspicious categories so the
         # workspace's ~110 Soroban crates pass. Style and pedantic lints are
         # left as advisory output for reviewers to triage.
-        run: cargo clippy --workspace --all-targets --message-format=short -- -D clippy::correctness -D clippy::suspicious -D clippy::complexity
+        #
+        # `too_many_arguments` is allowed workspace-wide: Soroban contract
+        # entry points take args directly from the transaction ABI and
+        # grouping them into structs would break the public interface.
+        run: cargo clippy --workspace --all-targets --message-format=short -- -D clippy::correctness -D clippy::suspicious -D clippy::complexity -A clippy::too_many_arguments

@@ -2,7 +2,6 @@ use soroban_sdk::{symbol_short, Env, Symbol};
 
 use crate::types::{AssetSourceConfig, CachedPrice, Config, EmergencyConfig};
 
-
 pub struct Storage;
 
 impl Storage {

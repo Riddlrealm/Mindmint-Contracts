@@ -273,8 +273,10 @@ impl TimeAttack {
                 .set(&last_reset_key, &current_timestamp);
             Self::bump_persistent_ttl(env, &last_reset_key);
 
-            env.events()
-                .publish((symbol_short!("LB_RESET"), scope, period), current_timestamp);
+            env.events().publish(
+                (symbol_short!("LB_RESET"), scope, period),
+                current_timestamp,
+            );
         }
     }
 

@@ -57,7 +57,9 @@ fn test_submit_score() {
     client.submit_score(&admin, &player, &5000);
 
     // Verify player's score
-    let score = client.get_player_score(&player, &TimePeriod::AllTime).unwrap();
+    let score = client
+        .get_player_score(&player, &TimePeriod::AllTime)
+        .unwrap();
     assert_eq!(score.score, 5000);
     assert_eq!(score.player, player);
     assert_eq!(score.timestamp, 1000);
@@ -85,7 +87,9 @@ fn test_cumulative_score() {
     client.submit_score(&admin, &player, &1500);
 
     // Verify cumulative score within same period
-    let score = client.get_player_score(&player, &TimePeriod::AllTime).unwrap();
+    let score = client
+        .get_player_score(&player, &TimePeriod::AllTime)
+        .unwrap();
     assert_eq!(score.score, 4500);
 
     // Verify all-time total
@@ -201,7 +205,7 @@ fn test_daily_period() {
 
     // Move to Day 2 (timestamp 86400)
     env.ledger().set_timestamp(86_400);
-    
+
     // Daily score should be None for new period
     let daily_score = client.get_player_score(&player, &TimePeriod::Daily);
     assert!(daily_score.is_none());
@@ -234,7 +238,7 @@ fn test_weekly_period() {
 
     // Move to Week 2 (timestamp 604800)
     env.ledger().set_timestamp(604_800);
-    
+
     // Weekly score should be None for new period
     let weekly_score = client.get_player_score(&player, &TimePeriod::Weekly);
     assert!(weekly_score.is_none());
@@ -331,7 +335,9 @@ fn test_update_score_admin() {
     // Admin updates score directly (replace, not add)
     client.update_score(&admin, &player, &7000, &TimePeriod::AllTime);
 
-    let score = client.get_player_score(&player, &TimePeriod::AllTime).unwrap();
+    let score = client
+        .get_player_score(&player, &TimePeriod::AllTime)
+        .unwrap();
     assert_eq!(score.score, 7000);
 }
 
@@ -384,7 +390,7 @@ fn test_update_period_lengths() {
     client.update_period_lengths(&admin, &43_200, &302_400);
 
     let config = client.get_config();
-    assert_eq!(config.daily_period_length, 43_200);   // 12 hours
+    assert_eq!(config.daily_period_length, 43_200); // 12 hours
     assert_eq!(config.weekly_period_length, 302_400); // 3.5 days
 }
 
@@ -508,7 +514,7 @@ fn test_multiple_periods_independent() {
 
     // Daily rankings should reset
     assert_eq!(client.get_player_rank(&player2, &TimePeriod::Daily), 0);
-    
+
     // Weekly and All-time should remain
     assert_eq!(client.get_player_rank(&player2, &TimePeriod::Weekly), 1);
     assert_eq!(client.get_player_rank(&player2, &TimePeriod::AllTime), 1);

@@ -1,8 +1,6 @@
 #![cfg(test)]
 
-use crate::{
-    ListingStatus, PuzzleRentalContract, PuzzleRentalContractClient, RentalStatus,
-};
+use crate::{ListingStatus, PuzzleRentalContract, PuzzleRentalContractClient, RentalStatus};
 use soroban_sdk::{
     testutils::{Address as _, Ledger, LedgerInfo},
     token::{Client as TokenClient, StellarAssetClient},
@@ -100,12 +98,26 @@ fn test_create_listing_returns_sequential_ids() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let id1 = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
     let id2 = client.create_listing(
-        &t.owner, &t.nft_contract, &2u64, &t.token_id,
-        &200i128, &7200u64, &5u32, &false, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &2u64,
+        &t.token_id,
+        &200i128,
+        &7200u64,
+        &5u32,
+        &false,
+        &0u32,
     );
 
     assert_eq!(id1, 1u64);
@@ -149,8 +161,15 @@ fn test_create_listing_zero_price_panics() {
     let t = setup();
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
     client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &0i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &0i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 }
 
@@ -160,8 +179,15 @@ fn test_create_listing_negative_price_panics() {
     let t = setup();
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
     client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &-1i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &-1i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 }
 
@@ -171,8 +197,15 @@ fn test_create_listing_zero_duration_panics() {
     let t = setup();
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
     client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &0u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &0u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 }
 
@@ -182,8 +215,15 @@ fn test_create_listing_zero_max_periods_panics() {
     let t = setup();
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
     client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &0u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &0u32,
+        &true,
+        &50u32,
     );
 }
 
@@ -193,8 +233,15 @@ fn test_create_listing_refund_pct_over_100_panics() {
     let t = setup();
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
     client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &101u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &101u32,
     );
 }
 
@@ -208,8 +255,15 @@ fn test_cancel_listing_sets_cancelled_status() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 
     client.cancel_listing(&t.owner, &listing_id);
@@ -224,8 +278,15 @@ fn test_cancel_listing_removes_from_marketplace() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 
     client.cancel_listing(&t.owner, &listing_id);
@@ -241,8 +302,15 @@ fn test_cancel_listing_wrong_caller_panics() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 
     client.cancel_listing(&t.renter, &listing_id);
@@ -268,8 +336,15 @@ fn test_rent_basic_creates_agreement() {
     set_timestamp(&t.env, 1000);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 
     let rental_id = client.rent(&t.renter, &listing_id, &2u32);
@@ -295,8 +370,15 @@ fn test_rent_escrows_tokens_in_contract() {
     let before_renter = token_client.balance(&t.renter);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &250i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &250i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
 
     client.rent(&t.renter, &listing_id, &3u32);
@@ -314,8 +396,15 @@ fn test_rent_cancelled_listing_panics() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
     client.cancel_listing(&t.owner, &listing_id);
     client.rent(&t.renter, &listing_id, &1u32);
@@ -328,8 +417,15 @@ fn test_rent_exceeds_max_periods_panics() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &3u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &3u32,
+        &true,
+        &50u32,
     );
     client.rent(&t.renter, &listing_id, &5u32);
 }
@@ -341,8 +437,15 @@ fn test_rent_zero_periods_panics() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
     client.rent(&t.renter, &listing_id, &0u32);
 }
@@ -356,8 +459,15 @@ fn test_owner_cannot_rent_own_listing() {
     token_sac.mint(&t.owner, &10_000);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
     client.rent(&t.owner, &listing_id, &1u32);
 }
@@ -382,8 +492,15 @@ fn test_has_access_during_active_rental() {
     set_timestamp(&t.env, 1000);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &42u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &42u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
     client.rent(&t.renter, &listing_id, &1u32);
 
@@ -405,8 +522,15 @@ fn test_no_access_after_expiry() {
 
     set_timestamp(&t.env, 1000);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &42u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &42u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     client.rent(&t.renter, &listing_id, &1u32);
     // end_time = 1000 + 3600 = 4600
@@ -422,8 +546,15 @@ fn test_no_access_for_wrong_nft_token() {
 
     set_timestamp(&t.env, 1000);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     client.rent(&t.renter, &listing_id, &1u32);
 
@@ -440,8 +571,15 @@ fn test_no_access_for_different_nft_contract() {
 
     set_timestamp(&t.env, 1000);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     client.rent(&t.renter, &listing_id, &1u32);
 
@@ -462,8 +600,15 @@ fn test_extend_rental_updates_end_time_and_cost() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &50u32,
     );
 
     let rental_id = client.rent(&t.renter, &listing_id, &2u32);
@@ -488,8 +633,15 @@ fn test_extend_rental_escrows_additional_tokens() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -500,7 +652,10 @@ fn test_extend_rental_escrows_additional_tokens() {
 
     // Additional 200 tokens escrowed; owner still receives nothing until expiry
     assert_eq!(token_client.balance(&t.renter), renter_after_rent - 200);
-    assert_eq!(token_client.balance(&t.contract_id), contract_after_rent + 200);
+    assert_eq!(
+        token_client.balance(&t.contract_id),
+        contract_after_rent + 200
+    );
     assert_eq!(token_client.balance(&t.owner), 0);
 }
 
@@ -512,8 +667,15 @@ fn test_extend_rental_not_allowed_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &false, &50u32, // no extensions
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &false,
+        &50u32, // no extensions
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
     client.extend_rental(&t.renter, &rental_id, &1u32);
@@ -529,8 +691,15 @@ fn test_extend_beyond_max_periods_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &3u32, &true, &50u32, // max = 3
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &3u32,
+        &true,
+        &50u32, // max = 3
     );
     let rental_id = client.rent(&t.renter, &listing_id, &2u32);
     // Already at 2; extending by 2 would give 4 which exceeds max of 3
@@ -545,8 +714,15 @@ fn test_extend_rental_wrong_caller_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
     client.extend_rental(&t.owner, &rental_id, &1u32);
@@ -560,8 +736,15 @@ fn test_extend_rental_zero_periods_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
     client.extend_rental(&t.renter, &rental_id, &0u32);
@@ -578,8 +761,15 @@ fn test_expire_rental_sets_expired_status() {
 
     set_timestamp(&t.env, 1000);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
     // end_time = 4600
@@ -598,8 +788,15 @@ fn test_expire_rental_writes_history() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &200i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &200i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -620,8 +817,15 @@ fn test_expire_rental_too_early_panics() {
 
     set_timestamp(&t.env, 1000);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -637,8 +841,15 @@ fn test_expire_already_expired_rental_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -659,8 +870,14 @@ fn test_terminate_rental_with_full_refund() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &1000i128, &10_000u64, &10u32, &true,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &1000i128,
+        &10_000u64,
+        &10u32,
+        &true,
         &100u32, // 100% refund
     );
 
@@ -685,8 +902,14 @@ fn test_terminate_rental_with_partial_refund() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &1000i128, &10_000u64, &10u32, &true,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &1000i128,
+        &10_000u64,
+        &10u32,
+        &true,
         &50u32, // 50% refund
     );
 
@@ -711,8 +934,14 @@ fn test_terminate_rental_with_no_refund() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &1000i128, &10_000u64, &10u32, &true,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &1000i128,
+        &10_000u64,
+        &10u32,
+        &true,
         &0u32, // 0% refund
     );
 
@@ -735,8 +964,15 @@ fn test_terminate_rental_sets_terminated_status() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -754,8 +990,15 @@ fn test_terminate_rental_writes_history() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &500i128, &10_000u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &500i128,
+        &10_000u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -776,8 +1019,15 @@ fn test_terminate_rental_wrong_caller_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
     client.terminate_rental(&t.owner, &rental_id);
@@ -791,8 +1041,15 @@ fn test_terminate_already_terminated_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -812,8 +1069,15 @@ fn test_marketplace_pagination_first_page() {
 
     for i in 0..5u64 {
         client.create_listing(
-            &t.owner, &t.nft_contract, &i, &t.token_id,
-            &100i128, &3600u64, &10u32, &true, &50u32,
+            &t.owner,
+            &t.nft_contract,
+            &i,
+            &t.token_id,
+            &100i128,
+            &3600u64,
+            &10u32,
+            &true,
+            &50u32,
         );
     }
 
@@ -829,8 +1093,15 @@ fn test_marketplace_pagination_second_page() {
 
     for i in 0..5u64 {
         client.create_listing(
-            &t.owner, &t.nft_contract, &i, &t.token_id,
-            &100i128, &3600u64, &10u32, &true, &50u32,
+            &t.owner,
+            &t.nft_contract,
+            &i,
+            &t.token_id,
+            &100i128,
+            &3600u64,
+            &10u32,
+            &true,
+            &50u32,
         );
     }
 
@@ -855,12 +1126,26 @@ fn test_marketplace_excludes_cancelled_listings() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let id1 = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     client.create_listing(
-        &t.owner, &t.nft_contract, &2u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &2u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
 
     client.cancel_listing(&t.owner, &id1);
@@ -881,8 +1166,15 @@ fn test_rental_history_stored_after_expiry() {
 
     set_timestamp(&t.env, 1000);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &200i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &200i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &2u32);
 
@@ -908,8 +1200,15 @@ fn test_get_rental_history_before_close_panics() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let rental_id = client.rent(&t.renter, &listing_id, &1u32);
 
@@ -927,12 +1226,26 @@ fn test_get_owner_listings_returns_all() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let id1 = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let id2 = client.create_listing(
-        &t.owner, &t.nft_contract, &2u64, &t.token_id,
-        &200i128, &7200u64, &5u32, &false, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &2u64,
+        &t.token_id,
+        &200i128,
+        &7200u64,
+        &5u32,
+        &false,
+        &0u32,
     );
 
     let listings = client.get_owner_listings(&t.owner);
@@ -957,8 +1270,15 @@ fn test_get_renter_rentals_returns_all() {
     let client = PuzzleRentalContractClient::new(&t.env, &t.contract_id);
 
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
 
     let r1 = client.rent(&t.renter, &listing_id, &1u32);
@@ -1001,8 +1321,15 @@ fn test_full_happy_path_lifecycle() {
     // 1. Owner creates listing
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &99u64, &t.token_id,
-        &1000i128, &10_000u64, &5u32, &true, &50u32,
+        &t.owner,
+        &t.nft_contract,
+        &99u64,
+        &t.token_id,
+        &1000i128,
+        &10_000u64,
+        &5u32,
+        &true,
+        &50u32,
     );
 
     // 2. Marketplace shows the listing
@@ -1073,8 +1400,14 @@ fn test_full_early_termination_lifecycle() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &1000i128, &10_000u64, &5u32, &true,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &1000i128,
+        &10_000u64,
+        &5u32,
+        &true,
         &100u32, // 100% refund of unused time
     );
 
@@ -1115,8 +1448,15 @@ fn test_multiple_renters_independent_access_windows() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &7u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &7u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
 
     // renter1 rents 1 period (ends at 3600), renter2 rents 2 periods (ends at 7200)
@@ -1152,12 +1492,26 @@ fn test_owner_with_multiple_listings_and_renters() {
     set_timestamp(&t.env, 0);
 
     let listing1 = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
     let listing2 = client.create_listing(
-        &t.owner, &t.nft_contract, &2u64, &t.token_id,
-        &200i128, &7200u64, &5u32, &false, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &2u64,
+        &t.token_id,
+        &200i128,
+        &7200u64,
+        &5u32,
+        &false,
+        &0u32,
     );
 
     let r1 = client.rent(&t.renter, &listing1, &1u32);
@@ -1200,8 +1554,15 @@ fn test_renter_sequential_rentals_on_same_listing() {
 
     set_timestamp(&t.env, 0);
     let listing_id = client.create_listing(
-        &t.owner, &t.nft_contract, &1u64, &t.token_id,
-        &100i128, &3600u64, &10u32, &true, &0u32,
+        &t.owner,
+        &t.nft_contract,
+        &1u64,
+        &t.token_id,
+        &100i128,
+        &3600u64,
+        &10u32,
+        &true,
+        &0u32,
     );
 
     // First rental

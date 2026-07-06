@@ -25,12 +25,12 @@ pub struct Set {
 #[contracttype]
 pub enum DataKey {
     NextSetId,
-    Set(u32),                // Set
-    AchToSet(u32),           // u32 set_id
+    Set(u32),                     // Set
+    AchToSet(u32),                // u32 set_id
     PlayerProgress(Address, u32), // Vec<u32> collected achievement IDs in set
-    AchCount(u32),           // u32 global claim count for limited edition
-    Bonus(Address),          // i128 internal bonus ledger per player
-    Completed(Address, u32), // bool marker to avoid double bonus
+    AchCount(u32),                // u32 global claim count for limited edition
+    Bonus(Address),               // i128 internal bonus ledger per player
+    Completed(Address, u32),      // bool marker to avoid double bonus
 }
 
 #[contract]
@@ -98,7 +98,11 @@ impl AchievementCollection {
         if set.achievements.contains(&achievement_id) {
             return;
         }
-        if env.storage().instance().has(&DataKey::AchToSet(achievement_id)) {
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::AchToSet(achievement_id))
+        {
             panic!("achievement already mapped");
         }
         set.achievements.push_back(achievement_id);
@@ -267,4 +271,3 @@ impl AchievementCollection {
             .unwrap_or(0)
     }
 }
-

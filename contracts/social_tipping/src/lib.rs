@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, token, Address, Env, Vec,
-    String,
+    Address, Env, String, Vec, contract, contracterror, contractimpl, contracttype, token,
 };
 
 // ──────────────────────────────────────────────────────────
@@ -67,14 +66,14 @@ pub struct TippingConfig {
 
 #[contracttype]
 pub enum DataKey {
-    Config,                          // TippingConfig
-    TipperBalance(Address),          // Address -> i128 (withdrawable balance)
-    TipperStats(Address),            // TipperStats
-    RecipientStats(Address),         // RecipientStats
-    TipHistory(Address),             // Vec<TipRecord> (tip history for recipient)
-    DailyTipCount(Address, u64),     // u32 (tips sent on a given day)
-    TopTippers,                      // Vec<(Address, i128)> sorted by amount
-    TopRecipients,                   // Vec<(Address, i128)> sorted by amount
+    Config,                      // TippingConfig
+    TipperBalance(Address),      // Address -> i128 (withdrawable balance)
+    TipperStats(Address),        // TipperStats
+    RecipientStats(Address),     // RecipientStats
+    TipHistory(Address),         // Vec<TipRecord> (tip history for recipient)
+    DailyTipCount(Address, u64), // u32 (tips sent on a given day)
+    TopTippers,                  // Vec<(Address, i128)> sorted by amount
+    TopRecipients,               // Vec<(Address, i128)> sorted by amount
 }
 
 // ──────────────────────────────────────────────────────────
@@ -96,7 +95,12 @@ impl SocialTippingContract {
         cooldown_seconds: u64,
         max_batch_size: u32,
     ) -> Result<(), TippingError> {
-        if env.storage().instance().get::<_, TippingConfig>(&DataKey::Config).is_some() {
+        if env
+            .storage()
+            .instance()
+            .get::<_, TippingConfig>(&DataKey::Config)
+            .is_some()
+        {
             return Err(TippingError::AlreadyInitialized);
         }
 
@@ -116,16 +120,11 @@ impl SocialTippingContract {
     }
 
     /// Send a direct tip to a recipient
-    pub fn tip(
-        env: Env,
-        from: Address,
-        to: Address,
-        amount: i128,
-    ) -> Result<(), TippingError> {
+    pub fn tip(env: Env, from: Address, to: Address, amount: i128) -> Result<(), TippingError> {
         from.require_auth();
 
         let config = Self::get_config(&env)?;
-        
+
         // Validation
         if amount <= 0 || amount > config.max_tip_per_transaction {
             return Err(TippingError::InvalidAmount);
@@ -161,7 +160,7 @@ impl SocialTippingContract {
         from.require_auth();
 
         let config = Self::get_config(&env)?;
-        
+
         // Validation
         if amount <= 0 || amount > config.max_tip_per_transaction {
             return Err(TippingError::InvalidAmount);
@@ -202,7 +201,7 @@ impl SocialTippingContract {
             return Err(TippingError::InvalidBatchSize);
         }
 
-        if recipients.len() as u32 > config.max_batch_size {
+        if recipients.len() > config.max_batch_size {
             return Err(TippingError::InvalidBatchSize);
         }
 
@@ -235,8 +234,8 @@ impl SocialTippingContract {
         for i in 0..amounts.len() {
             total_amount += amounts.get(i).unwrap();
         }
-        Self::update_tipper_stats_batch(&env, &from, total_amount, amounts.len() as u32);
-        
+        Self::update_tipper_stats_batch(&env, &from, total_amount, amounts.len());
+
         // Check daily limit after all transfers
         Self::check_tip_limits(&env, &from, &config)?;
 
@@ -244,10 +243,7 @@ impl SocialTippingContract {
     }
 
     /// Get tip history for a recipient
-    pub fn get_tip_history(
-        env: Env,
-        recipient: Address,
-    ) -> Result<Vec<TipRecord>, TippingError> {
+    pub fn get_tip_history(env: Env, recipient: Address) -> Result<Vec<TipRecord>, TippingError> {
         Self::get_config(&env)?;
 
         let history = env
@@ -260,10 +256,7 @@ impl SocialTippingContract {
     }
 
     /// Get tip statistics for a tipper
-    pub fn get_tipper_stats(
-        env: Env,
-        tipper: Address,
-    ) -> Result<TipperStats, TippingError> {
+    pub fn get_tipper_stats(env: Env, tipper: Address) -> Result<TipperStats, TippingError> {
         Self::get_config(&env)?;
 
         let stats = env
@@ -300,10 +293,7 @@ impl SocialTippingContract {
     }
 
     /// Get top tippers leaderboard
-    pub fn get_top_tippers(
-        env: Env,
-        limit: u32,
-    ) -> Result<Vec<(Address, i128)>, TippingError> {
+    pub fn get_top_tippers(env: Env, limit: u32) -> Result<Vec<(Address, i128)>, TippingError> {
         Self::get_config(&env)?;
 
         let leaderboard = env
@@ -321,10 +311,7 @@ impl SocialTippingContract {
     }
 
     /// Get top recipients leaderboard
-    pub fn get_top_recipients(
-        env: Env,
-        limit: u32,
-    ) -> Result<Vec<(Address, i128)>, TippingError> {
+    pub fn get_top_recipients(env: Env, limit: u32) -> Result<Vec<(Address, i128)>, TippingError> {
         Self::get_config(&env)?;
 
         let leaderboard = env
@@ -358,7 +345,11 @@ impl SocialTippingContract {
     // INTERNAL HELPERS
     // ──────────────────────────────────────────────────────────
 
-    fn check_tip_limits(env: &Env, from: &Address, config: &TippingConfig) -> Result<(), TippingError> {
+    fn check_tip_limits(
+        env: &Env,
+        from: &Address,
+        config: &TippingConfig,
+    ) -> Result<(), TippingError> {
         let current_time = Self::get_timestamp(env);
         let day_key = current_time / 86400; // Seconds in a day
 
@@ -423,9 +414,10 @@ impl SocialTippingContract {
 
         daily_count += 1;
 
-        env.storage()
-            .instance()
-            .set(&DataKey::DailyTipCount(tipper.clone(), day_key), &daily_count);
+        env.storage().instance().set(
+            &DataKey::DailyTipCount(tipper.clone(), day_key),
+            &daily_count,
+        );
 
         // Update top tippers leaderboard
         Self::update_top_tippers(env, tipper, stats.total_tipped);
@@ -462,9 +454,10 @@ impl SocialTippingContract {
 
         daily_count += tip_count;
 
-        env.storage()
-            .instance()
-            .set(&DataKey::DailyTipCount(tipper.clone(), day_key), &daily_count);
+        env.storage().instance().set(
+            &DataKey::DailyTipCount(tipper.clone(), day_key),
+            &daily_count,
+        );
 
         // Update top tippers leaderboard
         Self::update_top_tippers(env, tipper, stats.total_tipped);
@@ -493,13 +486,7 @@ impl SocialTippingContract {
         Self::update_top_recipients(env, recipient, stats.total_received);
     }
 
-    fn record_tip(
-        env: &Env,
-        from: &Address,
-        to: &Address,
-        amount: i128,
-        message: String,
-    ) {
+    fn record_tip(env: &Env, from: &Address, to: &Address, amount: i128, message: String) {
         let current_time = Self::get_timestamp(env);
 
         let record = TipRecord {
@@ -547,7 +534,7 @@ impl SocialTippingContract {
 
         // Sort by amount descending (simple bubble sort for small lists)
         for i in 0..leaderboard.len() {
-            let limit = leaderboard.len().saturating_sub(i as u32).saturating_sub(1);
+            let limit = leaderboard.len().saturating_sub(i).saturating_sub(1);
             for j in 0..limit {
                 let j_plus_1 = j + 1;
                 let (_, amount_j) = leaderboard.get(j).unwrap();
@@ -590,7 +577,7 @@ impl SocialTippingContract {
 
         // Sort by amount descending
         for i in 0..leaderboard.len() {
-            let limit = leaderboard.len().saturating_sub(i as u32).saturating_sub(1);
+            let limit = leaderboard.len().saturating_sub(i).saturating_sub(1);
             for j in 0..limit {
                 let j_plus_1 = j + 1;
                 let (_, amount_j) = leaderboard.get(j).unwrap();

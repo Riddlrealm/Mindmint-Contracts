@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, BytesN,
-    Bytes, Env, Vec, String,
+    contract, contracterror, contractimpl, contracttype, Address, Bytes, BytesN, Env, String, Vec,
 };
 
 #[cfg(test)]
@@ -16,20 +15,20 @@ mod test;
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BridgeAction {
-    Lock = 0,    
-    Unlock = 1,  
+    Lock = 0,
+    Unlock = 1,
 }
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransferStatus {
-    Initiated = 0,    
-    Locked = 1,       
-    Verified = 2,     
-    Wrapped = 3,      
-    Completed = 4,    
-    Cancelled = 5,    
-    Failed = 6,       
+    Initiated = 0,
+    Locked = 1,
+    Verified = 2,
+    Wrapped = 3,
+    Completed = 4,
+    Cancelled = 5,
+    Failed = 6,
 }
 
 #[contracttype]
@@ -190,10 +189,11 @@ impl NftWrapperContract {
         Self::check_paused(&env)?;
 
         let storage = env.storage().instance();
-        
+
         let config: BridgeConfig = storage.get(&DataKey::Config).unwrap();
 
-        let mut validators: Vec<Validator> = storage.get(&DataKey::Validators).unwrap_or(Vec::new(&env));
+        let mut validators: Vec<Validator> =
+            storage.get(&DataKey::Validators).unwrap_or(Vec::new(&env));
 
         for validator in validators.iter() {
             if validator.address == validator_address {
@@ -201,7 +201,7 @@ impl NftWrapperContract {
             }
         }
 
-        if validators.len() as u32 >= config.max_validators {
+        if validators.len() >= config.max_validators {
             return Err(NftWrapperError::MaxValidatorsReached);
         }
 
@@ -219,15 +219,14 @@ impl NftWrapperContract {
     }
 
     /// Remove a validator from the bridge
-    pub fn remove_validator(
-        env: Env,
-        validator_address: Address,
-    ) -> Result<(), NftWrapperError> {
+    pub fn remove_validator(env: Env, validator_address: Address) -> Result<(), NftWrapperError> {
         Self::require_admin(&env)?;
 
         let storage = env.storage().instance();
-        
-        let validators: Vec<Validator> = storage.get(&DataKey::Validators).ok_or(NftWrapperError::ValidatorNotFound)?;
+
+        let validators: Vec<Validator> = storage
+            .get(&DataKey::Validators)
+            .ok_or(NftWrapperError::ValidatorNotFound)?;
 
         let mut updated_validators = Vec::new(&env);
         let mut found = false;
@@ -251,7 +250,10 @@ impl NftWrapperContract {
 
     /// Get list of active validators
     pub fn get_validators(env: Env) -> Vec<Validator> {
-        env.storage().instance().get(&DataKey::Validators).unwrap_or(Vec::new(&env))
+        env.storage()
+            .instance()
+            .get(&DataKey::Validators)
+            .unwrap_or(Vec::new(&env))
     }
 
     /// Lock an NFT on the source chain
@@ -307,7 +309,9 @@ impl NftWrapperContract {
             nonce: env.ledger().sequence() as u64,
         };
 
-        env.storage().persistent().set(&TransferKey::Transfer(transfer_id), &bridge_transfer);
+        env.storage()
+            .persistent()
+            .set(&TransferKey::Transfer(transfer_id), &bridge_transfer);
         storage.set(&DataKey::NextTransferId, &(transfer_id + 1));
 
         Ok(transfer_id)
@@ -325,7 +329,10 @@ impl NftWrapperContract {
         Self::check_paused(&env)?;
         caller.require_auth();
 
-        let transfer_opt: Option<BridgeTransfer> = env.storage().persistent().get(&TransferKey::Transfer(transfer_id));
+        let transfer_opt: Option<BridgeTransfer> = env
+            .storage()
+            .persistent()
+            .get(&TransferKey::Transfer(transfer_id));
         let mut transfer = transfer_opt.ok_or(NftWrapperError::TransferNotFound)?;
 
         if transfer.status != TransferStatus::Locked {
@@ -349,35 +356,43 @@ impl NftWrapperContract {
             metadata_uri: transfer.nft_data.uri.clone(),
         };
 
-        env.storage().persistent().set(&TransferKey::Transfer(transfer_id), &transfer);
-        env.storage().persistent().set(&TransferKey::WrappedNFT(transfer_id), &wrapped_nft);
+        env.storage()
+            .persistent()
+            .set(&TransferKey::Transfer(transfer_id), &transfer);
+        env.storage()
+            .persistent()
+            .set(&TransferKey::WrappedNFT(transfer_id), &wrapped_nft);
 
         Ok(())
     }
 
     /// Unwrap a wrapped NFT
-    pub fn unwrap_nft(
-        env: Env,
-        sender: Address,
-        transfer_id: u64,
-    ) -> Result<(), NftWrapperError> {
+    pub fn unwrap_nft(env: Env, sender: Address, transfer_id: u64) -> Result<(), NftWrapperError> {
         Self::check_paused(&env)?;
         sender.require_auth();
 
-        let wrapped_nft_opt: Option<WrappedNFTData> = env.storage().persistent().get(&TransferKey::WrappedNFT(transfer_id));
+        let wrapped_nft_opt: Option<WrappedNFTData> = env
+            .storage()
+            .persistent()
+            .get(&TransferKey::WrappedNFT(transfer_id));
         let wrapped_nft = wrapped_nft_opt.ok_or(NftWrapperError::TransferNotFound)?;
 
         if wrapped_nft.current_owner != sender {
             return Err(NftWrapperError::Unauthorized);
         }
 
-        let transfer_opt: Option<BridgeTransfer> = env.storage().persistent().get(&TransferKey::Transfer(transfer_id));
+        let transfer_opt: Option<BridgeTransfer> = env
+            .storage()
+            .persistent()
+            .get(&TransferKey::Transfer(transfer_id));
         let mut transfer = transfer_opt.ok_or(NftWrapperError::TransferNotFound)?;
 
         transfer.status = TransferStatus::Cancelled;
         transfer.completed_timestamp = Some(env.ledger().timestamp());
 
-        env.storage().persistent().set(&TransferKey::Transfer(transfer_id), &transfer);
+        env.storage()
+            .persistent()
+            .set(&TransferKey::Transfer(transfer_id), &transfer);
 
         Ok(())
     }
@@ -392,7 +407,10 @@ impl NftWrapperContract {
         Self::check_paused(&env)?;
         caller.require_auth();
 
-        let transfer_opt: Option<BridgeTransfer> = env.storage().persistent().get(&TransferKey::Transfer(transfer_id));
+        let transfer_opt: Option<BridgeTransfer> = env
+            .storage()
+            .persistent()
+            .get(&TransferKey::Transfer(transfer_id));
         let mut transfer = transfer_opt.ok_or(NftWrapperError::TransferNotFound)?;
 
         if transfer.status != TransferStatus::Wrapped {
@@ -404,20 +422,28 @@ impl NftWrapperContract {
         transfer.status = TransferStatus::Completed;
         transfer.completed_timestamp = Some(env.ledger().timestamp());
 
-        env.storage().persistent().set(&TransferKey::Transfer(transfer_id), &transfer);
+        env.storage()
+            .persistent()
+            .set(&TransferKey::Transfer(transfer_id), &transfer);
 
         Ok(())
     }
 
     /// Get transfer details
     pub fn get_transfer(env: Env, transfer_id: u64) -> Result<BridgeTransfer, NftWrapperError> {
-        let transfer_opt: Option<BridgeTransfer> = env.storage().persistent().get(&TransferKey::Transfer(transfer_id));
+        let transfer_opt: Option<BridgeTransfer> = env
+            .storage()
+            .persistent()
+            .get(&TransferKey::Transfer(transfer_id));
         transfer_opt.ok_or(NftWrapperError::TransferNotFound)
     }
 
     /// Get wrapped NFT details
     pub fn get_wrapped_nft(env: Env, transfer_id: u64) -> Result<WrappedNFTData, NftWrapperError> {
-        let wrapped_opt: Option<WrappedNFTData> = env.storage().persistent().get(&TransferKey::WrappedNFT(transfer_id));
+        let wrapped_opt: Option<WrappedNFTData> = env
+            .storage()
+            .persistent()
+            .get(&TransferKey::WrappedNFT(transfer_id));
         wrapped_opt.ok_or(NftWrapperError::TransferNotFound)
     }
 
@@ -437,7 +463,10 @@ impl NftWrapperContract {
 
     /// Check if contract is paused
     pub fn is_paused(env: Env) -> bool {
-        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
     }
 
     /// Collect accumulated bridge fees
@@ -456,7 +485,10 @@ impl NftWrapperContract {
 
     /// Get current bridge configuration
     pub fn get_config(env: Env) -> Result<BridgeConfig, NftWrapperError> {
-        env.storage().instance().get(&DataKey::Config).ok_or(NftWrapperError::InvalidTransfer)
+        env.storage()
+            .instance()
+            .get(&DataKey::Config)
+            .ok_or(NftWrapperError::InvalidTransfer)
     }
 
     /// Update bridge configuration
@@ -470,7 +502,9 @@ impl NftWrapperContract {
         Self::require_admin(&env)?;
 
         let storage = env.storage().instance();
-        let mut config: BridgeConfig = storage.get(&DataKey::Config).ok_or(NftWrapperError::InvalidTransfer)?;
+        let mut config: BridgeConfig = storage
+            .get(&DataKey::Config)
+            .ok_or(NftWrapperError::InvalidTransfer)?;
 
         if let Some(sigs) = required_signatures {
             config.required_signatures = sigs;
@@ -494,13 +528,19 @@ impl NftWrapperContract {
 
     fn require_admin(env: &Env) -> Result<(), NftWrapperError> {
         let storage = env.storage().instance();
-        let _admin: Address = storage.get(&DataKey::Admin).ok_or(NftWrapperError::Unauthorized)?;
+        let _admin: Address = storage
+            .get(&DataKey::Admin)
+            .ok_or(NftWrapperError::Unauthorized)?;
         // In a real scenario, you would pass the admin address as a parameter and check require_auth
         Ok(())
     }
 
     fn check_paused(env: &Env) -> Result<(), NftWrapperError> {
-        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+        let paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false);
 
         if paused {
             return Err(NftWrapperError::ContractPaused);
@@ -511,7 +551,9 @@ impl NftWrapperContract {
 
     fn calculate_fee(env: &Env, base_amount: i128) -> Result<i128, NftWrapperError> {
         let storage = env.storage().instance();
-        let config: BridgeConfig = storage.get(&DataKey::Config).ok_or(NftWrapperError::FeeCalculationError)?;
+        let config: BridgeConfig = storage
+            .get(&DataKey::Config)
+            .ok_or(NftWrapperError::FeeCalculationError)?;
 
         let fee = (base_amount * config.base_fee_bps as i128) / 10_000;
         let fee = fee.max(config.min_fee).min(config.max_fee);
@@ -525,11 +567,15 @@ impl NftWrapperContract {
         signatures: &Vec<ValidatorSignature>,
     ) -> Result<(), NftWrapperError> {
         let storage = env.storage().instance();
-        let config: BridgeConfig = storage.get(&DataKey::Config).ok_or(NftWrapperError::InvalidTransfer)?;
+        let config: BridgeConfig = storage
+            .get(&DataKey::Config)
+            .ok_or(NftWrapperError::InvalidTransfer)?;
 
-        let validators: Vec<Validator> = storage.get(&DataKey::Validators).ok_or(NftWrapperError::ValidatorNotFound)?;
+        let validators: Vec<Validator> = storage
+            .get(&DataKey::Validators)
+            .ok_or(NftWrapperError::ValidatorNotFound)?;
 
-        if (signatures.len() as u32) < config.required_signatures {
+        if (signatures.len()) < config.required_signatures {
             return Err(NftWrapperError::InsufficientSignatures);
         }
 

@@ -739,6 +739,17 @@
                       "val": {
                         "string": "Stellar Knights"
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "withdrawal_threshold"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 10000
+                        }
+                      }
                     }
                   ]
                 }

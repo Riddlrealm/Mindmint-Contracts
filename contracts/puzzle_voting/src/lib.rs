@@ -3,9 +3,9 @@
 mod storage;
 pub mod types;
 
-use soroban_sdk::{contract, contractimpl, contracttype, log, Address, Env, Symbol, Vec, Val};
 use crate::storage::*;
 use crate::types::*;
+use soroban_sdk::{contract, contractimpl, contracttype, log, Address, Env, Symbol, Val, Vec};
 
 //
 // ──────────────────────────────────────────────────────────
@@ -235,10 +235,10 @@ impl PuzzleVotingContract {
     //
 
     /// Get a voter's staked balance as voting weight
-    /// 
+    ///
     /// IMPORTANT: This function requires the staking contract to expose a public
     /// view function that returns the voter's staked balance. Currently it returns 0.
-    /// 
+    ///
     /// To properly integrate:
     /// 1. Ensure staking contract has a public function: `get_staker_balance(address) -> i128`
     /// 2. Update this function to call it via invoke_contract
@@ -252,7 +252,7 @@ impl PuzzleVotingContract {
         //     args,
         // );
         // balance
-        
+
         // For now, return 0 to allow tests to proceed
         // In production, this MUST query the actual staking balance
         0i128
@@ -260,16 +260,17 @@ impl PuzzleVotingContract {
 
     /// Update the aggregate voting data after a new vote
     fn update_aggregate(env: &Env, new_vote: &PuzzleVote) {
-        let mut aggregate = get_aggregate(&env, new_vote.puzzle_id).unwrap_or(PuzzleVotingAggregate {
-            puzzle_id: new_vote.puzzle_id,
-            weighted_difficulty_avg: 0,
-            weighted_fun_avg: 0,
-            weighted_fairness_avg: 0,
-            vote_count: 0,
-            total_weight: 0,
-            is_reset: false,
-            last_reset_at: 0,
-        });
+        let mut aggregate =
+            get_aggregate(&env, new_vote.puzzle_id).unwrap_or(PuzzleVotingAggregate {
+                puzzle_id: new_vote.puzzle_id,
+                weighted_difficulty_avg: 0,
+                weighted_fun_avg: 0,
+                weighted_fairness_avg: 0,
+                vote_count: 0,
+                total_weight: 0,
+                is_reset: false,
+                last_reset_at: 0,
+            });
 
         // Update totals
         let old_total_weight = aggregate.total_weight;
@@ -287,8 +288,7 @@ impl PuzzleVotingContract {
         aggregate.weighted_difficulty_avg =
             (difficulty_numerator as u128) / (new_total_weight as u128);
         aggregate.weighted_fun_avg = (fun_numerator as u128) / (new_total_weight as u128);
-        aggregate.weighted_fairness_avg =
-            (fairness_numerator as u128) / (new_total_weight as u128);
+        aggregate.weighted_fairness_avg = (fairness_numerator as u128) / (new_total_weight as u128);
 
         aggregate.vote_count += 1;
         aggregate.total_weight = new_total_weight;
@@ -303,4 +303,3 @@ impl PuzzleVotingContract {
 // TESTS
 // ──────────────────────────────────────────────────────────
 //
-

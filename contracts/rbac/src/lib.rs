@@ -3,9 +3,9 @@
 mod storage;
 mod types;
 
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
 use storage::Storage;
 use types::{AuditEntry, RBACError};
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
 
 #[contract]
 pub struct RBACContract;
@@ -25,11 +25,7 @@ impl RBACContract {
         Ok(())
     }
 
-    pub fn assign_role(
-        env: Env,
-        address: Address,
-        role: Symbol,
-    ) -> Result<(), RBACError> {
+    pub fn assign_role(env: Env, address: Address, role: Symbol) -> Result<(), RBACError> {
         let admin = require_admin(&env)?;
         require_not_paused(&env)?;
         let mut roles = Storage::get_user_roles(&env, &address);
@@ -51,11 +47,7 @@ impl RBACContract {
         Ok(())
     }
 
-    pub fn revoke_role(
-        env: Env,
-        address: Address,
-        role: Symbol,
-    ) -> Result<(), RBACError> {
+    pub fn revoke_role(env: Env, address: Address, role: Symbol) -> Result<(), RBACError> {
         let admin = require_admin(&env)?;
         require_not_paused(&env)?;
         let mut roles = Storage::get_user_roles(&env, &address);
@@ -63,7 +55,7 @@ impl RBACContract {
         if index.is_none() {
             return Err(RBACError::RoleNotAssigned);
         }
-        roles.remove(index.unwrap() as u32);
+        roles.remove(index.unwrap());
         Storage::set_user_roles(&env, &address, &roles);
         Storage::add_audit_entry(
             &env,
@@ -116,7 +108,7 @@ impl RBACContract {
         if index.is_none() {
             return Err(RBACError::PermissionNotFound);
         }
-        permissions.remove(index.unwrap() as u32);
+        permissions.remove(index.unwrap());
         Storage::set_role_permissions(&env, &role, &permissions);
         Storage::add_audit_entry(
             &env,
@@ -153,8 +145,10 @@ impl RBACContract {
             child_role.clone(),
             Some(parent_role.clone()),
         );
-        env.events()
-            .publish((symbol_short!("set_hier"),), (admin, child_role, parent_role));
+        env.events().publish(
+            (symbol_short!("set_hier"),),
+            (admin, child_role, parent_role),
+        );
         Ok(())
     }
 
@@ -274,7 +268,10 @@ impl RBACContract {
         Ok(())
     }
 
-    pub fn transfer_emergency_admin(env: Env, new_emergency_admin: Address) -> Result<(), RBACError> {
+    pub fn transfer_emergency_admin(
+        env: Env,
+        new_emergency_admin: Address,
+    ) -> Result<(), RBACError> {
         let old_emergency_admin = Storage::get_emergency_admin(&env)?;
         old_emergency_admin.require_auth();
         Storage::set_emergency_admin(&env, &new_emergency_admin);
@@ -286,11 +283,10 @@ impl RBACContract {
             Symbol::new(&env, ""),
             None,
         );
-        env.events()
-            .publish(
-                (symbol_short!("xfer_eadm"),),
-                (old_emergency_admin, new_emergency_admin),
-            );
+        env.events().publish(
+            (symbol_short!("xfer_eadm"),),
+            (old_emergency_admin, new_emergency_admin),
+        );
         Ok(())
     }
 

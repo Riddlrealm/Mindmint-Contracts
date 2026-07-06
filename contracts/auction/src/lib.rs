@@ -1,6 +1,6 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol,
+    contract, contractimpl, contracttype, token, Address, Env, IntoVal, Map, Symbol, Vec,
 };
 
 #[contracttype]
@@ -53,7 +53,7 @@ pub struct SealedBid {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuctionSettings {
     pub start_time: u64,
-    pub end_time: u64, // For sealed-bid: end of bidding period
+    pub end_time: u64,        // For sealed-bid: end of bidding period
     pub reveal_end_time: u64, // For sealed-bid: end of reveal period
     pub starting_price: i128,
     pub reserve_price: i128,
@@ -99,8 +99,8 @@ pub struct AuctionAnalytics {
 pub enum DataKey {
     Auction(u64),
     AuctionCount,
-    AuctionBids(u64), // Stores Vec<Bid> for English auctions
-    SealedBids(u64), // Stores Vec<SealedBid> for sealed-bid auctions
+    AuctionBids(u64),      // Stores Vec<Bid> for English auctions
+    SealedBids(u64),       // Stores Vec<SealedBid> for sealed-bid auctions
     AuctionAnalytics(u64), // Stores analytics for each auction
 }
 
@@ -159,10 +159,10 @@ impl AuctionContract {
         // Initialize empty bids list
         env.storage()
             .instance()
-            .set(&DataKey::AuctionBids(id), &Vec::<Bid>::new());
-            
+            .set(&DataKey::AuctionBids(id), &Vec::<Bid>::new(&env));
+
         // Initialize analytics
-        let mut bid_count_map = soroban_sdk::Map::new();
+        let mut bid_count_map = Map::new(&env);
         let analytics = AuctionAnalytics {
             total_bids: 0,
             unique_bidders: 0,
@@ -173,12 +173,12 @@ impl AuctionContract {
         env.storage()
             .instance()
             .set(&DataKey::AuctionAnalytics(id), &analytics);
-            
+
         // Initialize sealed bids storage if it's a sealed bid auction
         if auction.auction_type == AuctionType::SealedBid {
             env.storage()
                 .instance()
-                .set(&DataKey::SealedBids(id), &Vec::<SealedBid>::new());
+                .set(&DataKey::SealedBids(id), &Vec::<SealedBid>::new(&env));
         }
 
         // Save
@@ -254,27 +254,29 @@ impl AuctionContract {
         }
 
         // 7. Add bid to history
-        let mut bids: Vec<Bid> = env.storage()
+        let mut bids: Vec<Bid> = env
+            .storage()
             .instance()
             .get(&DataKey::AuctionBids(auction_id))
             .unwrap();
-            
-        bids.push(Bid {
+
+        bids.push_back(Bid {
             bidder: bidder.clone(),
             amount: bid_amount,
             timestamp: current_time,
         });
-        
+
         env.storage()
             .instance()
             .set(&DataKey::AuctionBids(auction_id), &bids);
-            
+
         // 8. Update analytics
-        let mut analytics: AuctionAnalytics = env.storage()
+        let mut analytics: AuctionAnalytics = env
+            .storage()
             .instance()
             .get(&DataKey::AuctionAnalytics(auction_id))
             .unwrap();
-            
+
         analytics.total_bids += 1;
         if let Some(count) = analytics.bid_count_by_bidder.get(bidder.clone()) {
             analytics.bid_count_by_bidder.set(bidder.clone(), count + 1);
@@ -282,7 +284,7 @@ impl AuctionContract {
             analytics.bid_count_by_bidder.set(bidder.clone(), 1);
             analytics.unique_bidders += 1;
         }
-        
+
         env.storage()
             .instance()
             .set(&DataKey::AuctionAnalytics(auction_id), &analytics);
@@ -353,35 +355,38 @@ impl AuctionContract {
         token_client.transfer(&buyer, &env.current_contract_address(), &current_price);
 
         // 5. End the Auction Immediately
-        auction.highest_bidder = Some(buyer);
+        // Address is non-Copy in SDK 21; clone so the bid push below can still use it.
+        auction.highest_bidder = Some(buyer.clone());
         auction.current_bid = current_price;
         auction.settled = true; // Dutch auctions end instantly
 
         env.storage()
             .instance()
             .set(&DataKey::Auction(auction_id), &auction);
-            
+
         // Update analytics for Dutch auction purchase
-        let mut bids: Vec<Bid> = env.storage()
+        let mut bids: Vec<Bid> = env
+            .storage()
             .instance()
             .get(&DataKey::AuctionBids(auction_id))
             .unwrap();
-            
-        bids.push(Bid {
+
+        bids.push_back(Bid {
             bidder: buyer.clone(),
             amount: current_price,
             timestamp: current_time,
         });
-        
+
         env.storage()
             .instance()
             .set(&DataKey::AuctionBids(auction_id), &bids);
-            
-        let mut analytics: AuctionAnalytics = env.storage()
+
+        let mut analytics: AuctionAnalytics = env
+            .storage()
             .instance()
             .get(&DataKey::AuctionAnalytics(auction_id))
             .unwrap();
-            
+
         analytics.total_bids += 1;
         if let Some(count) = analytics.bid_count_by_bidder.get(buyer.clone()) {
             analytics.bid_count_by_bidder.set(buyer.clone(), count + 1);
@@ -389,23 +394,28 @@ impl AuctionContract {
             analytics.bid_count_by_bidder.set(buyer.clone(), 1);
             analytics.unique_bidders += 1;
         }
-        
+
         analytics.settled_at = Some(current_time);
         env.storage()
             .instance()
             .set(&DataKey::AuctionAnalytics(auction_id), &analytics);
     }
-    
+
     /// Submit a sealed bid for a Sealed-Bid Auction
-    pub fn submit_sealed_bid(env: Env, bidder: Address, auction_id: u64, bid_hash: soroban_sdk::Bytes) {
+    pub fn submit_sealed_bid(
+        env: Env,
+        bidder: Address,
+        auction_id: u64,
+        bid_hash: soroban_sdk::Bytes,
+    ) {
         bidder.require_auth();
-        
+
         let mut auction: AuctionInfo = env
             .storage()
             .instance()
             .get(&DataKey::Auction(auction_id))
             .unwrap_or_else(|| panic_with_error(&env, AuctionError::AuctionNotFound));
-            
+
         // Validation checks
         if auction.auction_type != AuctionType::SealedBid {
             panic_with_error(&env, AuctionError::SealedBidOnly);
@@ -413,7 +423,7 @@ impl AuctionContract {
         if auction.settled {
             panic_with_error(&env, AuctionError::AuctionAlreadySettled);
         }
-        
+
         let current_time = env.ledger().timestamp();
         if current_time < auction.settings.start_time {
             panic_with_error(&env, AuctionError::AuctionNotStarted);
@@ -421,37 +431,39 @@ impl AuctionContract {
         if current_time > auction.settings.end_time {
             panic_with_error(&env, AuctionError::BiddingPeriodEnded);
         }
-        
+
         // Store the sealed bid
-        let mut sealed_bids: Vec<SealedBid> = env.storage()
+        let mut sealed_bids: Vec<SealedBid> = env
+            .storage()
             .instance()
             .get(&DataKey::SealedBids(auction_id))
             .unwrap();
-            
+
         // Check if bidder already submitted a bid
         for existing_bid in &sealed_bids {
             if existing_bid.bidder == bidder {
                 panic_with_error(&env, AuctionError::BidAlreadyRevealed); // Using existing error for duplicate bid
             }
         }
-            
-        sealed_bids.push(SealedBid {
+
+        sealed_bids.push_back(SealedBid {
             bidder: bidder.clone(),
             bid_hash,
             revealed: false,
             amount: None,
         });
-        
+
         env.storage()
             .instance()
             .set(&DataKey::SealedBids(auction_id), &sealed_bids);
-            
+
         // Update analytics
-        let mut analytics: AuctionAnalytics = env.storage()
+        let mut analytics: AuctionAnalytics = env
+            .storage()
             .instance()
             .get(&DataKey::AuctionAnalytics(auction_id))
             .unwrap();
-            
+
         analytics.total_bids += 1;
         if let Some(count) = analytics.bid_count_by_bidder.get(bidder.clone()) {
             analytics.bid_count_by_bidder.set(bidder.clone(), count + 1);
@@ -459,22 +471,28 @@ impl AuctionContract {
             analytics.bid_count_by_bidder.set(bidder.clone(), 1);
             analytics.unique_bidders += 1;
         }
-        
+
         env.storage()
             .instance()
             .set(&DataKey::AuctionAnalytics(auction_id), &analytics);
     }
-    
+
     /// Reveal a sealed bid
-    pub fn reveal_sealed_bid(env: Env, bidder: Address, auction_id: u64, amount: i128, secret: soroban_sdk::Bytes) {
+    pub fn reveal_sealed_bid(
+        env: Env,
+        bidder: Address,
+        auction_id: u64,
+        amount: i128,
+        secret: soroban_sdk::Bytes,
+    ) {
         bidder.require_auth();
-        
+
         let mut auction: AuctionInfo = env
             .storage()
             .instance()
             .get(&DataKey::Auction(auction_id))
             .unwrap_or_else(|| panic_with_error(&env, AuctionError::AuctionNotFound));
-            
+
         // Validation checks
         if auction.auction_type != AuctionType::SealedBid {
             panic_with_error(&env, AuctionError::SealedBidOnly);
@@ -482,7 +500,7 @@ impl AuctionContract {
         if auction.settled {
             panic_with_error(&env, AuctionError::AuctionAlreadySettled);
         }
-        
+
         let current_time = env.ledger().timestamp();
         if current_time < auction.settings.end_time {
             panic_with_error(&env, AuctionError::RevealPeriodNotStarted);
@@ -490,37 +508,40 @@ impl AuctionContract {
         if current_time > auction.settings.reveal_end_time {
             panic_with_error(&env, AuctionError::RevealPeriodEnded);
         }
-        
+
         // Get sealed bids and find the bidder's bid
-        let mut sealed_bids: Vec<SealedBid> = env.storage()
+        let mut sealed_bids: Vec<SealedBid> = env
+            .storage()
             .instance()
             .get(&DataKey::SealedBids(auction_id))
             .unwrap();
-            
-        let mut bid_index = None;
+
+        let mut bid_index: Option<u32> = None;
         for (i, bid) in sealed_bids.iter().enumerate() {
             if bid.bidder == bidder && !bid.revealed {
-                bid_index = Some(i);
+                bid_index = Some(i as u32);
                 break;
             }
         }
-        
-        let bid_index = bid_index.unwrap_or_else(|| panic_with_error(&env, AuctionError::AuctionNotFound));
-        let mut bid = sealed_bids[bid_index].clone();
-        
+
+        let bid_index =
+            bid_index.unwrap_or_else(|| panic_with_error(&env, AuctionError::AuctionNotFound));
+        let mut bid = sealed_bids.get(bid_index as u32).unwrap().clone();
+
         // Verify the bid hash matches (in Soroban, we'd use env.crypto().sha256() to verify)
         // For this implementation, we'll trust the reveal but log the event
-        env.events().publish(("bid_revealed", auction_id, bidder.clone()), amount);
-        
+        env.events()
+            .publish(("bid_revealed", auction_id, bidder.clone()), amount);
+
         // Update the bid as revealed
         bid.revealed = true;
         bid.amount = Some(amount);
-        sealed_bids[bid_index] = bid;
-        
+        sealed_bids.set(bid_index as u32, bid);
+
         env.storage()
             .instance()
             .set(&DataKey::SealedBids(auction_id), &sealed_bids);
-            
+
         // If this is the highest bid so far, update the current highest bid
         if amount > auction.current_bid && amount >= auction.settings.reserve_price {
             // Refund previous highest bidder if exists
@@ -532,15 +553,15 @@ impl AuctionContract {
                     &auction.current_bid,
                 );
             }
-            
+
             // Transfer the new bid amount from the bidder
             let token_client = token::Client::new(&env, &auction.payment_token);
             token_client.transfer(&bidder, &env.current_contract_address(), &amount);
-            
+
             auction.highest_bidder = Some(bidder);
             auction.current_bid = amount;
         }
-        
+
         env.storage()
             .instance()
             .set(&DataKey::Auction(auction_id), &auction);
@@ -559,7 +580,7 @@ impl AuctionContract {
         }
 
         let current_time = env.ledger().timestamp();
-        
+
         // Check auction can be settled
         if auction.auction_type == AuctionType::English {
             if current_time < auction.settings.end_time {
@@ -570,11 +591,12 @@ impl AuctionContract {
                 panic_with_error(&env, AuctionError::AuctionStillOngoing);
             }
             // Ensure all bids are revealed for sealed-bid auctions
-            let sealed_bids: Vec<SealedBid> = env.storage()
+            let sealed_bids: Vec<SealedBid> = env
+                .storage()
                 .instance()
                 .get(&DataKey::SealedBids(auction_id))
                 .unwrap();
-                
+
             for bid in &sealed_bids {
                 if !bid.revealed {
                     // Refund unrevealed bids
@@ -611,9 +633,10 @@ impl AuctionContract {
                 transfer_args.into_val(&env),
             );
         }
-        
+
         // Update analytics with settled timestamp
-        let mut analytics: AuctionAnalytics = env.storage()
+        let mut analytics: AuctionAnalytics = env
+            .storage()
             .instance()
             .get(&DataKey::AuctionAnalytics(auction_id))
             .unwrap();
@@ -633,28 +656,37 @@ impl AuctionContract {
     pub fn get_auction(env: Env, auction_id: u64) -> Option<AuctionInfo> {
         env.storage().instance().get(&DataKey::Auction(auction_id))
     }
-    
+
     /// Get all bids for an auction
     pub fn get_auction_bids(env: Env, auction_id: u64) -> Option<Vec<Bid>> {
-        env.storage().instance().get(&DataKey::AuctionBids(auction_id))
+        env.storage()
+            .instance()
+            .get(&DataKey::AuctionBids(auction_id))
     }
-    
+
     /// Get sealed bids for a sealed-bid auction (only callable after reveal period ends)
     pub fn get_sealed_bids(env: Env, auction_id: u64) -> Option<Vec<SealedBid>> {
-        let auction: AuctionInfo = env.storage()
+        let auction: AuctionInfo = env
+            .storage()
             .instance()
             .get(&DataKey::Auction(auction_id))?;
-            
+
         let current_time = env.ledger().timestamp();
-        if auction.auction_type == AuctionType::SealedBid && current_time > auction.settings.reveal_end_time {
-            env.storage().instance().get(&DataKey::SealedBids(auction_id))
+        if auction.auction_type == AuctionType::SealedBid
+            && current_time > auction.settings.reveal_end_time
+        {
+            env.storage()
+                .instance()
+                .get(&DataKey::SealedBids(auction_id))
         } else {
             None
         }
     }
-    
+
     /// Get analytics for an auction
     pub fn get_auction_analytics(env: Env, auction_id: u64) -> Option<AuctionAnalytics> {
-        env.storage().instance().get(&DataKey::AuctionAnalytics(auction_id))
+        env.storage()
+            .instance()
+            .get(&DataKey::AuctionAnalytics(auction_id))
     }
 }

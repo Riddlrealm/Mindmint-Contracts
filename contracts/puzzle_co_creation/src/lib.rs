@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Vec, symbol_short};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
 
 mod storage;
 pub mod types;
@@ -27,7 +27,12 @@ impl PuzzleCoCreation {
     /// Initialize the contract with the royalty oracle address
     pub fn initialize(env: Env, oracle: Address) {
         // Prevent re-initialization
-        if env.storage().instance().get(&ROYALTY_ORACLE).is_some() {
+        if env
+            .storage()
+            .instance()
+            .get::<_, Address>(&ROYALTY_ORACLE)
+            .is_some()
+        {
             panic!("Already initialized");
         }
 
@@ -68,10 +73,8 @@ impl PuzzleCoCreation {
         // Lead creator is considered to have signed
         set_signed(&env, id, &lead_creator);
 
-        env.events().publish(
-            (CO_CREATION_INITIATED,),
-            (id, puzzle_id, lead_creator),
-        );
+        env.events()
+            .publish((CO_CREATION_INITIATED,), (id, puzzle_id, lead_creator));
 
         id
     }
@@ -81,8 +84,7 @@ impl PuzzleCoCreation {
     pub fn sign(env: Env, co_creation_id: u64, signer: Address) {
         signer.require_auth();
 
-        let mut co_creation = get_co_creation(&env, co_creation_id)
-            .expect("Co-creation not found");
+        let mut co_creation = get_co_creation(&env, co_creation_id).expect("Co-creation not found");
 
         // Check if already published
         if co_creation.status == CoCreationStatus::Published {
@@ -104,17 +106,14 @@ impl PuzzleCoCreation {
         set_signed(&env, co_creation_id, &signer);
         set_co_creation(&env, &co_creation);
 
-        env.events().publish(
-            (SIGNATURE_ADDED,),
-            (co_creation_id, signer),
-        );
+        env.events()
+            .publish((SIGNATURE_ADDED,), (co_creation_id, signer));
     }
 
     /// Publish a co-creation once all creators have signed
     /// co_creation_id: The ID of the co-creation to publish
     pub fn publish(env: Env, co_creation_id: u64) {
-        let mut co_creation = get_co_creation(&env, co_creation_id)
-            .expect("Co-creation not found");
+        let mut co_creation = get_co_creation(&env, co_creation_id).expect("Co-creation not found");
 
         // Check if already published
         if co_creation.status == CoCreationStatus::Published {
@@ -131,10 +130,8 @@ impl PuzzleCoCreation {
         co_creation.published_at = Some(env.ledger().timestamp());
         set_co_creation(&env, &co_creation);
 
-        env.events().publish(
-            (PUZZLE_PUBLISHED,),
-            (co_creation_id, co_creation.puzzle_id),
-        );
+        env.events()
+            .publish((PUZZLE_PUBLISHED,), (co_creation_id, co_creation.puzzle_id));
     }
 
     /// Withdraw signature (only before all have signed)
@@ -142,8 +139,7 @@ impl PuzzleCoCreation {
     pub fn withdraw_signature(env: Env, co_creation_id: u64, signer: Address) {
         signer.require_auth();
 
-        let mut co_creation = get_co_creation(&env, co_creation_id)
-            .expect("Co-creation not found");
+        let mut co_creation = get_co_creation(&env, co_creation_id).expect("Co-creation not found");
 
         // Cannot withdraw from published co-creation
         if co_creation.status == CoCreationStatus::Published {
@@ -185,8 +181,10 @@ impl PuzzleCoCreation {
     /// total_amount: Total amount to distribute
     pub fn distribute_royalty(env: Env, co_creation_id: u64, total_amount: i128) {
         // Verify caller is royalty oracle
-        let oracle = env.storage().instance()
-            .get(&ROYALTY_ORACLE)
+        let oracle: Address = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&ROYALTY_ORACLE)
             .expect("Not initialized");
         oracle.require_auth();
 
@@ -195,8 +193,7 @@ impl PuzzleCoCreation {
             panic!("Invalid amount");
         }
 
-        let co_creation = get_co_creation(&env, co_creation_id)
-            .expect("Co-creation not found");
+        let co_creation = get_co_creation(&env, co_creation_id).expect("Co-creation not found");
 
         // Must be published to receive royalties
         if co_creation.status != CoCreationStatus::Published {
@@ -205,8 +202,9 @@ impl PuzzleCoCreation {
 
         // Distribute to each creator based on their share
         for creator_share in co_creation.creators.iter() {
-            let share_amount = (total_amount * creator_share.share_bps as i128) / BASIS_POINTS_TOTAL as i128;
-            
+            let share_amount =
+                (total_amount * creator_share.share_bps as i128) / BASIS_POINTS_TOTAL as i128;
+
             if share_amount > 0 {
                 // In a real implementation, this would transfer tokens
                 // For now, we just emit an event
@@ -232,7 +230,10 @@ impl PuzzleCoCreation {
 
     /// Get the royalty oracle address
     pub fn get_oracle(env: Env) -> Address {
-        env.storage().instance().get(&ROYALTY_ORACLE).expect("Not initialized")
+        env.storage()
+            .instance()
+            .get(&ROYALTY_ORACLE)
+            .expect("Not initialized")
     }
 
     // ==================== HELPER FUNCTIONS ====================
@@ -245,10 +246,16 @@ impl PuzzleCoCreation {
         }
 
         // Check for duplicate addresses
-        let mut seen = Vec::new(creators.env());
+        // Type annotation required: soroban_sdk::Vec elements can't be
+        // inferred from an empty `Vec::new(...)` in SDK 21.x.
+        let mut seen: Vec<Address> = Vec::new(creators.env());
         for creator in creators.iter() {
             for seen_addr in seen.iter() {
-                if seen_addr == &creator.address {
+                // soroban_sdk::Address lacks PartialEq against &Address in SDK 21.x;
+                // compare via the owned Address on the rhs.
+                // soroban_sdk::Address lacks PartialEq against &Address in SDK 21.x;
+                // compare via the owned Address on the rhs.
+                if seen_addr.clone() == creator.address {
                     panic!("Duplicate creator address");
                 }
             }
@@ -263,9 +270,7 @@ impl PuzzleCoCreation {
         }
 
         // Validate shares sum to exactly 10000 basis points
-        let total_share: u32 = creators.iter()
-            .map(|c| c.share_bps)
-            .sum();
+        let total_share: u32 = creators.iter().map(|c| c.share_bps).sum();
 
         if total_share != BASIS_POINTS_TOTAL {
             panic!("Shares must sum to exactly 10000 basis points");
@@ -292,4 +297,3 @@ impl PuzzleCoCreation {
         true
     }
 }
-

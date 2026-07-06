@@ -2,7 +2,7 @@
 
 mod types;
 
-use soroban_sdk::{contract, contractimpl, contracterror, vec, Address, Env};
+use soroban_sdk::{contract, contracterror, contractimpl, vec, Address, Env};
 use types::{Config, DataKey, Feedback, Milestone, ReputationScore};
 
 #[contracterror]
@@ -89,18 +89,18 @@ impl ReputationContract {
     pub fn get_reputation(env: Env, player: Address) -> ReputationScore {
         let mut reputation = Self::get_or_create_reputation(&env, &player);
         Self::apply_decay(&env, &mut reputation);
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Reputation(player), &reputation);
-        
+
         reputation
     }
 
     pub fn calculate_score(env: Env, player: Address) -> u32 {
         let reputation = Self::get_reputation(env.clone(), player);
         let activity_score = Self::calculate_activity_score(&env, &reputation);
-        
+
         (reputation.positive_feedback * 40 / 100)
             + (reputation.quests_completed * 30 / 100)
             + (reputation.contributions * 20 / 100)
@@ -116,11 +116,11 @@ impl ReputationContract {
         reputation.quests_completed = reputation.quests_completed.saturating_add(points);
         reputation.total_score = reputation.total_score.saturating_add(points);
         reputation.last_activity = env.ledger().timestamp();
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Reputation(player.clone()), &reputation);
-        
+
         Self::check_milestones(&env, &player, &reputation);
         Ok(())
     }
@@ -134,11 +134,11 @@ impl ReputationContract {
         reputation.contributions = reputation.contributions.saturating_add(points);
         reputation.total_score = reputation.total_score.saturating_add(points);
         reputation.last_activity = env.ledger().timestamp();
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Reputation(player), &reputation);
-        
+
         Ok(())
     }
 
@@ -148,7 +148,7 @@ impl ReputationContract {
             .persistent()
             .get(&DataKey::PlayerMilestones(player))
             .unwrap_or(0);
-        
+
         if level > 0 && level <= 32 {
             (milestones & (1 << (level - 1))) != 0
         } else {
@@ -156,30 +156,26 @@ impl ReputationContract {
         }
     }
 
-    pub fn request_recovery(
-        env: Env,
-        player: Address,
-        points: u32,
-    ) -> Result<(), ContractError> {
+    pub fn request_recovery(env: Env, player: Address, points: u32) -> Result<(), ContractError> {
         player.require_auth();
-        
+
         let config = Self::get_config(&env)?;
         let recovery_points = points.min(config.recovery_cap);
         let mut reputation = Self::get_or_create_reputation(&env, &player);
-        
+
         reputation.total_score = reputation.total_score.saturating_add(recovery_points);
-        
+
         if reputation.negative_feedback > 0 {
             let reduction = (recovery_points / 10).min(reputation.negative_feedback);
             reputation.negative_feedback = reputation.negative_feedback.saturating_sub(reduction);
         }
-        
+
         reputation.last_activity = env.ledger().timestamp();
-        
+
         env.storage()
             .persistent()
             .set(&DataKey::Reputation(player), &reputation);
-        
+
         Ok(())
     }
 }
@@ -228,7 +224,7 @@ impl ReputationContract {
     ) -> Result<(), ContractError> {
         let config = Self::get_config(env)?;
         let feedback_count = Self::get_feedback_count(env, to);
-        
+
         for i in 0..feedback_count {
             if let Some(feedback) = env
                 .storage()
@@ -309,15 +305,15 @@ impl ReputationContract {
 
         let current_time = env.ledger().timestamp();
         let time_elapsed = current_time.saturating_sub(reputation.last_activity);
-        
+
         if config.decay_period > 0 && time_elapsed >= config.decay_period {
             let periods_elapsed = time_elapsed / config.decay_period;
-            
+
             for _ in 0..periods_elapsed {
                 let decay_amount = (reputation.total_score * config.decay_rate) / 10000;
                 reputation.total_score = reputation.total_score.saturating_sub(decay_amount);
             }
-            
+
             reputation.last_activity = current_time;
         }
     }
@@ -326,7 +322,7 @@ impl ReputationContract {
         let current_time = env.ledger().timestamp();
         let time_since_activity = current_time.saturating_sub(reputation.last_activity);
         const SEVEN_DAYS: u64 = 7 * 24 * 60 * 60;
-        
+
         if time_since_activity < SEVEN_DAYS {
             100
         } else {
@@ -341,7 +337,7 @@ impl ReputationContract {
             .persistent()
             .get(&DataKey::PlayerMilestones(player.clone()))
             .unwrap_or(0);
-        
+
         for level in 1..=4 {
             if let Some(milestone) = env
                 .storage()
@@ -353,9 +349,10 @@ impl ReputationContract {
                 }
             }
         }
-        
-        env.storage()
-            .persistent()
-            .set(&DataKey::PlayerMilestones(player.clone()), &milestones_bitfield);
+
+        env.storage().persistent().set(
+            &DataKey::PlayerMilestones(player.clone()),
+            &milestones_bitfield,
+        );
     }
 }

@@ -243,8 +243,7 @@ impl FlashLoanContract {
             .get(&DataKey::Pool(token.clone()))
             .unwrap_or_else(|| panic!("Pool not found for token"));
 
-        let max_loan = (pool.available_liquidity as i128 * config.max_loan_ratio as i128
-            / BASIS_POINTS) as i128;
+        let max_loan = (pool.available_liquidity * config.max_loan_ratio as i128) / BASIS_POINTS;
         if amount > max_loan {
             panic!("Amount exceeds maximum loan limit");
         }

@@ -3,7 +3,10 @@
 use super::*;
 use soroban_sdk::{testutils::Address as _, token, Env};
 
-fn create_token_contract<'a>(env: &Env, admin: &Address) -> (token::TokenClient<'a>, token::StellarAssetClient<'a>) {
+fn create_token_contract<'a>(
+    env: &Env,
+    admin: &Address,
+) -> (token::TokenClient<'a>, token::StellarAssetClient<'a>) {
     let contract_id = env.register_stellar_asset_contract_v2(admin.clone());
     (
         token::TokenClient::new(env, &contract_id.address()),

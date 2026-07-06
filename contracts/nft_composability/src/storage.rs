@@ -32,21 +32,35 @@ pub fn set_admin(env: &Env, admin: &Address) {
 }
 
 pub fn get_admin(env: &Env) -> Address {
-    env.storage().instance().get(&DataKey::Admin).expect("Admin not set")
+    env.storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .expect("Admin not set")
 }
 
 pub fn set_required_traits(env: &Env, traits: &Vec<Symbol>) {
-    env.storage().instance().set(&DataKey::RequiredTraits, traits);
+    env.storage()
+        .instance()
+        .set(&DataKey::RequiredTraits, traits);
 }
 
 pub fn get_required_traits(env: &Env) -> Vec<Symbol> {
-    env.storage().instance().get(&DataKey::RequiredTraits).unwrap_or_else(|| Vec::new(env))
+    env.storage()
+        .instance()
+        .get(&DataKey::RequiredTraits)
+        .unwrap_or_else(|| Vec::new(env))
 }
 
 pub fn increment_supply(env: &Env) -> u32 {
-    let mut current = env.storage().instance().get(&DataKey::TokenSupply).unwrap_or(0);
+    let mut current = env
+        .storage()
+        .instance()
+        .get(&DataKey::TokenSupply)
+        .unwrap_or(0);
     current += 1;
-    env.storage().instance().set(&DataKey::TokenSupply, &current);
+    env.storage()
+        .instance()
+        .set(&DataKey::TokenSupply, &current);
     current
 }
 

@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env,
+};
 
 /// Energy and Stamina Management Contract
 ///
@@ -19,9 +21,9 @@ use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_sh
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BoostType {
     None = 0,
-    DoubleRegen = 1,     // 2x regeneration rate
-    TripleRegen = 2,     // 3x regeneration rate
-    QuintupleRegen = 3,  // 5x regeneration rate
+    DoubleRegen = 1,    // 2x regeneration rate
+    TripleRegen = 2,    // 3x regeneration rate
+    QuintupleRegen = 3, // 5x regeneration rate
 }
 
 #[contracttype]
@@ -207,7 +209,10 @@ impl EnergyContract {
         let player_addr = player.clone();
         Self::assert_not_paused(&env)?;
 
-        let config: EnergyConfig = env.storage().instance().get(&DataKey::Config)
+        let config: EnergyConfig = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
             .ok_or(Error::NotInitialized)?;
 
         let mut player_energy = Self::get_or_create_player_energy(&env, player_addr.clone());
@@ -220,7 +225,9 @@ impl EnergyContract {
         player_energy.current_energy -= config.puzzle_energy_cost;
         player_energy.last_update = env.ledger().timestamp();
 
-        env.storage().instance().set(&DataKey::PlayerEnergy(player.clone()), &player_energy);
+        env.storage()
+            .instance()
+            .set(&DataKey::PlayerEnergy(player.clone()), &player_energy);
 
         // Emit consumption event
         env.events().publish(
@@ -241,7 +248,10 @@ impl EnergyContract {
         let player_addr = player.clone();
         Self::assert_not_paused(&env)?;
 
-        let config: EnergyConfig = env.storage().instance().get(&DataKey::Config)
+        let config: EnergyConfig = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
             .ok_or(Error::NotInitialized)?;
 
         // Check token balance and transfer
@@ -253,7 +263,11 @@ impl EnergyContract {
         }
 
         // Transfer tokens to contract
-        token_client.transfer(&player_addr, &env.current_contract_address(), &config.refill_token_cost);
+        token_client.transfer(
+            &player_addr,
+            &env.current_contract_address(),
+            &config.refill_token_cost,
+        );
 
         // Update player energy to maximum
         let mut player_energy = Self::get_or_create_player_energy(&env, player_addr.clone());
@@ -262,7 +276,9 @@ impl EnergyContract {
         player_energy.current_energy = player_energy.max_energy;
         player_energy.last_update = env.ledger().timestamp();
 
-        env.storage().instance().set(&DataKey::PlayerEnergy(player.clone()), &player_energy);
+        env.storage()
+            .instance()
+            .set(&DataKey::PlayerEnergy(player.clone()), &player_energy);
 
         // Emit refill event
         env.events().publish(
@@ -300,7 +316,10 @@ impl EnergyContract {
             return Err(Error::InvalidAmount);
         }
 
-        let config: EnergyConfig = env.storage().instance().get(&DataKey::Config)
+        let config: EnergyConfig = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
             .ok_or(Error::NotInitialized)?;
 
         // Reset daily gift counters if needed
@@ -335,14 +354,16 @@ impl EnergyContract {
         to_energy.current_energy += amount;
         to_energy.last_update = env.ledger().timestamp();
 
-        env.storage().instance().set(&DataKey::PlayerEnergy(from_player.clone()), &from_energy);
-        env.storage().instance().set(&DataKey::PlayerEnergy(to_player.clone()), &to_energy);
+        env.storage()
+            .instance()
+            .set(&DataKey::PlayerEnergy(from_player.clone()), &from_energy);
+        env.storage()
+            .instance()
+            .set(&DataKey::PlayerEnergy(to_player.clone()), &to_energy);
 
         // Emit gift event
-        env.events().publish(
-            (symbol_short!("E_GIFT"), from_player, to_player),
-            amount,
-        );
+        env.events()
+            .publish((symbol_short!("E_GIFT"), from_player, to_player), amount);
 
         Ok(())
     }
@@ -373,7 +394,9 @@ impl EnergyContract {
         let mut player_energy = Self::get_or_create_player_energy(&env, player.clone());
 
         // Check if boost already active
-        if player_energy.active_boost != BoostType::None && player_energy.boost_expires_at > env.ledger().timestamp() {
+        if player_energy.active_boost != BoostType::None
+            && player_energy.boost_expires_at > env.ledger().timestamp()
+        {
             return Err(Error::BoostAlreadyActive);
         }
 
@@ -382,7 +405,9 @@ impl EnergyContract {
         player_energy.boost_expires_at = env.ledger().timestamp() + duration_seconds;
         player_energy.last_update = env.ledger().timestamp();
 
-        env.storage().instance().set(&DataKey::PlayerEnergy(player.clone()), &player_energy);
+        env.storage()
+            .instance()
+            .set(&DataKey::PlayerEnergy(player.clone()), &player_energy);
 
         // Emit boost event
         env.events().publish(
@@ -413,13 +438,20 @@ impl EnergyContract {
 
     /// Get total number of players
     pub fn get_total_players(env: Env) -> u32 {
-        env.storage().instance().get(&DataKey::TotalPlayers).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalPlayers)
+            .unwrap_or(0)
     }
 
     // ───────────── INTERNAL HELPERS ─────────────
 
     fn get_or_create_player_energy(env: &Env, player: Address) -> PlayerEnergy {
-        if let Some(energy) = env.storage().instance().get(&DataKey::PlayerEnergy(player.clone())) {
+        if let Some(energy) = env
+            .storage()
+            .instance()
+            .get(&DataKey::PlayerEnergy(player.clone()))
+        {
             // Reset daily gifts if needed
             Self::reset_daily_gifts_if_needed(env);
             energy
@@ -438,17 +470,29 @@ impl EnergyContract {
                 last_gift_reset: current_time,
             };
 
-            env.storage().instance().set(&DataKey::PlayerEnergy(player), &energy);
+            env.storage()
+                .instance()
+                .set(&DataKey::PlayerEnergy(player), &energy);
 
             // Increment total players counter
-            let total_players: u32 = env.storage().instance().get(&DataKey::TotalPlayers).unwrap_or(0);
-            env.storage().instance().set(&DataKey::TotalPlayers, &(total_players + 1));
+            let total_players: u32 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalPlayers)
+                .unwrap_or(0);
+            env.storage()
+                .instance()
+                .set(&DataKey::TotalPlayers, &(total_players + 1));
 
             energy
         }
     }
 
-    fn update_energy_regeneration(env: &Env, player_energy: &mut PlayerEnergy, config: &EnergyConfig) {
+    fn update_energy_regeneration(
+        env: &Env,
+        player_energy: &mut PlayerEnergy,
+        config: &EnergyConfig,
+    ) {
         let current_time = env.ledger().timestamp();
 
         // Use saturating_sub to prevent underflow on timestamp issues
@@ -459,7 +503,9 @@ impl EnergyContract {
         }
 
         // Calculate regeneration multiplier from active boost
-        let multiplier = if player_energy.active_boost != BoostType::None && player_energy.boost_expires_at > current_time {
+        let multiplier = if player_energy.active_boost != BoostType::None
+            && player_energy.boost_expires_at > current_time
+        {
             match player_energy.active_boost {
                 BoostType::DoubleRegen => 2,
                 BoostType::TripleRegen => 3,
@@ -480,25 +526,37 @@ impl EnergyContract {
         let regenerated = time_elapsed * (config.base_regen_rate * multiplier);
 
         // Apply regeneration with saturation (capped at max_energy)
-        player_energy.current_energy = player_energy.current_energy.saturating_add(regenerated).min(player_energy.max_energy);
+        player_energy.current_energy = player_energy
+            .current_energy
+            .saturating_add(regenerated)
+            .min(player_energy.max_energy);
         player_energy.last_update = current_time;
     }
 
     fn reset_daily_gifts_if_needed(env: &Env) {
         let current_time = env.ledger().timestamp();
-        let last_reset: u64 = env.storage().instance().get(&DataKey::DailyGiftReset).unwrap_or(0);
+        let last_reset: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::DailyGiftReset)
+            .unwrap_or(0);
 
         if current_time - last_reset >= SECONDS_PER_DAY {
             // Reset all players' daily gift counters
             // Note: In a real implementation, you might want to iterate through all players
             // For now, we'll reset on access (lazy reset)
 
-            env.storage().instance().set(&DataKey::DailyGiftReset, &current_time);
+            env.storage()
+                .instance()
+                .set(&DataKey::DailyGiftReset, &current_time);
         }
     }
 
     fn assert_admin(env: &Env, user: &Address) -> Result<(), Error> {
-        let config: EnergyConfig = env.storage().instance().get(&DataKey::Config)
+        let config: EnergyConfig = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
             .ok_or(Error::NotInitialized)?;
         if config.admin != *user {
             return Err(Error::Unauthorized);
@@ -507,7 +565,10 @@ impl EnergyContract {
     }
 
     fn assert_not_paused(env: &Env) -> Result<(), Error> {
-        let config: EnergyConfig = env.storage().instance().get(&DataKey::Config)
+        let config: EnergyConfig = env
+            .storage()
+            .instance()
+            .get(&DataKey::Config)
             .ok_or(Error::NotInitialized)?;
         if config.paused {
             return Err(Error::ContractPaused);
@@ -538,10 +599,10 @@ mod test {
         client.initialize(
             &admin,
             &reward_token,
-            &1, // 1 energy per second base rate
+            &1,   // 1 energy per second base rate
             &100, // max 100 energy
-            &10, // 10 energy per puzzle
-            &50, // 50 tokens for refill
+            &10,  // 10 energy per puzzle
+            &50,  // 50 tokens for refill
         );
 
         let config = client.get_config();

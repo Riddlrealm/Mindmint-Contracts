@@ -2,8 +2,10 @@
 
 mod storage;
 
-use soroban_sdk::{contract, contractimpl, Env, Address, BytesN, Vec};
-use storage::{DataKey, set_admin, get_admin, set_paused, is_paused, push_upgrade_history, get_upgrade_history};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
+use storage::{
+    get_admin, get_upgrade_history, is_paused, push_upgrade_history, set_admin, set_paused, DataKey,
+};
 
 #[contract]
 pub struct ProxyContract;
@@ -65,4 +67,3 @@ impl ProxyContract {
         panic!("Method not found");
     }
 }
-

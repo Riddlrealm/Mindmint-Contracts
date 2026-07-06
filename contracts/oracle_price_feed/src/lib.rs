@@ -12,7 +12,11 @@ pub struct OraclePriceFeed;
 
 #[contractimpl]
 impl OraclePriceFeed {
-    pub fn initialize(env: Env, admin: Address, stale_threshold: u64) -> Result<(), PriceFeedError> {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        stale_threshold: u64,
+    ) -> Result<(), PriceFeedError> {
         if Storage::has_config(&env) {
             return Err(PriceFeedError::AlreadyInitialized);
         }
@@ -145,8 +149,10 @@ impl OraclePriceFeed {
 
         Storage::set_price_feed(&env, &pair_id, &feed);
 
-        env.events()
-            .publish((symbol_short!("price_sub"), pair_id.clone()), (provider, price));
+        env.events().publish(
+            (symbol_short!("price_sub"), pair_id.clone()),
+            (provider, price),
+        );
         env.events()
             .publish((symbol_short!("median_up"), pair_id), median);
 

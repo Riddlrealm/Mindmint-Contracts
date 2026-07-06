@@ -75,14 +75,18 @@ impl EmergencyPauseContract {
 
         let mut guardians = Vec::<Address>::new(&env);
         guardians.push_back(admin.clone());
-        env.storage().instance().set(&DataKey::Guardians, &guardians);
+        env.storage()
+            .instance()
+            .set(&DataKey::Guardians, &guardians);
 
         env.storage()
             .instance()
             .set(&DataKey::UnpauseTimelock, &DEFAULT_TIMELOCK);
 
         let history = Vec::<PauseEvent>::new(&env);
-        env.storage().persistent().set(&DataKey::PauseHistory, &history);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PauseHistory, &history);
 
         Ok(())
     }
@@ -120,10 +124,8 @@ impl EmergencyPauseContract {
         );
 
         // Emit event
-        env.events().publish(
-            (Symbol::new(&env, "ContractPaused"),),
-            (guardian, reason),
-        );
+        env.events()
+            .publish((Symbol::new(&env, "ContractPaused"),), (guardian, reason));
 
         Ok(())
     }
@@ -146,11 +148,7 @@ impl EmergencyPauseContract {
             .unwrap();
         let unpause_after = now + timelock;
 
-        let mut state: PauseState = env
-            .storage()
-            .instance()
-            .get(&DataKey::PauseState)
-            .unwrap();
+        let mut state: PauseState = env.storage().instance().get(&DataKey::PauseState).unwrap();
         state.unpause_after = unpause_after;
         env.storage().instance().set(&DataKey::PauseState, &state);
 
@@ -165,10 +163,8 @@ impl EmergencyPauseContract {
         );
 
         // Emit event
-        env.events().publish(
-            (Symbol::new(&env, "UnpauseRequested"),),
-            unpause_after,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "UnpauseRequested"),), unpause_after);
 
         Ok(unpause_after)
     }
@@ -181,11 +177,7 @@ impl EmergencyPauseContract {
             return Err(PauseError::NotPaused);
         }
 
-        let state: PauseState = env
-            .storage()
-            .instance()
-            .get(&DataKey::PauseState)
-            .unwrap();
+        let state: PauseState = env.storage().instance().get(&DataKey::PauseState).unwrap();
 
         if state.unpause_after == 0 {
             return Err(PauseError::UnpauseNotRequested);
@@ -210,10 +202,8 @@ impl EmergencyPauseContract {
         );
 
         // Emit event
-        env.events().publish(
-            (Symbol::new(&env, "ContractUnpaused"),),
-            now,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "ContractUnpaused"),), now);
 
         Ok(())
     }
@@ -238,11 +228,8 @@ impl EmergencyPauseContract {
     pub fn add_guardian(env: Env, new_guardian: Address) -> Result<(), PauseError> {
         Self::require_admin(&env)?;
 
-        let mut guardians: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Guardians)
-            .unwrap();
+        let mut guardians: Vec<Address> =
+            env.storage().instance().get(&DataKey::Guardians).unwrap();
 
         // Check duplicate
         for i in 0..guardians.len() {
@@ -263,11 +250,7 @@ impl EmergencyPauseContract {
     pub fn remove_guardian(env: Env, guardian: Address) -> Result<(), PauseError> {
         Self::require_admin(&env)?;
 
-        let guardians: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Guardians)
-            .unwrap();
+        let guardians: Vec<Address> = env.storage().instance().get(&DataKey::Guardians).unwrap();
 
         let mut found = false;
         let mut new_guardians = Vec::<Address>::new(&env);
@@ -294,11 +277,7 @@ impl EmergencyPauseContract {
     /// Query: returns all guardians.
     pub fn get_guardians(env: Env) -> Result<Vec<Address>, PauseError> {
         Self::require_initialized(&env)?;
-        Ok(env
-            .storage()
-            .instance()
-            .get(&DataKey::Guardians)
-            .unwrap())
+        Ok(env.storage().instance().get(&DataKey::Guardians).unwrap())
     }
 
     // ─── Timelock Configuration ───────────────────────────
@@ -357,11 +336,7 @@ impl EmergencyPauseContract {
     }
 
     fn require_guardian(env: &Env, addr: &Address) -> Result<(), PauseError> {
-        let guardians: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&DataKey::Guardians)
-            .unwrap();
+        let guardians: Vec<Address> = env.storage().instance().get(&DataKey::Guardians).unwrap();
         for i in 0..guardians.len() {
             if &guardians.get(i).unwrap() == addr {
                 return Ok(());
@@ -397,4 +372,3 @@ impl EmergencyPauseContract {
             .set(&DataKey::PauseHistory, &history);
     }
 }
-

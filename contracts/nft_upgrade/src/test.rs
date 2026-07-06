@@ -24,7 +24,16 @@ fn mint_tokens(env: &Env, token_addr: &Address, to: &Address, amount: i128) {
 /// Registers the upgrade contract and initialises it.
 /// Uses a random address as the NFT contract (no real wasm needed because the
 /// ownership cross-contract call uses `try_invoke_contract` and fails gracefully).
-fn setup(env: &Env) -> (NftUpgradeContractClient, Address, Address, Address, TokenClient, Address) {
+fn setup(
+    env: &Env,
+) -> (
+    NftUpgradeContractClient,
+    Address,
+    Address,
+    Address,
+    TokenClient,
+    Address,
+) {
     env.mock_all_auths();
     let admin = Address::generate(env);
     let player = Address::generate(env);
@@ -38,7 +47,14 @@ fn setup(env: &Env) -> (NftUpgradeContractClient, Address, Address, Address, Tok
 
     mint_tokens(env, &token_addr, &player, 100_000);
 
-    (client, admin, player, token_addr, token_client, nft_contract)
+    (
+        client,
+        admin,
+        player,
+        token_addr,
+        token_client,
+        nft_contract,
+    )
 }
 
 fn boosts(env: &Env, power: u32, rarity: u32) -> Map<String, u32> {
@@ -121,7 +137,11 @@ fn test_register_and_get_config() {
     assert_eq!(cfg.tier, 1);
     assert_eq!(cfg.cost, 500);
     assert_eq!(cfg.success_rate_bps, 7500);
-    assert_eq!(cfg.attribute_boosts.get(String::from_str(&env, "power_level")), Some(10));
+    assert_eq!(
+        cfg.attribute_boosts
+            .get(String::from_str(&env, "power_level")),
+        Some(10)
+    );
 }
 
 #[test]

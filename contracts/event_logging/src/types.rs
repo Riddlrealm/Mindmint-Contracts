@@ -1,12 +1,12 @@
 use soroban_sdk::{contracttype, Address, Symbol, Val, Vec};
 
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Event {
     pub id: u64,
     pub source_contract: Address,
     pub topic: Symbol,
-    pub data: Val,
+    pub data: Vec<Val>,
     pub timestamp: u64,
 }
 
@@ -21,8 +21,8 @@ pub enum DataKey {
     Admin,
     Config,
     EventCount,
-    Event(u64), // event payload
-    TopicIndex(Symbol), // Vec<u64> of event IDs
-    ContractIndex(Address), // Vec<u64> of event IDs
+    Event(u64),                  // event payload
+    TopicIndex(Symbol),          // Vec<u64> of event IDs
+    ContractIndex(Address),      // Vec<u64> of event IDs
     AnalyticsTopicCount(Symbol), // u64 total count
 }

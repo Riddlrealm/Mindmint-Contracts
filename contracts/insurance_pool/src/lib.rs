@@ -10,18 +10,18 @@ use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, Str
 
 #[contracttype]
 pub enum DataKey {
-    Config,                    // PoolConfig
-    ContractPolicy(Address),    // ContractPolicy for covered contract
-    PolicyList,                 // Vec<Address> of all covered contracts
-    Claim(u64),                 // Claim by ID
-    ClaimCounter,              // u64 counter for generating claim IDs
-    ContractClaims(Address),   // Vec<u64> of contract's claim IDs
-    PremiumPool,               // i128 total premium pool
-    ReservePool,               // i128 reserve pool for emergencies
-    TotalPolicies,             // u64 counter
-    TotalClaims,               // u64 counter
-    RiskScore(Address),        // RiskScore for contract
-    PoolMetrics,               // PoolMetrics for overall pool health
+    Config,                  // PoolConfig
+    ContractPolicy(Address), // ContractPolicy for covered contract
+    PolicyList,              // Vec<Address> of all covered contracts
+    Claim(u64),              // Claim by ID
+    ClaimCounter,            // u64 counter for generating claim IDs
+    ContractClaims(Address), // Vec<u64> of contract's claim IDs
+    PremiumPool,             // i128 total premium pool
+    ReservePool,             // i128 reserve pool for emergencies
+    TotalPolicies,           // u64 counter
+    TotalClaims,             // u64 counter
+    RiskScore(Address),      // RiskScore for contract
+    PoolMetrics,             // PoolMetrics for overall pool health
 }
 
 //
@@ -79,14 +79,14 @@ pub enum FailureType {
 #[derive(Clone, Debug)]
 pub struct PoolConfig {
     pub admin: Address,
-    pub payment_token: Address,        // Token used for premiums/payouts
-    pub base_premium_rate: u32,        // In basis points (100 = 1%)
-    pub min_coverage_period: u64,      // Minimum coverage period in seconds
-    pub max_coverage_period: u64,      // Maximum coverage period in seconds
-    pub max_coverage_amount: i128,     // Maximum coverage amount
-    pub claim_review_period: u64,      // Time for admin to review claims
-    pub reserve_ratio: u32,             // Percentage of pool to keep as reserve (basis points)
-    pub max_payout_ratio: u32,         // Max payout as percentage of coverage (basis points)
+    pub payment_token: Address,    // Token used for premiums/payouts
+    pub base_premium_rate: u32,    // In basis points (100 = 1%)
+    pub min_coverage_period: u64,  // Minimum coverage period in seconds
+    pub max_coverage_period: u64,  // Maximum coverage period in seconds
+    pub max_coverage_amount: i128, // Maximum coverage amount
+    pub claim_review_period: u64,  // Time for admin to review claims
+    pub reserve_ratio: u32,        // Percentage of pool to keep as reserve (basis points)
+    pub max_payout_ratio: u32,     // Max payout as percentage of coverage (basis points)
     pub paused: bool,
 }
 
@@ -100,7 +100,7 @@ pub struct ContractPolicy {
     pub end_time: u64,
     pub status: PolicyStatus,
     pub risk_level: RiskLevel,
-    pub premium_rate: u32,             // Actual premium rate applied
+    pub premium_rate: u32, // Actual premium rate applied
 }
 
 #[contracttype]
@@ -111,7 +111,7 @@ pub struct Claim {
     pub failure_type: FailureType,
     pub claim_amount: i128,
     pub description: String,
-    pub evidence_hash: String,          // Hash of evidence provided
+    pub evidence_hash: String, // Hash of evidence provided
     pub submission_time: u64,
     pub status: ClaimStatus,
     pub review_notes: String,
@@ -124,7 +124,7 @@ pub struct Claim {
 pub struct RiskScore {
     pub contract_address: Address,
     pub risk_level: RiskLevel,
-    pub score: u32,                     // 0-100, higher = riskier
+    pub score: u32, // 0-100, higher = riskier
     pub total_claims: u32,
     pub approved_claims: u32,
     pub total_payout: i128,
@@ -139,8 +139,8 @@ pub struct PoolMetrics {
     pub active_policies: u64,
     pub total_claims_submitted: u64,
     pub total_claims_approved: u64,
-    pub pool_utilization: u32,         // In basis points
-    pub reserve_ratio: u32,            // In basis points
+    pub pool_utilization: u32, // In basis points
+    pub reserve_ratio: u32,    // In basis points
 }
 
 //
@@ -173,12 +173,7 @@ impl InsurancePoolContract {
     /// * `admin` - Contract administrator
     /// * `payment_token` - Token address for premiums and payouts
     /// * `base_premium_rate` - Base premium rate in basis points (e.g., 100 = 1%)
-    pub fn initialize(
-        env: Env,
-        admin: Address,
-        payment_token: Address,
-        base_premium_rate: u32,
-    ) {
+    pub fn initialize(env: Env, admin: Address, payment_token: Address, base_premium_rate: u32) {
         admin.require_auth();
 
         if env.storage().persistent().has(&DataKey::Config) {
@@ -189,20 +184,28 @@ impl InsurancePoolContract {
             admin: admin.clone(),
             payment_token,
             base_premium_rate,
-            min_coverage_period: 30 * SECONDS_PER_DAY,    // 30 days minimum
-            max_coverage_period: 365 * SECONDS_PER_DAY,  // 1 year maximum
-            max_coverage_amount: 10_000_000_000_000,      // 10M tokens max
-            claim_review_period: 14 * SECONDS_PER_DAY,   // 14 days review time
-            reserve_ratio: 2000,                          // 20% reserve
-            max_payout_ratio: 10000,                     // 100% of coverage
+            min_coverage_period: 30 * SECONDS_PER_DAY, // 30 days minimum
+            max_coverage_period: 365 * SECONDS_PER_DAY, // 1 year maximum
+            max_coverage_amount: 10_000_000_000_000,   // 10M tokens max
+            claim_review_period: 14 * SECONDS_PER_DAY, // 14 days review time
+            reserve_ratio: 2000,                       // 20% reserve
+            max_payout_ratio: 10000,                   // 100% of coverage
             paused: false,
         };
 
         env.storage().persistent().set(&DataKey::Config, &config);
-        env.storage().persistent().set(&DataKey::PremiumPool, &0i128);
-        env.storage().persistent().set(&DataKey::ReservePool, &0i128);
-        env.storage().persistent().set(&DataKey::ClaimCounter, &0u64);
-        env.storage().persistent().set(&DataKey::TotalPolicies, &0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &0i128);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReservePool, &0i128);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ClaimCounter, &0u64);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalPolicies, &0u64);
         env.storage().persistent().set(&DataKey::TotalClaims, &0u64);
 
         // Initialize pool metrics
@@ -215,7 +218,9 @@ impl InsurancePoolContract {
             pool_utilization: 0,
             reserve_ratio: 2000,
         };
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
     }
 
     // ───────────── POLICY MANAGEMENT ─────────────
@@ -244,7 +249,9 @@ impl InsurancePoolContract {
             panic!("Invalid coverage amount");
         }
 
-        if coverage_period < config.min_coverage_period || coverage_period > config.max_coverage_period {
+        if coverage_period < config.min_coverage_period
+            || coverage_period > config.max_coverage_period
+        {
             panic!("Invalid coverage period");
         }
 
@@ -288,29 +295,53 @@ impl InsurancePoolContract {
         };
 
         // Store policy
-        env.storage().persistent().set(&DataKey::ContractPolicy(contract_address.clone()), &policy);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ContractPolicy(contract_address.clone()), &policy);
 
         // Add to policy list
         Self::add_to_policy_list(&env, contract_address.clone());
 
         // Update premium pool
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool + premium));
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool + premium));
 
         // Update reserve pool
         let reserve_amount = (premium * config.reserve_ratio as i128) / BASIS_POINTS as i128;
-        let reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::ReservePool, &(reserve + reserve_amount));
+        let reserve: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReservePool, &(reserve + reserve_amount));
 
         // Update pool metrics
         Self::update_metrics_on_purchase(&env, premium);
 
         // Increment total policies
-        let total: u64 = env.storage().persistent().get(&DataKey::TotalPolicies).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalPolicies, &(total + 1));
+        let total: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalPolicies)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalPolicies, &(total + 1));
 
         // Initialize risk score if not exists
-        if !env.storage().persistent().has(&DataKey::RiskScore(contract_address.clone())) {
+        if !env
+            .storage()
+            .persistent()
+            .has(&DataKey::RiskScore(contract_address.clone()))
+        {
             let risk_score = RiskScore {
                 contract_address: contract_address.clone(),
                 risk_level,
@@ -320,7 +351,9 @@ impl InsurancePoolContract {
                 total_payout: 0,
                 last_updated: start_time,
             };
-            env.storage().persistent().set(&DataKey::RiskScore(contract_address), &risk_score);
+            env.storage()
+                .persistent()
+                .set(&DataKey::RiskScore(contract_address), &risk_score);
         }
     }
 
@@ -340,7 +373,9 @@ impl InsurancePoolContract {
         Self::assert_not_paused(&env);
 
         let config: PoolConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let mut policy: ContractPolicy = env.storage().persistent()
+        let mut policy: ContractPolicy = env
+            .storage()
+            .persistent()
             .get(&DataKey::ContractPolicy(contract_address.clone()))
             .expect("Policy not found");
 
@@ -379,16 +414,31 @@ impl InsurancePoolContract {
         policy.premium_paid += additional_premium;
         policy.status = PolicyStatus::Active;
 
-        env.storage().persistent().set(&DataKey::ContractPolicy(contract_address), &policy);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ContractPolicy(contract_address), &policy);
 
         // Update premium pool
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool + additional_premium));
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool + additional_premium));
 
         // Update reserve pool
-        let reserve_amount = (additional_premium * config.reserve_ratio as i128) / BASIS_POINTS as i128;
-        let reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::ReservePool, &(reserve + reserve_amount));
+        let reserve_amount =
+            (additional_premium * config.reserve_ratio as i128) / BASIS_POINTS as i128;
+        let reserve: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReservePool, &(reserve + reserve_amount));
 
         // Update pool metrics
         Self::update_metrics_on_purchase(&env, additional_premium);
@@ -402,7 +452,9 @@ impl InsurancePoolContract {
     pub fn cancel_coverage(env: Env, contract_address: Address, payer: Address) {
         payer.require_auth();
 
-        let mut policy: ContractPolicy = env.storage().persistent()
+        let mut policy: ContractPolicy = env
+            .storage()
+            .persistent()
             .get(&DataKey::ContractPolicy(contract_address.clone()))
             .expect("Policy not found");
 
@@ -429,7 +481,9 @@ impl InsurancePoolContract {
 
         // Update policy status
         policy.status = PolicyStatus::Cancelled;
-        env.storage().persistent().set(&DataKey::ContractPolicy(contract_address.clone()), &policy);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ContractPolicy(contract_address.clone()), &policy);
 
         // Process refund if applicable
         if refund > 0 {
@@ -437,13 +491,25 @@ impl InsurancePoolContract {
             token_client.transfer(&env.current_contract_address(), &payer, &refund);
 
             // Update premium pool
-            let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-            env.storage().persistent().set(&DataKey::PremiumPool, &(pool - refund));
+            let pool: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::PremiumPool)
+                .unwrap_or(0);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PremiumPool, &(pool - refund));
 
             // Update reserve pool proportionally
             let reserve_refund = (refund * config.reserve_ratio as i128) / BASIS_POINTS as i128;
-            let reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
-            env.storage().persistent().set(&DataKey::ReservePool, &(reserve - reserve_refund));
+            let reserve: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::ReservePool)
+                .unwrap_or(0);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ReservePool, &(reserve - reserve_refund));
         }
 
         // Update pool metrics
@@ -477,7 +543,9 @@ impl InsurancePoolContract {
         Self::assert_not_paused(&env);
 
         // Get policy
-        let policy: ContractPolicy = env.storage().persistent()
+        let policy: ContractPolicy = env
+            .storage()
+            .persistent()
             .get(&DataKey::ContractPolicy(contract_address.clone()))
             .expect("No active coverage found");
 
@@ -513,9 +581,15 @@ impl InsurancePoolContract {
         Self::verify_claim(&env, &contract_address, &submitter);
 
         // Generate claim ID
-        let claim_id: u64 = env.storage().persistent().get(&DataKey::ClaimCounter).unwrap_or(0);
+        let claim_id: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ClaimCounter)
+            .unwrap_or(0);
         let new_claim_id = claim_id + 1;
-        env.storage().persistent().set(&DataKey::ClaimCounter, &new_claim_id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ClaimCounter, &new_claim_id);
 
         // Create claim
         let claim = Claim {
@@ -533,7 +607,9 @@ impl InsurancePoolContract {
         };
 
         // Store claim
-        env.storage().persistent().set(&DataKey::Claim(new_claim_id), &claim);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(new_claim_id), &claim);
 
         // Add to contract's claims list
         Self::add_to_contract_claims(&env, contract_address.clone(), new_claim_id);
@@ -542,8 +618,14 @@ impl InsurancePoolContract {
         Self::update_risk_score_on_claim(&env, contract_address.clone());
 
         // Increment total claims
-        let total: u64 = env.storage().persistent().get(&DataKey::TotalClaims).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::TotalClaims, &(total + 1));
+        let total: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::TotalClaims)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::TotalClaims, &(total + 1));
 
         // Update pool metrics
         Self::update_metrics_on_claim(&env);
@@ -570,7 +652,9 @@ impl InsurancePoolContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let mut claim: Claim = env.storage().persistent()
+        let mut claim: Claim = env
+            .storage()
+            .persistent()
             .get(&DataKey::Claim(claim_id))
             .expect("Claim not found");
 
@@ -586,7 +670,8 @@ impl InsurancePoolContract {
             }
 
             // Enforce max payout ratio
-            let max_payout = (claim.claim_amount * config.max_payout_ratio as i128) / BASIS_POINTS as i128;
+            let max_payout =
+                (claim.claim_amount * config.max_payout_ratio as i128) / BASIS_POINTS as i128;
             if payout_amount > max_payout {
                 panic!("Payout amount exceeds maximum allowed");
             }
@@ -600,11 +685,17 @@ impl InsurancePoolContract {
 
         claim.review_notes = review_notes;
 
-        env.storage().persistent().set(&DataKey::Claim(claim_id), &claim);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(claim_id), &claim);
 
         // Update risk score if approved
         if approved {
-            Self::update_risk_score_on_approval(&env, claim.contract_address.clone(), payout_amount);
+            Self::update_risk_score_on_approval(
+                &env,
+                claim.contract_address.clone(),
+                payout_amount,
+            );
         }
 
         // Update pool metrics
@@ -621,7 +712,9 @@ impl InsurancePoolContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let mut claim: Claim = env.storage().persistent()
+        let mut claim: Claim = env
+            .storage()
+            .persistent()
             .get(&DataKey::Claim(claim_id))
             .expect("Claim not found");
 
@@ -630,10 +723,19 @@ impl InsurancePoolContract {
         }
 
         let config: PoolConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
 
         // Check pool has sufficient funds (excluding reserve)
-        let available_pool = pool - env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
+        let available_pool = pool
+            - env
+                .storage()
+                .persistent()
+                .get(&DataKey::ReservePool)
+                .unwrap_or(0);
         if available_pool < claim.payout_amount {
             // Try to use reserve if needed
             if pool < claim.payout_amount {
@@ -652,10 +754,14 @@ impl InsurancePoolContract {
         // Update claim
         claim.status = ClaimStatus::Paid;
         claim.payout_time = env.ledger().timestamp();
-        env.storage().persistent().set(&DataKey::Claim(claim_id), &claim);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Claim(claim_id), &claim);
 
         // Update premium pool
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool - claim.payout_amount));
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool - claim.payout_amount));
 
         // Update pool metrics
         Self::update_metrics_on_payout(&env, claim.payout_amount);
@@ -681,13 +787,25 @@ impl InsurancePoolContract {
 
         token_client.transfer(&admin, &env.current_contract_address(), &amount);
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool + amount));
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool + amount));
 
         // Update reserve pool proportionally
         let reserve_amount = (amount * config.reserve_ratio as i128) / BASIS_POINTS as i128;
-        let reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::ReservePool, &(reserve + reserve_amount));
+        let reserve: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReservePool, &(reserve + reserve_amount));
     }
 
     /// Withdraw from premium pool (admin only)
@@ -703,8 +821,16 @@ impl InsurancePoolContract {
             panic!("Amount must be positive");
         }
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        let reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+        let reserve: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0);
 
         // Ensure reserve is maintained
         let min_reserve = (pool * 2000) / BASIS_POINTS as i128; // 20% minimum
@@ -719,11 +845,15 @@ impl InsurancePoolContract {
 
         token_client.transfer(&env.current_contract_address(), &admin, &amount);
 
-        env.storage().persistent().set(&DataKey::PremiumPool, &(pool - amount));
+        env.storage()
+            .persistent()
+            .set(&DataKey::PremiumPool, &(pool - amount));
 
         // Adjust reserve proportionally
         let reserve_reduction = (amount * config.reserve_ratio as i128) / BASIS_POINTS as i128;
-        env.storage().persistent().set(&DataKey::ReservePool, &(reserve - reserve_reduction));
+        env.storage()
+            .persistent()
+            .set(&DataKey::ReservePool, &(reserve - reserve_reduction));
     }
 
     /// Calculate and update reserve requirements
@@ -735,24 +865,36 @@ impl InsurancePoolContract {
         Self::assert_admin(&env, &admin);
 
         let config: PoolConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
 
         // Calculate required reserve
         let required_reserve = (pool * config.reserve_ratio as i128) / BASIS_POINTS as i128;
-        let current_reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
+        let current_reserve: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0);
 
         if current_reserve < required_reserve {
             // Need to move funds from pool to reserve
             let shortage = required_reserve - current_reserve;
             let available_pool = pool - current_reserve;
-            
+
             if available_pool >= shortage {
-                env.storage().persistent().set(&DataKey::ReservePool, &required_reserve);
+                env.storage()
+                    .persistent()
+                    .set(&DataKey::ReservePool, &required_reserve);
             }
         } else if current_reserve > required_reserve {
             // Can release some reserve back to pool
             let _excess = current_reserve - required_reserve;
-            env.storage().persistent().set(&DataKey::ReservePool, &required_reserve);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ReservePool, &required_reserve);
         }
 
         // Update pool metrics
@@ -767,12 +909,17 @@ impl InsurancePoolContract {
     /// * `admin` - Admin address
     /// * `contract_address` - Contract address
     /// * `risk_level` - New risk level
-    pub fn set_risk_level(env: Env, admin: Address, contract_address: Address, risk_level: RiskLevel) {
+    pub fn set_risk_level(
+        env: Env,
+        admin: Address,
+        contract_address: Address,
+        risk_level: RiskLevel,
+    ) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let mut risk_score = Self::get_risk_score(env.clone(), contract_address.clone())
-            .unwrap_or(RiskScore {
+        let mut risk_score =
+            Self::get_risk_score(env.clone(), contract_address.clone()).unwrap_or(RiskScore {
                 contract_address: contract_address.clone(),
                 risk_level,
                 score: Self::risk_level_to_score(risk_level),
@@ -786,7 +933,9 @@ impl InsurancePoolContract {
         risk_score.score = Self::risk_level_to_score(risk_level);
         risk_score.last_updated = env.ledger().timestamp();
 
-        env.storage().persistent().set(&DataKey::RiskScore(contract_address), &risk_score);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RiskScore(contract_address), &risk_score);
     }
 
     /// Get current risk assessment for a contract
@@ -797,23 +946,24 @@ impl InsurancePoolContract {
     /// # Returns
     /// * RiskScore struct
     pub fn get_risk_assessment(env: Env, contract_address: Address) -> RiskScore {
-        Self::get_risk_score(env, contract_address.clone())
-            .unwrap_or(RiskScore {
-                contract_address,
-                risk_level: RiskLevel::Medium,
-                score: 50,
-                total_claims: 0,
-                approved_claims: 0,
-                total_payout: 0,
-                last_updated: 0,
-            })
+        Self::get_risk_score(env, contract_address.clone()).unwrap_or(RiskScore {
+            contract_address,
+            risk_level: RiskLevel::Medium,
+            score: 50,
+            total_claims: 0,
+            approved_claims: 0,
+            total_payout: 0,
+            last_updated: 0,
+        })
     }
 
     // ───────────── VIEW FUNCTIONS ─────────────
 
     /// Get policy information
     pub fn get_policy(env: Env, contract_address: Address) -> Option<ContractPolicy> {
-        env.storage().persistent().get(&DataKey::ContractPolicy(contract_address))
+        env.storage()
+            .persistent()
+            .get(&DataKey::ContractPolicy(contract_address))
     }
 
     /// Get claim information
@@ -823,34 +973,42 @@ impl InsurancePoolContract {
 
     /// Get contract's claim history
     pub fn get_contract_claims(env: Env, contract_address: Address) -> Vec<u64> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&DataKey::ContractClaims(contract_address))
             .unwrap_or(Vec::new(&env))
     }
 
     /// Get all covered contracts
     pub fn get_all_policies(env: Env) -> Vec<Address> {
-        env.storage().persistent()
+        env.storage()
+            .persistent()
             .get(&DataKey::PolicyList)
             .unwrap_or(Vec::new(&env))
     }
 
     /// Get total policies count
     pub fn get_total_policies(env: Env) -> u64 {
-        env.storage().persistent().get(&DataKey::TotalPolicies).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalPolicies)
+            .unwrap_or(0)
     }
 
     /// Get total claims count
     pub fn get_total_claims(env: Env) -> u64 {
-        env.storage().persistent().get(&DataKey::TotalClaims).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::TotalClaims)
+            .unwrap_or(0)
     }
 
     /// Check if coverage is active
     pub fn is_coverage_active(env: Env, contract_address: Address) -> bool {
         if let Some(policy) = Self::get_policy(env.clone(), contract_address) {
             let current_time = env.ledger().timestamp();
-            policy.status == PolicyStatus::Active 
-                && current_time >= policy.start_time 
+            policy.status == PolicyStatus::Active
+                && current_time >= policy.start_time
                 && current_time <= policy.end_time
         } else {
             false
@@ -859,12 +1017,18 @@ impl InsurancePoolContract {
 
     /// Get premium pool balance
     pub fn get_premium_pool(env: Env) -> i128 {
-        env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0)
     }
 
     /// Get reserve pool balance
     pub fn get_reserve_pool(env: Env) -> i128 {
-        env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0)
     }
 
     /// Get configuration
@@ -874,7 +1038,10 @@ impl InsurancePoolContract {
 
     /// Get pool metrics
     pub fn get_pool_metrics(env: Env) -> PoolMetrics {
-        env.storage().persistent().get(&DataKey::PoolMetrics).unwrap()
+        env.storage()
+            .persistent()
+            .get(&DataKey::PoolMetrics)
+            .unwrap()
     }
 
     /// Calculate premium for given parameters
@@ -886,7 +1053,13 @@ impl InsurancePoolContract {
     ) -> i128 {
         let config: PoolConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
         let premium_rate = Self::calculate_premium_rate(&config, risk_level);
-        Self::calculate_premium(&env, &config, premium_rate, coverage_amount, coverage_period)
+        Self::calculate_premium(
+            &env,
+            &config,
+            premium_rate,
+            coverage_amount,
+            coverage_period,
+        )
     }
 
     // ───────────── ADMIN FUNCTIONS ─────────────
@@ -962,7 +1135,11 @@ impl InsurancePoolContract {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
 
         if pool > 0 {
             let config: PoolConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
@@ -970,8 +1147,12 @@ impl InsurancePoolContract {
 
             token_client.transfer(&env.current_contract_address(), &admin, &pool);
 
-            env.storage().persistent().set(&DataKey::PremiumPool, &0i128);
-            env.storage().persistent().set(&DataKey::ReservePool, &0i128);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PremiumPool, &0i128);
+            env.storage()
+                .persistent()
+                .set(&DataKey::ReservePool, &0i128);
         }
 
         pool
@@ -988,9 +1169,9 @@ impl InsurancePoolContract {
     ) -> i128 {
         // Calculate: coverage_amount * premium_rate * (period_days / 365) / BASIS_POINTS
         let coverage_days = coverage_period / SECONDS_PER_DAY;
-        
+
         // Premium = coverage_amount * premium_rate * (coverage_days / 365) / BASIS_POINTS
-        let premium = (coverage_amount * premium_rate as i128 * coverage_days as i128) 
+        let premium = (coverage_amount * premium_rate as i128 * coverage_days as i128)
             / (365 * BASIS_POINTS as i128);
 
         // Ensure minimum premium of 1
@@ -1004,9 +1185,9 @@ impl InsurancePoolContract {
     fn calculate_premium_rate(config: &PoolConfig, risk_level: RiskLevel) -> u32 {
         // Adjust base rate based on risk level
         let risk_multiplier = match risk_level {
-            RiskLevel::Low => 80,      // 0.8x
-            RiskLevel::Medium => 100,  // 1.0x
-            RiskLevel::High => 150,    // 1.5x
+            RiskLevel::Low => 80,       // 0.8x
+            RiskLevel::Medium => 100,   // 1.0x
+            RiskLevel::High => 150,     // 1.5x
             RiskLevel::Critical => 200, // 2.0x
         };
 
@@ -1040,7 +1221,11 @@ impl InsurancePoolContract {
 
         let mut recent_claims = 0u32;
         for claim_id in claims.iter() {
-            if let Some(claim) = env.storage().persistent().get::<DataKey, Claim>(&DataKey::Claim(claim_id)) {
+            if let Some(claim) = env
+                .storage()
+                .persistent()
+                .get::<DataKey, Claim>(&DataKey::Claim(claim_id))
+            {
                 if current_time - claim.submission_time < lookback_period {
                     recent_claims += 1;
                 }
@@ -1054,7 +1239,9 @@ impl InsurancePoolContract {
 
         // Check if submitter has submitted claims for multiple contracts recently
         // (Simple check - could be enhanced with more sophisticated fraud detection)
-        let all_policies = env.storage().persistent()
+        let all_policies = env
+            .storage()
+            .persistent()
             .get::<DataKey, Vec<Address>>(&DataKey::PolicyList)
             .unwrap_or(Vec::new(env));
 
@@ -1062,7 +1249,11 @@ impl InsurancePoolContract {
         for policy_addr in all_policies.iter() {
             let policy_claims = Self::get_contract_claims(env.clone(), policy_addr);
             for claim_id in policy_claims.iter() {
-                if let Some(claim) = env.storage().persistent().get::<DataKey, Claim>(&DataKey::Claim(claim_id)) {
+                if let Some(claim) = env
+                    .storage()
+                    .persistent()
+                    .get::<DataKey, Claim>(&DataKey::Claim(claim_id))
+                {
                     // Check if this claim was submitted by the same submitter
                     // (In a real implementation, you'd track submitter in the claim)
                     if current_time - claim.submission_time < lookback_period {
@@ -1078,12 +1269,14 @@ impl InsurancePoolContract {
     }
 
     fn get_risk_score(env: Env, contract_address: Address) -> Option<RiskScore> {
-        env.storage().persistent().get(&DataKey::RiskScore(contract_address))
+        env.storage()
+            .persistent()
+            .get(&DataKey::RiskScore(contract_address))
     }
 
     fn update_risk_score_on_claim(env: &Env, contract_address: Address) {
-        let mut risk_score = Self::get_risk_score(env.clone(), contract_address.clone())
-            .unwrap_or(RiskScore {
+        let mut risk_score =
+            Self::get_risk_score(env.clone(), contract_address.clone()).unwrap_or(RiskScore {
                 contract_address: contract_address.clone(),
                 risk_level: RiskLevel::Medium,
                 score: 50,
@@ -1105,12 +1298,14 @@ impl InsurancePoolContract {
             risk_score.score = 100;
         }
 
-        env.storage().persistent().set(&DataKey::RiskScore(contract_address), &risk_score);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RiskScore(contract_address), &risk_score);
     }
 
     fn update_risk_score_on_approval(env: &Env, contract_address: Address, payout_amount: i128) {
-        let mut risk_score = Self::get_risk_score(env.clone(), contract_address.clone())
-            .unwrap_or(RiskScore {
+        let mut risk_score =
+            Self::get_risk_score(env.clone(), contract_address.clone()).unwrap_or(RiskScore {
                 contract_address: contract_address.clone(),
                 risk_level: RiskLevel::Medium,
                 score: 50,
@@ -1124,11 +1319,15 @@ impl InsurancePoolContract {
         risk_score.total_payout += payout_amount;
         risk_score.last_updated = env.ledger().timestamp();
 
-        env.storage().persistent().set(&DataKey::RiskScore(contract_address), &risk_score);
+        env.storage()
+            .persistent()
+            .set(&DataKey::RiskScore(contract_address), &risk_score);
     }
 
     fn update_metrics_on_purchase(env: &Env, premium: i128) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, PoolMetrics>(&DataKey::PoolMetrics)
             .unwrap_or(PoolMetrics {
                 total_premiums: 0,
@@ -1143,12 +1342,16 @@ impl InsurancePoolContract {
         metrics.total_premiums += premium;
         metrics.active_policies += 1;
 
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
         Self::update_pool_utilization(env);
     }
 
     fn update_metrics_on_cancel(env: &Env) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, PoolMetrics>(&DataKey::PoolMetrics)
             .unwrap_or(PoolMetrics {
                 total_premiums: 0,
@@ -1164,11 +1367,15 @@ impl InsurancePoolContract {
             metrics.active_policies -= 1;
         }
 
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
     }
 
     fn update_metrics_on_claim(env: &Env) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, PoolMetrics>(&DataKey::PoolMetrics)
             .unwrap_or(PoolMetrics {
                 total_premiums: 0,
@@ -1182,11 +1389,15 @@ impl InsurancePoolContract {
 
         metrics.total_claims_submitted += 1;
 
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
     }
 
     fn update_metrics_on_review(env: &Env, approved: bool) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, PoolMetrics>(&DataKey::PoolMetrics)
             .unwrap_or(PoolMetrics {
                 total_premiums: 0,
@@ -1202,11 +1413,15 @@ impl InsurancePoolContract {
             metrics.total_claims_approved += 1;
         }
 
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
     }
 
     fn update_metrics_on_payout(env: &Env, payout_amount: i128) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, PoolMetrics>(&DataKey::PoolMetrics)
             .unwrap_or(PoolMetrics {
                 total_premiums: 0,
@@ -1220,12 +1435,16 @@ impl InsurancePoolContract {
 
         metrics.total_payouts += payout_amount;
 
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
         Self::update_pool_utilization(env);
     }
 
     fn update_pool_utilization(env: &Env) {
-        let mut metrics = env.storage().persistent()
+        let mut metrics = env
+            .storage()
+            .persistent()
             .get::<DataKey, PoolMetrics>(&DataKey::PoolMetrics)
             .unwrap_or(PoolMetrics {
                 total_premiums: 0,
@@ -1237,42 +1456,61 @@ impl InsurancePoolContract {
                 reserve_ratio: 2000,
             });
 
-        let pool: i128 = env.storage().persistent().get(&DataKey::PremiumPool).unwrap_or(0);
-        
+        let pool: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PremiumPool)
+            .unwrap_or(0);
+
         if pool > 0 {
-            metrics.pool_utilization = ((metrics.total_payouts * BASIS_POINTS as i128) / pool) as u32;
+            metrics.pool_utilization =
+                ((metrics.total_payouts * BASIS_POINTS as i128) / pool) as u32;
         } else {
             metrics.pool_utilization = 0;
         }
 
-        let reserve: i128 = env.storage().persistent().get(&DataKey::ReservePool).unwrap_or(0);
+        let reserve: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ReservePool)
+            .unwrap_or(0);
         if pool > 0 {
             metrics.reserve_ratio = ((reserve * BASIS_POINTS as i128) / pool) as u32;
         } else {
             metrics.reserve_ratio = 0;
         }
 
-        env.storage().persistent().set(&DataKey::PoolMetrics, &metrics);
+        env.storage()
+            .persistent()
+            .set(&DataKey::PoolMetrics, &metrics);
     }
 
     fn add_to_policy_list(env: &Env, contract_address: Address) {
-        let mut policies: Vec<Address> = env.storage().persistent()
+        let mut policies: Vec<Address> = env
+            .storage()
+            .persistent()
             .get(&DataKey::PolicyList)
             .unwrap_or(Vec::new(env));
 
         if !policies.contains(&contract_address) {
             policies.push_back(contract_address);
-            env.storage().persistent().set(&DataKey::PolicyList, &policies);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PolicyList, &policies);
         }
     }
 
     fn add_to_contract_claims(env: &Env, contract_address: Address, claim_id: u64) {
-        let mut claims: Vec<u64> = env.storage().persistent()
+        let mut claims: Vec<u64> = env
+            .storage()
+            .persistent()
             .get(&DataKey::ContractClaims(contract_address.clone()))
             .unwrap_or(Vec::new(env));
 
         claims.push_back(claim_id);
-        env.storage().persistent().set(&DataKey::ContractClaims(contract_address), &claims);
+        env.storage()
+            .persistent()
+            .set(&DataKey::ContractClaims(contract_address), &claims);
     }
 
     fn assert_admin(env: &Env, user: &Address) {
@@ -1289,4 +1527,3 @@ impl InsurancePoolContract {
         }
     }
 }
-
