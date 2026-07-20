@@ -59,6 +59,7 @@ fn test_initialize() {
     assert_eq!(config.referrer_reward, 1000);
     assert_eq!(config.referee_reward, 500);
     assert_eq!(config.max_referrals_per_user, 10);
+    assert!(config.max_referrals_per_user < MAX_REFERRALS_PER_USER);
 
     let stats = client.get_statistics();
     assert_eq!(stats.total_referrals, 0);
@@ -307,6 +308,23 @@ fn test_update_config() {
     assert_eq!(config.referrer_reward, 2000);
     assert_eq!(config.referee_reward, 1000);
     assert_eq!(config.max_referrals_per_user, 20);
+}
+
+#[test]
+fn test_update_config_rejects_max_referrals_above_bound() {
+    let e = Env::default();
+    let (referral_contract, _, admin, _) = setup_contract(&e);
+
+    let client = ReferralContractClient::new(&e, &referral_contract);
+    let result = client.try_update_config(&admin, &None, &None, &Some(MAX_REFERRALS_PER_USER + 1));
+
+    assert_eq!(
+        result,
+        Err(Ok(soroban_sdk::Error::from_contract_error(
+            Error::ConfigOutOfRange as u32,
+        )))
+    );
+    assert_eq!(client.get_config().max_referrals_per_user, 10);
 }
 
 #[test]
