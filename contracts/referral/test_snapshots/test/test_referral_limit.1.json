@@ -52,6 +52,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -545,6 +548,14 @@
                         },
                         "val": {
                           "map": [
+                            {
+                              "key": {
+                                "symbol": "max_chain_depth"
+                              },
+                              "val": {
+                                "u32": 10
+                              }
+                            },
                             {
                               "key": {
                                 "symbol": "max_referrals_per_user"
@@ -2413,6 +2424,9 @@
                     "hi": 0,
                     "lo": 500
                   }
+                },
+                {
+                  "u32": 10
                 },
                 {
                   "u32": 10
@@ -6826,7 +6840,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Referrer has reached maximum referral limit' from contract function 'Symbol(obj#4783)'"
+                  "string": "caught panic 'Referrer has reached maximum referral limit' from contract function 'Symbol(obj#4847)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABB6KO"

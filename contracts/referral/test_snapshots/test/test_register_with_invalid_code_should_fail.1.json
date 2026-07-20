@@ -52,6 +52,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -281,6 +284,14 @@
                         },
                         "val": {
                           "map": [
+                            {
+                              "key": {
+                                "symbol": "max_chain_depth"
+                              },
+                              "val": {
+                                "u32": 10
+                              }
+                            },
                             {
                               "key": {
                                 "symbol": "max_referrals_per_user"
@@ -760,6 +771,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -968,7 +982,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Invalid referral code' from contract function 'Symbol(obj#205)'"
+                  "string": "caught panic 'Invalid referral code' from contract function 'Symbol(obj#207)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"

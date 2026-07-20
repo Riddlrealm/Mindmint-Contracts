@@ -52,6 +52,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -224,6 +227,14 @@
                         },
                         "val": {
                           "map": [
+                            {
+                              "key": {
+                                "symbol": "max_chain_depth"
+                              },
+                              "val": {
+                                "u32": 10
+                              }
+                            },
                             {
                               "key": {
                                 "symbol": "max_referrals_per_user"
@@ -630,6 +641,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -742,6 +756,14 @@
             ],
             "data": {
               "map": [
+                {
+                  "key": {
+                    "symbol": "max_chain_depth"
+                  },
+                  "val": {
+                    "u32": 10
+                  }
+                },
                 {
                   "key": {
                     "symbol": "max_referrals_per_user"
