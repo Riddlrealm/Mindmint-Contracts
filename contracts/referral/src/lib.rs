@@ -1,6 +1,22 @@
 #![no_std]
 
-use soroban_sdk::{Address, Env, String, Symbol, Vec, contract, contractimpl, contracttype, token};
+use soroban_sdk::{
+    Address, Env, String, Symbol, Vec, contract, contracterror, contractimpl, contracttype,
+    panic_with_error, token,
+};
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    ConfigOutOfRange = 1,
+}
+
+/// Maximum number of addresses stored in a referrer's `ReferralsList`.
+///
+/// This cap follows the per-account referral storage budget documented in
+/// `docs/STORAGE_ESTIMATION.md` (5 KiB including encoding overhead).
+pub const MAX_REFERRALS_PER_USER: u32 = 100;
 
 //
 // ──────────────────────────────────────────────────────────
@@ -444,6 +460,9 @@ impl ReferralContract {
             config.referee_reward = reward;
         }
         if let Some(max) = max_referrals_per_user {
+            if max > MAX_REFERRALS_PER_USER {
+                panic_with_error!(&env, Error::ConfigOutOfRange);
+            }
             config.max_referrals_per_user = max;
         }
 
