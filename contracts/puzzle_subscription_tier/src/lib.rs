@@ -11,6 +11,10 @@ const SECONDS_PER_DAY: u64 = 86_400;
 #[cfg(test)]
 const SECONDS_PER_DAY: u64 = 1;
 
+// Maximum number of price-history records kept per tier.
+// Oldest entries are dropped once this cap is reached so ledger storage stays bounded.
+const MAX_PRICE_HISTORY: u32 = 50;
+
 // ─────────────────────────────────────────────────────────
 // TIERS
 // ─────────────────────────────────────────────────────────
@@ -30,18 +34,20 @@ pub enum Tier {
 
 #[contracttype]
 pub enum DataKey {
-    /// Contract-wide admin config
+    /// Contract-wide admin address.
     Admin,
-    /// Payment token address
+    /// Payment token address.
     PaymentToken,
-    /// TierConfig keyed by Tier enum value
+    /// TierConfig keyed by Tier enum value (current / live config).
     TierConfig(Tier),
-    /// Subscription record keyed by subscription id
+    /// Subscription record keyed by subscription id.
     Subscription(u64),
-    /// Maps player Address → their current subscription id
+    /// Maps player Address → their current subscription id.
     PlayerSub(Address),
-    /// Monotonic counter for subscription ids
+    /// Monotonic counter for subscription ids.
     NextId,
+    /// Append-only price-history log per tier (Vec<PriceChangeRecord>).
+    PriceHistory(Tier),
 }
 
 // ─────────────────────────────────────────────────────────
@@ -49,6 +55,15 @@ pub enum DataKey {
 // ─────────────────────────────────────────────────────────
 
 /// Per-subscription state stored on-chain.
+///
+/// `locked_price` and `locked_duration_days` capture the pricing terms
+/// that were active when the subscription was **first created or last
+/// manually renewed**.  This means existing subscribers are grandfathered:
+/// even if the admin later calls `update_tier_price`, their next renewal
+/// continues at the price they originally agreed to.
+///
+/// Only a brand-new subscription (or a re-subscribe after expiry) picks
+/// up the then-current `TierConfig` price.
 #[contracttype]
 #[derive(Clone, Debug)]
 pub struct Subscription {
@@ -62,6 +77,10 @@ pub struct Subscription {
     pub expires_at: u64,
     /// When true, anyone may call `renew` to extend the subscription.
     pub auto_renew: bool,
+    /// Price locked at subscribe time; used for renewals (grandfathering).
+    pub locked_price: i128,
+    /// Duration locked at subscribe time; used for renewals.
+    pub locked_duration_days: u64,
 }
 
 /// Configuration for a single tier, set by the admin.
@@ -71,6 +90,7 @@ pub struct TierConfig {
     /// The tier this config applies to.
     pub tier: Tier,
     /// Token amount required to subscribe (or pay difference on upgrade).
+    /// This is the **current** price for brand-new subscriptions.
     pub price: i128,
     /// How many days each subscription period lasts.
     pub duration_days: u64,
@@ -78,6 +98,26 @@ pub struct TierConfig {
     pub puzzle_access_level: u32,
     /// Arbitrary feature flag strings (e.g. "hints", "leaderboard").
     pub feature_flags: Vec<String>,
+}
+
+/// One record in the auditable price-change history for a tier.
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct PriceChangeRecord {
+    /// The tier whose price changed.
+    pub tier: Tier,
+    /// Price before the change.
+    pub old_price: i128,
+    /// Price after the change.
+    pub new_price: i128,
+    /// Duration before the change (for full audit completeness).
+    pub old_duration_days: u64,
+    /// Duration after the change.
+    pub new_duration_days: u64,
+    /// Address of the admin who made the change.
+    pub changed_by: Address,
+    /// Ledger timestamp at which the change was recorded.
+    pub changed_at: u64,
 }
 
 // ─────────────────────────────────────────────────────────
@@ -88,6 +128,7 @@ const EVT_SUBSCRIBED: &str = "subscribed";
 const EVT_RENEWED: &str = "renewed";
 const EVT_UPGRADED: &str = "upgraded";
 const EVT_CANCELLED: &str = "cancelled";
+const EVT_PRICE_UPDATED: &str = "price_updated";
 
 // ─────────────────────────────────────────────────────────
 // CONTRACT
@@ -100,7 +141,7 @@ pub struct PuzzleSubscriptionTierContract;
 impl PuzzleSubscriptionTierContract {
     // ──────────────── INITIALIZATION ────────────────
 
-    /// Initialize the contract.  Must be called once before any other function.
+    /// Initialize the contract. Must be called once before any other function.
     pub fn initialize(env: Env, admin: Address, payment_token: Address) {
         admin.require_auth();
         if env.storage().persistent().has(&DataKey::Admin) {
@@ -113,9 +154,13 @@ impl PuzzleSubscriptionTierContract {
         env.storage().persistent().set(&DataKey::NextId, &1u64);
     }
 
-    // ──────────────── ADMIN ────────────────
+    // ──────────────── ADMIN — TIER CONFIG ────────────────
 
-    /// Set (or update) the configuration for a tier.  Admin only.
+    /// Set (or update) the full configuration for a tier. Admin only.
+    ///
+    /// This function does **not** touch the `PriceHistory` log.
+    /// To change only the price and have it recorded in the audit trail,
+    /// use `update_tier_price` instead.
     pub fn set_tier_config(
         env: Env,
         admin: Address,
@@ -147,11 +192,86 @@ impl PuzzleSubscriptionTierContract {
             .set(&DataKey::TierConfig(tier), &cfg);
     }
 
+    // ──────────────── ADMIN — DYNAMIC PRICING ────────────────
+
+    /// Update the price (and optionally the duration) for an existing tier.
+    /// Admin only.
+    ///
+    /// ## Semantics
+    /// - The new price takes effect for **new subscriptions** immediately
+    ///   after this call.
+    /// - **Active subscribers** are grandfathered: their `locked_price` and
+    ///   `locked_duration_days` are unchanged, so their next renewal charges
+    ///   what they originally agreed to pay.
+    /// - A `PriceChangeRecord` is appended to the on-chain audit log for this
+    ///   tier and a `price_updated` event is emitted so off-chain indexers
+    ///   can track every change.
+    ///
+    /// # Panics
+    /// - `"caller is not admin"` — if caller is not the stored admin.
+    /// - `"tier not configured"` — if the tier has no existing config
+    ///   (call `set_tier_config` first).
+    /// - `"new_price must be non-negative"` — on negative price.
+    /// - `"new_duration_days must be > 0"` — on zero duration.
+    pub fn update_tier_price(
+        env: Env,
+        admin: Address,
+        tier: Tier,
+        new_price: i128,
+        new_duration_days: u64,
+    ) {
+        admin.require_auth();
+        Self::assert_admin(&env, &admin);
+
+        if new_price < 0 {
+            panic!("new_price must be non-negative");
+        }
+        if new_duration_days == 0 {
+            panic!("new_duration_days must be > 0");
+        }
+
+        let mut cfg = Self::get_tier_config_or_panic(&env, tier);
+
+        let old_price = cfg.price;
+        let old_duration_days = cfg.duration_days;
+
+        // Record change in audit log before updating the config.
+        let record = PriceChangeRecord {
+            tier,
+            old_price,
+            new_price,
+            old_duration_days,
+            new_duration_days,
+            changed_by: admin.clone(),
+            changed_at: env.ledger().timestamp(),
+        };
+        Self::append_price_history(&env, tier, record);
+
+        // Update the live TierConfig.
+        cfg.price = new_price;
+        cfg.duration_days = new_duration_days;
+        env.storage()
+            .persistent()
+            .set(&DataKey::TierConfig(tier), &cfg);
+
+        // Emit auditable event.
+        env.events().publish(
+            (Symbol::new(&env, EVT_PRICE_UPDATED), admin),
+            (tier as u32, old_price, new_price, old_duration_days, new_duration_days),
+        );
+    }
+
     // ──────────────── SUBSCRIBE ────────────────
 
-    /// Subscribe to a tier (or upgrade inline).  Player pays the tier price.
+    /// Subscribe to a tier (or upgrade inline). Player pays the **current**
+    /// tier price at the time of this call.
+    ///
     /// If the player has an existing active subscription it must be expired first;
     /// use `upgrade` for mid-period tier changes.
+    ///
+    /// The price and duration are **locked into the Subscription record**
+    /// so future renewals honour the grandfathered rate even if the admin
+    /// later changes the price via `update_tier_price`.
     pub fn subscribe(env: Env, player: Address, tier: Tier) -> u64 {
         player.require_auth();
 
@@ -190,6 +310,9 @@ impl PuzzleSubscriptionTierContract {
             started_at: now,
             expires_at: now + cfg.duration_days * SECONDS_PER_DAY,
             auto_renew: false,
+            // Lock the price and duration active at subscribe time.
+            locked_price: cfg.price,
+            locked_duration_days: cfg.duration_days,
         };
 
         env.storage()
@@ -201,7 +324,7 @@ impl PuzzleSubscriptionTierContract {
 
         env.events().publish(
             (Symbol::new(&env, EVT_SUBSCRIBED), player),
-            (sub_id, tier as u32),
+            (sub_id, tier as u32, cfg.price),
         );
 
         sub_id
@@ -209,7 +332,15 @@ impl PuzzleSubscriptionTierContract {
 
     // ──────────────── RENEW ────────────────
 
-    /// Extend an existing subscription by one period (duration_days).
+    /// Extend an existing subscription by one period.
+    ///
+    /// ## Grandfathering
+    /// The renewal charge and duration come from the subscription's
+    /// **`locked_price` / `locked_duration_days`**, not from the current
+    /// `TierConfig`. This means price changes made by the admin do NOT affect
+    /// subscribers who are already paying an older rate — they keep renewing
+    /// at the price they originally agreed to.
+    ///
     /// If `auto_renew` is true anyone may call this; otherwise the holder must sign.
     pub fn renew(env: Env, caller: Address, subscription_id: u64) {
         let mut sub: Subscription = env
@@ -226,16 +357,18 @@ impl PuzzleSubscriptionTierContract {
             sub.holder.require_auth();
         }
 
-        let cfg = Self::get_tier_config_or_panic(&env, sub.tier);
+        // Use the locked price (grandfathered rate) rather than the current TierConfig price.
+        let price = sub.locked_price;
+        let duration_days = sub.locked_duration_days;
 
-        if cfg.price > 0 {
+        if price > 0 {
             let payment_token: Address = env
                 .storage()
                 .persistent()
                 .get(&DataKey::PaymentToken)
                 .unwrap();
             let token_client = token::Client::new(&env, &payment_token);
-            token_client.transfer(&sub.holder, &env.current_contract_address(), &cfg.price);
+            token_client.transfer(&sub.holder, &env.current_contract_address(), &price);
         }
 
         let now = env.ledger().timestamp();
@@ -245,7 +378,7 @@ impl PuzzleSubscriptionTierContract {
         } else {
             now
         };
-        sub.expires_at = base + cfg.duration_days * SECONDS_PER_DAY;
+        sub.expires_at = base + duration_days * SECONDS_PER_DAY;
 
         env.storage()
             .persistent()
@@ -253,16 +386,29 @@ impl PuzzleSubscriptionTierContract {
 
         env.events().publish(
             (Symbol::new(&env, EVT_RENEWED), sub.holder),
-            (subscription_id, sub.expires_at),
+            (subscription_id, sub.expires_at, price),
         );
     }
 
     // ──────────────── UPGRADE ────────────────
 
     /// Upgrade an active subscription to a higher tier.
-    /// Prorates the remaining time: the unused value from the current tier is
-    /// subtracted from the new tier's price before charging.
-    /// The subscription period is reset to a full period of the new tier.
+    ///
+    /// ## Pricing
+    /// The upgrade charge is computed using:
+    /// - **Old side**: the subscription's `locked_price` and `locked_duration_days`
+    ///   (the grandfathered terms).
+    /// - **New side**: the **current** `TierConfig` price and duration for the
+    ///   target tier (the scout explicitly chooses to move to a new tier, so
+    ///   they see the live market price).
+    ///
+    /// Proration formula:
+    /// ```
+    /// remaining_value = locked_price * remaining_secs / locked_period_secs
+    /// charge = max(0, new_cfg.price - remaining_value)
+    /// ```
+    ///
+    /// The new locked price/duration are set from the target tier's current config.
     pub fn upgrade(env: Env, subscription_id: u64, new_tier: Tier) {
         let mut sub: Subscription = env
             .storage()
@@ -281,19 +427,18 @@ impl PuzzleSubscriptionTierContract {
             panic!("can only upgrade to a higher tier");
         }
 
-        let old_cfg = Self::get_tier_config_or_panic(&env, sub.tier);
-        let new_cfg = Self::get_tier_config_or_panic(&env, new_tier);
-
-        // Proration: remaining fraction of the old period × old price.
-        let old_period = old_cfg.duration_days * SECONDS_PER_DAY;
+        // Old-side proration uses the locked (grandfathered) terms.
+        let old_locked_period = sub.locked_duration_days * SECONDS_PER_DAY;
         let remaining_secs = sub.expires_at.saturating_sub(now);
 
-        // remaining_value = old_price * remaining_secs / old_period  (integer arithmetic)
-        let remaining_value: i128 = if old_period > 0 && old_cfg.price > 0 {
-            (old_cfg.price * remaining_secs as i128) / old_period as i128
+        let remaining_value: i128 = if old_locked_period > 0 && sub.locked_price > 0 {
+            (sub.locked_price * remaining_secs as i128) / old_locked_period as i128
         } else {
             0
         };
+
+        // New-side uses the current (live) TierConfig.
+        let new_cfg = Self::get_tier_config_or_panic(&env, new_tier);
 
         let charge = (new_cfg.price - remaining_value).max(0);
 
@@ -310,6 +455,11 @@ impl PuzzleSubscriptionTierContract {
         let old_tier = sub.tier;
         sub.tier = new_tier;
         sub.expires_at = now + new_cfg.duration_days * SECONDS_PER_DAY;
+
+        // Lock in the new tier's current price/duration so subsequent renewals
+        // also see the price the subscriber agreed to at upgrade time.
+        sub.locked_price = new_cfg.price;
+        sub.locked_duration_days = new_cfg.duration_days;
 
         env.storage()
             .persistent()
@@ -394,6 +544,18 @@ impl PuzzleSubscriptionTierContract {
         Self::get_tier_config_or_panic(&env, tier)
     }
 
+    /// Return the full price-change history for a tier, oldest-first.
+    ///
+    /// Each entry records: old price, new price, old/new duration, who changed it,
+    /// and when.  At most `MAX_PRICE_HISTORY` entries are stored; older entries
+    /// are dropped automatically to keep ledger storage bounded.
+    pub fn get_price_history(env: Env, tier: Tier) -> Vec<PriceChangeRecord> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::PriceHistory(tier))
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
     /// Enable or disable auto-renew for a subscription.
     pub fn set_auto_renew(env: Env, subscription_id: u64, auto_renew: bool) {
         let mut sub: Subscription = env
@@ -440,4 +602,31 @@ impl PuzzleSubscriptionTierContract {
         env.storage().persistent().set(&DataKey::NextId, &(id + 1));
         id
     }
+
+    /// Append a `PriceChangeRecord` to the bounded history log for `tier`.
+    /// If the log is at capacity, the oldest entry is dropped.
+    fn append_price_history(env: &Env, tier: Tier, record: PriceChangeRecord) {
+        let key = DataKey::PriceHistory(tier);
+        let mut history: Vec<PriceChangeRecord> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or_else(|| Vec::new(env));
+
+        // If at capacity, drop the oldest entry (index 0) to stay bounded.
+        if history.len() >= MAX_PRICE_HISTORY {
+            // Build a new vec skipping the first element.
+            let mut trimmed: Vec<PriceChangeRecord> = Vec::new(env);
+            for i in 1..history.len() {
+                trimmed.push_back(history.get(i).unwrap());
+            }
+            history = trimmed;
+        }
+
+        history.push_back(record);
+        env.storage().persistent().set(&key, &history);
+    }
 }
+
+#[cfg(test)]
+mod tests;
