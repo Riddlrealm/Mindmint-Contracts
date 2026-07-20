@@ -22,6 +22,11 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Pin ed25519-dalek to compatible version
+        # soroban-env-host 21.x requires ed25519-dalek 2.x / rand_core 0.6.x.
+        # Without this pin, cargo resolves ed25519-dalek 3.x (rand_core 0.9+)
+        # which breaks the ChaCha20Rng: CryptoRng bound in soroban-env-host.
+        run: cargo update ed25519-dalek@3.0.0 --precise 2.2.0
       - name: Run clippy
         # Only deny `clippy::correctness`. That category gates
         # soundness bugs that change contract state or control flow,
