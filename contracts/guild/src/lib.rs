@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, Map, String, Symbol, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String, Symbol, Vec};
 
 //
 // ──────────────────────────────────────────────────────────
@@ -145,6 +143,7 @@ impl GuildContract {
     pub fn deposit(env: Env, member: Address, amount: i128) {
         member.require_auth();
         Self::assert_active(&env);
+        Self::assert_member(&env, &member);
 
         let token_addr: Address = env
             .storage()
@@ -215,10 +214,7 @@ impl GuildContract {
     pub fn vote_withdrawal(env: Env, member: Address, proposal_id: u32, approve: bool) {
         member.require_auth();
         Self::assert_active(&env);
-
-        if Self::get_role(env.clone(), member.clone()).is_none() {
-            panic!("Not a member");
-        }
+        Self::assert_member(&env, &member);
 
         let voted_key = DataKey::WithdrawalVoted(proposal_id, member.clone());
         if env.storage().persistent().has(&voted_key) {
@@ -254,6 +250,7 @@ impl GuildContract {
     pub fn execute_withdrawal(env: Env, executor: Address, proposal_id: u32) {
         executor.require_auth();
         Self::assert_active(&env);
+        Self::assert_member(&env, &executor);
 
         let mut proposal: WithdrawalProposal = env
             .storage()
@@ -377,10 +374,7 @@ impl GuildContract {
     pub fn vote(env: Env, member: Address, proposal_id: u32, approve: bool) {
         member.require_auth();
         Self::assert_active(&env);
-
-        if Self::get_role(env.clone(), member).is_none() {
-            panic!("Not a member");
-        }
+        Self::assert_member(&env, &member);
 
         let mut proposal: Proposal = env
             .storage()
@@ -433,12 +427,9 @@ impl GuildContract {
     pub fn disband(env: Env, leader: Address) {
         leader.require_auth();
         Self::assert_leader(&env, &leader);
+        Self::assert_active(&env);
 
         let mut config: GuildConfig = env.storage().persistent().get(&DataKey::Config).unwrap();
-
-        if config.disbanded {
-            panic!("Already disbanded");
-        }
 
         let token_addr: Address = env
             .storage()
@@ -487,6 +478,15 @@ impl GuildContract {
 
     pub fn get_role(env: Env, user: Address) -> Option<Role> {
         env.storage().persistent().get(&DataKey::Member(user))
+    }
+
+    /// Panics unless `user` holds any role in the guild (member or above).
+    /// Extracted from the inline checks in `vote` / `vote_withdrawal` so every
+    /// membership gate shares one implementation and one panic message.
+    fn assert_member(env: &Env, user: &Address) {
+        if Self::get_role(env.clone(), user.clone()).is_none() {
+            panic!("Not a member");
+        }
     }
 
     fn assert_leader(env: &Env, user: &Address) {

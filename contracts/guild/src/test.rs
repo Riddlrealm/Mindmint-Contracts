@@ -89,3 +89,104 @@ fn test_unauthorized_resource_addition() {
 
     client.add_resource(&stranger, &Symbol::new(&env, "Iron"), &100);
 }
+
+// ── Issue #19: role/membership gates on previously-unsecured entry points ──
+
+#[test]
+#[should_panic(expected = "Not a member")]
+fn non_member_cannot_execute_withdrawal() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let leader = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let token_addr = Address::generate(&env);
+
+    let contract_id = env.register_contract(None, GuildContract);
+    let client = GuildContractClient::new(&env, &contract_id);
+    client.initialize(&leader, &String::from_str(&env, "DAO"), &token_addr);
+
+    // A non-member is rejected at the membership gate, before any proposal logic.
+    client.execute_withdrawal(&stranger, &1);
+}
+
+#[test]
+#[should_panic(expected = "Not a member")]
+fn non_member_cannot_deposit() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let leader = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let token_addr = Address::generate(&env);
+
+    let contract_id = env.register_contract(None, GuildContract);
+    let client = GuildContractClient::new(&env, &contract_id);
+    client.initialize(&leader, &String::from_str(&env, "DAO"), &token_addr);
+
+    // Rejected at the membership gate, before the treasury transfer.
+    client.deposit(&stranger, &1000);
+}
+
+#[test]
+#[should_panic(expected = "Guild disbanded")]
+fn disband_is_once_only() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let leader = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let (token_addr, _token_client) = create_token_contract(&env, &token_admin);
+    let token_admin_client = StellarAssetClient::new(&env, &token_addr);
+
+    let contract_id = env.register_contract(None, GuildContract);
+    let client = GuildContractClient::new(&env, &contract_id);
+    client.initialize(&leader, &String::from_str(&env, "DAO"), &token_addr);
+
+    token_admin_client.mint(&contract_id, &100);
+
+    client.disband(&leader); // first disband succeeds
+    client.disband(&leader); // second must panic "Guild disbanded"
+}
+
+/// Regression guard for the design decision in the audit: execution gates on
+/// membership, not officer — a plain Member can execute an approved withdrawal.
+#[test]
+fn member_can_execute_approved_withdrawal() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().set_timestamp(1000);
+
+    let leader = Address::generate(&env);
+    let member_a = Address::generate(&env);
+    let member_b = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let (token_addr, token_client) = create_token_contract(&env, &token_admin);
+    let token_admin_client = StellarAssetClient::new(&env, &token_addr);
+
+    let contract_id = env.register_contract(None, GuildContract);
+    let client = GuildContractClient::new(&env, &contract_id);
+    client.initialize(&leader, &String::from_str(&env, "DAO"), &token_addr);
+
+    client.join(&member_a);
+    client.join(&member_b);
+
+    // Fund the treasury above the withdrawal threshold (10_000).
+    token_admin_client.mint(&contract_id, &20_000);
+
+    // Leader proposes a large withdrawal -> creates a proposal (returns Some(id)).
+    let wid = client
+        .withdraw(&leader, &20_000i128, &Some(100_000u64))
+        .expect("large withdrawal should create a proposal");
+
+    // Two of three members approve -> yes (2) > total_members (3) / 2.
+    client.vote_withdrawal(&member_a, &wid, &true);
+    client.vote_withdrawal(&member_b, &wid, &true);
+
+    // A plain Member (not officer/leader) can execute the approved withdrawal.
+    client.execute_withdrawal(&member_a, &wid);
+
+    // Funds went to the proposal's officer (the leader who proposed it).
+    assert_eq!(token_client.balance(&leader), 20_000);
+    assert_eq!(token_client.balance(&contract_id), 0);
+}
