@@ -1,6 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, Symbol};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Bytes, BytesN,
+    Env, Symbol,
+};
 
 #[contracttype]
 #[derive(Clone)]
@@ -19,6 +22,15 @@ pub enum DataKey {
     Puzzle(u32),
     Completed(Address, u32),
     Rewards(Address),
+}
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    /// Reward point arithmetic overflowed (reward_points × difficulty, or
+    /// accumulated rewards). See Issue #15.
+    RewardOverflow = 1,
 }
 
 #[contract]
@@ -106,15 +118,24 @@ impl PuzzleVerification {
             .instance()
             .set(&DataKey::Completed(player.clone(), puzzle_id), &true);
 
-        let scaled = meta.reward_points * (meta.difficulty as i128).max(1);
+        let scaled = match meta
+            .reward_points
+            .checked_mul((meta.difficulty as i128).max(1))
+        {
+            Some(v) => v,
+            None => panic_with_error!(&env, Error::RewardOverflow),
+        };
 
-        let mut rewards: i128 = env
+        let rewards: i128 = env
             .storage()
             .instance()
             .get(&DataKey::Rewards(player.clone()))
             .unwrap_or(0);
 
-        rewards += scaled;
+        let rewards = match rewards.checked_add(scaled) {
+            Some(v) => v,
+            None => panic_with_error!(&env, Error::RewardOverflow),
+        };
 
         env.storage()
             .instance()
@@ -148,60 +169,4 @@ impl PuzzleVerification {
 }
 
 #[cfg(test)]
-mod test {
-    use super::*;
-    use soroban_sdk::testutils::Address as _;
-    use soroban_sdk::testutils::Ledger as _;
-
-    #[test]
-    fn test_verification_flow() {
-        let env = Env::default();
-        let contract_id = env.register_contract(None, PuzzleVerification);
-        let client = PuzzleVerificationClient::new(&env, &contract_id);
-
-        let admin = Address::generate(&env);
-        let player = Address::generate(&env);
-
-        env.mock_all_auths();
-        client.initialize(&admin);
-
-        env.ledger().set_timestamp(1_000);
-
-        let preimage = Bytes::from_array(&env, &[7u8; 5]);
-        let hash: BytesN<32> = env.crypto().sha256(&preimage).into();
-        let now = env.ledger().timestamp();
-
-        client.set_puzzle(&1, &hash, &(now - 1), &(now + 1000), &2, &50);
-
-        let wrong = Bytes::from_array(&env, &[8u8; 5]);
-        assert_eq!(client.verify_solution(&player, &1, &wrong), false);
-
-        assert_eq!(client.verify_solution(&player, &1, &preimage), true);
-        assert_eq!(client.is_completed(&player, &1), true);
-        assert_eq!(client.rewards_of(&player), 100);
-    }
-
-    #[test]
-    #[should_panic(expected = "puzzle not active")]
-    fn test_expiration_enforced() {
-        let env = Env::default();
-        let contract_id = env.register_contract(None, PuzzleVerification);
-        let client = PuzzleVerificationClient::new(&env, &contract_id);
-
-        let admin = Address::generate(&env);
-        let player = Address::generate(&env);
-
-        env.mock_all_auths();
-        client.initialize(&admin);
-
-        env.ledger().set_timestamp(1_000);
-
-        let preimage = Bytes::from_array(&env, &[1u8; 3]);
-        let hash: BytesN<32> = env.crypto().sha256(&preimage).into();
-        let now = env.ledger().timestamp();
-
-        client.set_puzzle(&42, &hash, &(now - 100), &(now - 50), &1, &10);
-
-        let _ = client.verify_solution(&player, &42, &preimage);
-    }
-}
+mod test;

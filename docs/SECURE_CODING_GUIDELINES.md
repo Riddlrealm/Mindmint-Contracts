@@ -14,6 +14,13 @@
 
 - Use checked math everywhere totals could overflow.
 - Avoid float.
+- Regression test every overflow fix with a `#[should_panic]` case that drives
+  the inputs to the `i128`/`u128` extremes. Example:
+  `contracts/puzzle_verification/src/test.rs::test_reward_overflow_panics`
+  (Issue #15) feeds `reward_points = i128::MAX` and `difficulty = u32::MAX` so
+  `reward_points * difficulty` overflows `i128`; `verify_solution` must abort
+  with `Error::RewardOverflow` instead of silently wrapping ledger state relied
+  on by `leaderboard`, `achievement_nft`, and `reward_token`.
 
 ## State
 
