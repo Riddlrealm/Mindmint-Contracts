@@ -34,4 +34,17 @@ never received, so vulnerabilities are discovered late or never.
 ## Labels
 `area:security`, `kind:docs`, `priority:P1`
 
+## CI status — known pre-existing infra break (unrelated to this PR)
+The `CI / build` and `clippy / clippy` workflows are RED for **all** workspace
+pull requests, including this docs-only one. This is a pre-existing, repo-wide
+dependency break in the test-only `soroban-env-host 21.2.1` harness pulled by
+`soroban-sdk 21.7.7`: `ed25519-dalek 3.0.0` requires `rand_core 0.10` while its
+`ChaCha20Rng` (via `rand 0.8.7`) implements `rand_core 0.6.4`, so
+`cargo check --workspace --all-targets` / `cargo clippy --workspace --all-targets`
+fail with `error[E0277]: ChaCha20Rng: ed25519_dalek::rand_core::CryptoRng is not satisfied`.
+`Cargo.lock` is gitignored, so CI regenerates the broken resolution every run.
+The changes in this PR are correct (docs / `CODEOWNERS` only). Separate follow-up:
+bump `soroban-sdk` or commit a `Cargo.lock` pinning the `rand_core 0.6`-compatible
+crypto stack.
+
 closes #51
