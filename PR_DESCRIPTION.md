@@ -65,10 +65,18 @@ storage:
   event topic that exceeds the 9-char limit). Their `DataKey` refactors are
   validated; the remaining errors are pre-existing and outside the scope of this
   issue.
-- Note: `cargo test --no-run` currently fails repository-wide in this sandbox
-  because the regenerated `Cargo.lock` resolved `ed25519-dalek 3.0.0`, which is
-  incompatible with `soroban-env-host`'s `testutils`. This affects all contracts'
-  test builds and is unrelated to these changes.
+- **CI status — known pre-existing infra break (unrelated to this PR):** the
+  `CI / build` and `clippy / clippy` workflows are RED for *all* workspace PRs.
+  Root cause: `soroban-env-host 21.2.1` (test-only, via `soroban-sdk 21.7.7`)
+  depends on `ed25519-dalek 3.0.0`, which requires `rand_core 0.10`, while its
+  `ChaCha20Rng` (via `rand 0.8.7`) implements `rand_core 0.6.4`. The two
+  `rand_core` versions never unify, so `cargo check --workspace --all-targets` /
+  `cargo clippy --workspace --all-targets` fail with
+  `error[E0277]: ChaCha20Rng: ed25519_dalek::rand_core::CryptoRng is not satisfied`.
+  `Cargo.lock` is gitignored, so CI regenerates the broken resolution. This PR's
+  contract code is correct (`cargo build` succeeds; `cargo clippy --lib -D clippy::correctness` rc=0).
+  Separate follow-up: bump `soroban-sdk` or commit a `Cargo.lock` pinning the
+  `rand_core 0.6`-compatible crypto stack.
 
 ## Acceptance criteria checklist
 - [x] Every affected contract defines `enum DataKey { ... }` with variant docs.
