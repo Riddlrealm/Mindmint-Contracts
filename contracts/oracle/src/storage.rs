@@ -1,36 +1,45 @@
 use crate::types::{Config, OracleError, PriceData};
-use soroban_sdk::{symbol_short, BytesN, Env, Map, Symbol};
+use soroban_sdk::{contracttype, BytesN, Env, Map, Symbol};
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Global oracle configuration (instance storage).
+    Config,
+    /// Set of authorized signer public keys (instance storage).
+    Signers,
+    /// Per-asset dispute flag, keyed by asset symbol (persistent storage).
+    Dispute(Symbol),
+}
 
 pub struct Storage;
 
 impl Storage {
     pub fn has_config(env: &Env) -> bool {
-        env.storage().instance().has(&symbol_short!("config"))
+        env.storage().instance().has(&DataKey::Config)
     }
 
     pub fn set_config(env: &Env, config: &Config) {
-        env.storage()
-            .instance()
-            .set(&symbol_short!("config"), config);
+        env.storage().instance().set(&DataKey::Config, config);
     }
 
     pub fn get_config(env: &Env) -> Result<Config, OracleError> {
         env.storage()
             .instance()
-            .get(&symbol_short!("config"))
+            .get(&DataKey::Config)
             .ok_or(OracleError::NotInitialized)
     }
 
     pub fn set_signers(env: &Env, signers: &Map<BytesN<32>, bool>) {
         env.storage()
             .instance()
-            .set(&symbol_short!("signers"), signers);
+            .set(&DataKey::Signers, signers);
     }
 
     pub fn get_signers(env: &Env) -> Result<Map<BytesN<32>, bool>, OracleError> {
         env.storage()
             .instance()
-            .get(&symbol_short!("signers"))
+            .get(&DataKey::Signers)
             .ok_or(OracleError::NotInitialized) // Should be initialized if config is
     }
 
@@ -45,13 +54,13 @@ impl Storage {
     pub fn set_dispute(env: &Env, asset: &Symbol, is_disputed: bool) {
         env.storage()
             .persistent()
-            .set(&(symbol_short!("dispute"), asset.clone()), &is_disputed);
+            .set(&DataKey::Dispute(asset.clone()), &is_disputed);
     }
 
     pub fn get_dispute(env: &Env, asset: &Symbol) -> bool {
         env.storage()
             .persistent()
-            .get(&(symbol_short!("dispute"), asset.clone()))
+            .get(&DataKey::Dispute(asset.clone()))
             .unwrap_or(false)
     }
 }

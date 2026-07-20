@@ -69,9 +69,13 @@ pub struct RewardView {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
+    /// Contract admin address (persistent storage).
     Admin,
+    /// Reward token address (persistent storage).
     Token,
+    /// Auto-incremented next reward id (persistent storage).
     NextRewardId,
+    /// Per-reward definition, keyed by reward id (persistent storage).
     Reward(u64),
 }
 
