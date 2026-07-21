@@ -398,3 +398,25 @@ fn test_get_referrals_list() {
     assert_eq!(referrals.get(1), Some(referee2));
     assert_eq!(referrals.get(2), Some(referee3));
 }
+
+#[test]
+fn test_referral_code_uniqueness_over_100k() {
+    let e = Env::default();
+    let (referral_contract, _, _, _) = setup_contract(&e);
+    let client = ReferralContractClient::new(&e, &referral_contract);
+
+    let mut codes = soroban_sdk::Map::<String, bool>::new(&e);
+    let num_codes = 100_000u64;
+
+    for i in 0..num_codes {
+        let user = Address::generate(&e);
+        let code = client.generate_referral_code(&user);
+
+        // Verify each code is unique
+        assert!(!codes.contains_key(code.clone()), "Duplicate code found at iteration {}", i);
+        codes.set(code, true);
+    }
+
+    // Verify we generated the expected number of codes
+    assert_eq!(codes.len(), num_codes as u32);
+}
