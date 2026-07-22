@@ -277,6 +277,127 @@ impl GovernanceContract {
         set_proposal(&env, &proposal);
     }
 
+    // ───────────── MULTISIG GATE (ADR-0013) ─────────────
+
+    /// Initialize the multisig gate.
+    pub fn initialize_multisig(env: Env, admin: Address, threshold: u32, action_ttl: u64) {
+        admin.require_auth();
+        if get_multisig_config(&env).is_some() {
+            panic!("Multisig already initialized");
+        }
+        if threshold == 0 {
+            panic!("Threshold must be >= 1");
+        }
+        let cfg = MultisigConfig {
+            threshold,
+            action_ttl,
+        };
+        set_multisig_config(&env, &cfg);
+    }
+
+    /// Propose a multisig-gated admin action.
+    pub fn propose_admin_action(
+        env: Env,
+        proposer: Address,
+        description: String,
+    ) -> u64 {
+        proposer.require_auth();
+
+        let msig = get_multisig_config(&env).expect("Multisig not initialized");
+        let now = env.ledger().timestamp();
+        let id = increment_admin_action_count(&env);
+
+        let mut signers = Vec::new(&env);
+        signers.push_back(proposer.clone());
+
+        let action = AdminAction {
+            id,
+            proposer: proposer.clone(),
+            description,
+            status: AdminActionStatus::Pending,
+            created_at: now,
+            expires_at: now + msig.action_ttl,
+            executed_at: None,
+            signers,
+        };
+        set_admin_action(&env, &action);
+
+        env.events().publish(
+            (Symbol::new(&env, "admin_action_proposed"),),
+            (id, proposer),
+        );
+        id
+    }
+
+    /// Sign a pending admin action.
+    pub fn sign_admin_action(env: Env, signer: Address, action_id: u64) {
+        signer.require_auth();
+
+        let mut action = get_admin_action(&env, action_id).expect("Action not found");
+        if action.status != AdminActionStatus::Pending {
+            panic!("Action not pending");
+        }
+
+        let now = env.ledger().timestamp();
+        if now > action.expires_at {
+            action.status = AdminActionStatus::Rejected;
+            set_admin_action(&env, &action);
+            panic!("Action expired");
+        }
+
+        if action.signers.contains(&signer) {
+            panic!("Already signed");
+        }
+
+        action.signers.push_back(signer.clone());
+
+        let msig = get_multisig_config(&env).expect("Multisig not initialized");
+        if action.signers.len() >= msig.threshold {
+            action.status = AdminActionStatus::Approved;
+        }
+
+        set_admin_action(&env, &action);
+
+        env.events()
+            .publish((Symbol::new(&env, "admin_action_signed"),), (action_id, signer));
+    }
+
+    /// Execute an approved admin action.
+    pub fn execute_admin_action(env: Env, executor: Address, action_id: u64) {
+        executor.require_auth();
+
+        let mut action = get_admin_action(&env, action_id).expect("Action not found");
+        if action.status != AdminActionStatus::Approved {
+            panic!("Action not approved");
+        }
+
+        let now = env.ledger().timestamp();
+        if now > action.expires_at {
+            action.status = AdminActionStatus::Rejected;
+            set_admin_action(&env, &action);
+            panic!("Action expired");
+        }
+
+        action.status = AdminActionStatus::Executed;
+        action.executed_at = Some(now);
+        set_admin_action(&env, &action);
+
+        env.events().publish(
+            (Symbol::new(&env, "admin_action_executed"),),
+            (action_id, executor),
+        );
+    }
+
+    /// Get multisig configuration.
+    pub fn get_multisig_info(env: Env) -> MultisigConfig {
+        get_multisig_config(&env).expect("Multisig not initialized")
+    }
+
+    /// Get admin action details.
+    pub fn get_admin_action_info(env: Env, action_id: u64) -> AdminAction {
+        get_admin_action(&env, action_id).expect("Action not found")
+    }
+
     // Read-only helpers
     pub fn get_proposal_info(env: Env, proposal_id: u64) -> Proposal {
         get_proposal(&env, proposal_id).expect("Proposal not found")

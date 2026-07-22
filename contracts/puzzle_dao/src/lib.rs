@@ -393,30 +393,153 @@ impl PuzzleDaoContract {
 
     /// Treasury management functions
 
-    /// Allocate funds from treasury
+    /// Allocate funds from treasury (requires multisig approval, ADR-0013).
     pub fn allocate_treasury_funds(env: Env, amount: i128, recipient: Address) {
-        let config = get_config(&env);
-        let mut treasury_info = get_treasury_info(&env);
-
-        if amount <= 0 {
-            panic!("Invalid amount");
-        }
-
-        if treasury_info.allocated_funds + amount > treasury_info.total_balance {
-            panic!("Insufficient treasury funds");
-        }
-
-        let token = TokenClient::new(&env, &config.token_address);
-        token.transfer(&config.treasury_address, &recipient, &amount);
-
-        treasury_info.allocated_funds += amount;
-        set_treasury_info(&env, &treasury_info);
+        // Single-admin path is blocked: this function is now gated behind
+        // multisig_propose_admin_action / sign / execute.  Direct calls panic.
+        panic!("Use multisig propose_admin_action to allocate treasury funds");
     }
 
-    /// Update membership thresholds (requires governance proposal)
+    /// Update membership thresholds (requires multisig approval, ADR-0013).
     pub fn update_membership_thresholds(env: Env, thresholds: Map<MembershipTier, i128>) {
-        // This should only be callable through a successful governance proposal
-        set_membership_thresholds(&env, &thresholds);
+        let _ = thresholds;
+        panic!("Use multisig propose_admin_action to update membership thresholds");
+    }
+
+    // ───────────── MULTISIG GATE (ADR-0013) ─────────────
+
+    /// Initialize the multisig gate.  Can only be called during contract
+    /// initialization or by the first Council member.
+    pub fn initialize_multisig(env: Env, admin: Address, threshold: u32, action_ttl: u64) {
+        admin.require_auth();
+        if get_multisig_config(&env).is_some() {
+            panic!("Multisig already initialized");
+        }
+        if threshold == 0 {
+            panic!("Threshold must be >= 1");
+        }
+        let cfg = MultisigConfig {
+            threshold,
+            action_ttl,
+        };
+        set_multisig_config(&env, &cfg);
+    }
+
+    /// Propose a multisig-gated admin action.  Only Council members may propose.
+    /// Returns the action ID.
+    pub fn propose_admin_action(
+        env: Env,
+        proposer: Address,
+        description: String,
+    ) -> u64 {
+        proposer.require_auth();
+        let member = get_member(&env, &proposer).expect("Not a member");
+        if member.tier != MembershipTier::Council {
+            panic!("Only Council members can propose admin actions");
+        }
+
+        let msig = get_multisig_config(&env).expect("Multisig not initialized");
+        let now = env.ledger().timestamp();
+        let id = increment_admin_action_count(&env);
+
+        let mut signers = Vec::new(&env);
+        signers.push_back(proposer.clone());
+
+        let action = AdminAction {
+            id,
+            proposer: proposer.clone(),
+            description,
+            status: AdminActionStatus::Pending,
+            created_at: now,
+            expires_at: now + msig.action_ttl,
+            executed_at: None,
+            signers,
+        };
+        set_admin_action(&env, &action);
+
+        env.events().publish(
+            (Symbol::new(&env, "admin_action_proposed"),),
+            (id, proposer),
+        );
+        id
+    }
+
+    /// Sign a pending admin action.  Only Council members may sign.
+    /// If the threshold is met, the action moves to Approved.
+    pub fn sign_admin_action(env: Env, signer: Address, action_id: u64) {
+        signer.require_auth();
+        let member = get_member(&env, &signer).expect("Not a member");
+        if member.tier != MembershipTier::Council {
+            panic!("Only Council members can sign admin actions");
+        }
+
+        let mut action = get_admin_action(&env, action_id).expect("Action not found");
+        if action.status != AdminActionStatus::Pending {
+            panic!("Action not pending");
+        }
+
+        let now = env.ledger().timestamp();
+        if now > action.expires_at {
+            action.status = AdminActionStatus::Rejected;
+            set_admin_action(&env, &action);
+            panic!("Action expired");
+        }
+
+        if action.signers.contains(&signer) {
+            panic!("Already signed");
+        }
+
+        action.signers.push_back(signer.clone());
+
+        let msig = get_multisig_config(&env).expect("Multisig not initialized");
+        if action.signers.len() >= msig.threshold {
+            action.status = AdminActionStatus::Approved;
+        }
+
+        set_admin_action(&env, &action);
+
+        env.events()
+            .publish((Symbol::new(&env, "admin_action_signed"),), (action_id, signer));
+    }
+
+    /// Execute an approved admin action.
+    pub fn execute_admin_action(env: Env, executor: Address, action_id: u64) {
+        executor.require_auth();
+        let member = get_member(&env, &executor).expect("Not a member");
+        if member.tier != MembershipTier::Council {
+            panic!("Only Council members can execute admin actions");
+        }
+
+        let mut action = get_admin_action(&env, action_id).expect("Action not found");
+        if action.status != AdminActionStatus::Approved {
+            panic!("Action not approved");
+        }
+
+        let now = env.ledger().timestamp();
+        if now > action.expires_at {
+            action.status = AdminActionStatus::Rejected;
+            set_admin_action(&env, &action);
+            panic!("Action expired");
+        }
+
+        action.status = AdminActionStatus::Executed;
+        action.executed_at = Some(now);
+        set_admin_action(&env, &action);
+
+        env.events().publish(
+            (Symbol::new(&env, "admin_action_executed"),),
+            (action_id, executor),
+        );
+    }
+
+    /// Get multisig configuration.
+    pub fn get_multisig_info(env: Env) -> MultisigConfig {
+        get_multisig_config(&env).expect("Multisig not initialized")
+    }
+
+    /// Get admin action details.
+    pub fn get_admin_action_info(env: Env, action_id: u64) -> AdminAction {
+        get_admin_action(&env, action_id).expect("Action not found")
     }
 
     // Read-only helpers
