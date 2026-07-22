@@ -552,3 +552,82 @@ fn test_max_chain_depth_clamped_on_update_config() {
     let config = client.get_config();
     assert_eq!(config.max_chain_depth, MAX_CHAIN_DEPTH);
 }
+
+/// Edge case: attempt a direct 2-node cycle (A→B→A).
+/// A refers B, then B tries to refer A back — this is a simple 2-hop cycle.
+#[test]
+#[should_panic(expected = "Cyclic referral chain detected")]
+fn test_direct_two_hop_cycle_should_fail() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin = Address::generate(&e);
+    let token_admin = Address::generate(&e);
+    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let referral_contract = create_referral_contract(&e);
+
+    let token_admin_client = StellarAssetClient::new(&e, &token_address);
+    let client = ReferralContractClient::new(&e, &referral_contract);
+
+    client.initialize(&admin, &token_address, &0, &0, &100, &MAX_CHAIN_DEPTH);
+    token_admin_client.mint(&referral_contract, &1_000_000);
+
+    let user_a = Address::generate(&e);
+    let user_b = Address::generate(&e);
+
+    let code_a = client.generate_referral_code(&user_a);
+    let code_b = client.generate_referral_code(&user_b);
+
+    // A refers B
+    client.register_with_referral_code(&user_b, &code_a);
+    // B tries to refer A back — cycle
+    client.register_with_referral_code(&user_a, &code_b);
+}
+
+/// Edge case: when max_chain_depth is very small, long cycles that exceed
+/// the depth limit should NOT panic (the walk stops before finding the cycle).
+/// This tests the depth-bounding behavior.
+#[test]
+fn test_cycle_beyond_max_depth_not_detected() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin = Address::generate(&e);
+    let token_admin = Address::generate(&e);
+    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let referral_contract = create_referral_contract(&e);
+
+    let token_admin_client = StellarAssetClient::new(&e, &token_address);
+    let client = ReferralContractClient::new(&e, &referral_contract);
+
+    // Set max_chain_depth = 2 (very small)
+    client.initialize(&admin, &token_address, &0, &0, &100, &2);
+    token_admin_client.mint(&referral_contract, &1_000_000);
+
+    // Create 4 users: A→B→C→D
+    let user_a = Address::generate(&e);
+    let user_b = Address::generate(&e);
+    let user_c = Address::generate(&e);
+    let user_d = Address::generate(&e);
+
+    let code_a = client.generate_referral_code(&user_a);
+    let code_b = client.generate_referral_code(&user_b);
+    let code_c = client.generate_referral_code(&user_c);
+
+    // Build chain: A→B→C→D
+    client.register_with_referral_code(&user_b, &code_a);
+    client.register_with_referral_code(&user_c, &code_b);
+    client.register_with_referral_code(&user_d, &code_c);
+
+    // D tries to refer A back (cycle A→B→C→D→A = 4 hops)
+    // With max_chain_depth=2, the walk from D stops after 2 hops
+    // (D→C→B), never reaching A, so the cycle is NOT detected.
+    // This is expected behavior: the depth bound limits cycle detection.
+    // NOTE: This test documents the limitation, not a bug.
+    let code_d = client.get_referral_code(&user_d).unwrap();
+    // This will NOT panic because the walk stops at depth 2
+    client.register_with_referral_code(&user_a, &code_d);
+
+    // Verify the (potentially cyclic) relationship was stored
+    assert_eq!(client.get_referrer(&user_a), Some(user_d.clone()));
+}
