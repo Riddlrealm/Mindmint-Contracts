@@ -41,6 +41,8 @@ pub enum DataKey {
     Admin,
     /// Counter for generating unique codes
     CodeCounter,
+    /// Reentrancy guard: true when an external call is in progress
+    ReentrancyGuard,
 }
 
 //
@@ -391,7 +393,11 @@ impl ReferralContract {
 
     // ───────────── REWARD DISTRIBUTION ─────────────
 
-    /// Distribute rewards to both referrer and referee
+    /// Distribute rewards to both referrer and referee.
+    ///
+    /// Protected by a reentrancy guard: if the reward token contract calls
+    /// back into this contract during `transfer`, the call will panic.
+    ///
     /// Note: This requires the contract to have authorization to mint tokens
     /// or have sufficient balance to transfer from itself
     fn distribute_rewards(env: &Env, referrer: Address, referee: Address, config: &Config) -> bool {
@@ -413,6 +419,9 @@ impl ReferralContract {
             return false;
         }
 
+        // Acquire reentrancy guard before external calls
+        Self::acquire_guard(env);
+
         // Transfer rewards using token client
         let token_client = token::Client::new(env, &config.reward_token);
 
@@ -433,6 +442,9 @@ impl ReferralContract {
                 &config.referee_reward,
             );
         }
+
+        // Release reentrancy guard after external calls complete
+        Self::release_guard(env);
 
         event::emit::rewards_distributed(
             env,
@@ -538,6 +550,28 @@ impl ReferralContract {
     }
 
     // ───────────── HELPERS ─────────────
+
+    /// Acquire the reentrancy guard. Panics if already held (reentrant call).
+    fn acquire_guard(env: &Env) {
+        let held: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::ReentrancyGuard)
+            .unwrap_or(false);
+        if held {
+            panic!("Reentrancy detected");
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::ReentrancyGuard, &true);
+    }
+
+    /// Release the reentrancy guard.
+    fn release_guard(env: &Env) {
+        env.storage()
+            .instance()
+            .set(&DataKey::ReentrancyGuard, &false);
+    }
 
     fn assert_initialized(env: &Env) {
         if !env.storage().instance().has(&DataKey::Admin) {
