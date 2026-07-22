@@ -631,3 +631,34 @@ fn test_cycle_beyond_max_depth_not_detected() {
     // Verify the (potentially cyclic) relationship was stored
     assert_eq!(client.get_referrer(&user_a), Some(user_d.clone()));
 }
+
+/// Verify that the reentrancy guard is properly acquired and released.
+/// This test ensures that after a successful reward distribution, the guard
+/// is released and subsequent calls work normally.
+#[test]
+fn test_reentrancy_guard_released_after_distribution() {
+    let e = Env::default();
+    let (referral_contract, _, _, _) = setup_contract(&e);
+
+    let referrer1 = Address::generate(&e);
+    let referrer2 = Address::generate(&e);
+    let referee1 = Address::generate(&e);
+    let referee2 = Address::generate(&e);
+
+    let client = ReferralContractClient::new(&e, &referral_contract);
+    let code1 = client.generate_referral_code(&referrer1);
+    let code2 = client.generate_referral_code(&referrer2);
+
+    // First distribution
+    client.register_with_referral_code(&referee1, &code1);
+    assert_eq!(client.get_referral_count(&referrer1), 1);
+
+    // Second distribution (guard should be released)
+    client.register_with_referral_code(&referee2, &code2);
+    assert_eq!(client.get_referral_count(&referrer2), 1);
+
+    // Verify statistics
+    let stats = client.get_statistics();
+    assert_eq!(stats.total_referrals, 2);
+    assert_eq!(stats.total_rewarded_referrals, 2);
+}
