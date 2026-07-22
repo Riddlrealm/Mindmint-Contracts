@@ -100,6 +100,9 @@ members = ["contracts/subscription",
 
 [workspace.dependencies]
 soroban-sdk = { version = "21.0.0" }
+# Pin ed25519-dalek to 2.x: soroban-env-host 21.x uses the v2 rand_core API;
+# the Cargo resolver was selecting v3 which broke SigningKey::generate.
+ed25519-dalek = { version = "=2.2.0", features = ["rand_core"] }
 
 [workspace.lints.rust]
 # unsafe_code intentionally NOT enforced: Soroban SDK / FFI shims require unsafe

@@ -52,6 +52,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -223,6 +226,14 @@
                         },
                         "val": {
                           "map": [
+                            {
+                              "key": {
+                                "symbol": "max_chain_depth"
+                              },
+                              "val": {
+                                "u32": 10
+                              }
+                            },
                             {
                               "key": {
                                 "symbol": "max_referrals_per_user"
@@ -629,6 +640,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -740,6 +754,9 @@
                 },
                 {
                   "u32": 10
+                },
+                {
+                  "u32": 10
                 }
               ]
             }
@@ -763,7 +780,7 @@
             "data": {
               "vec": [
                 {
-                  "string": "caught panic 'Already initialized' from contract function 'Symbol(obj#147)'"
+                  "string": "caught panic 'Already initialized' from contract function 'Symbol(obj#149)'"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
@@ -782,6 +799,9 @@
                     "hi": 0,
                     "lo": 500
                   }
+                },
+                {
+                  "u32": 10
                 },
                 {
                   "u32": 10
@@ -862,6 +882,9 @@
                         "hi": 0,
                         "lo": 500
                       }
+                    },
+                    {
+                      "u32": 10
                     },
                     {
                       "u32": 10

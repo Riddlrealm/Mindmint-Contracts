@@ -3,7 +3,7 @@
 use super::*;
 use soroban_sdk::{
     Address, Env, String,
-    testutils::{Address as _, Ledger},
+    testutils::Address as _,
     token::{Client as TokenClient, StellarAssetClient},
 };
 
@@ -31,9 +31,10 @@ fn setup_contract(e: &Env) -> (Address, Address, Address, TokenClient) {
     client.initialize(
         &admin,
         &token_address,
-        &1000, // referrer reward
-        &500,  // referee reward
-        &10,   // max referrals per user
+        &1000,           // referrer reward
+        &500,            // referee reward
+        &10,             // max referrals per user
+        &MAX_CHAIN_DEPTH, // max_chain_depth
     );
 
     // Mint tokens to referral contract for rewards
@@ -53,12 +54,13 @@ fn test_initialize() {
     let referral_contract = create_referral_contract(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    client.initialize(&admin, &token_address, &1000, &500, &10);
+    client.initialize(&admin, &token_address, &1000, &500, &10, &MAX_CHAIN_DEPTH);
 
     let config = client.get_config();
     assert_eq!(config.referrer_reward, 1000);
     assert_eq!(config.referee_reward, 500);
     assert_eq!(config.max_referrals_per_user, 10);
+    assert_eq!(config.max_chain_depth, MAX_CHAIN_DEPTH);
 
     let stats = client.get_statistics();
     assert_eq!(stats.total_referrals, 0);
@@ -77,8 +79,8 @@ fn test_initialize_twice_should_fail() {
     let referral_contract = create_referral_contract(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    client.initialize(&admin, &token_address, &1000, &500, &10);
-    client.initialize(&admin, &token_address, &1000, &500, &10);
+    client.initialize(&admin, &token_address, &1000, &500, &10, &MAX_CHAIN_DEPTH);
+    client.initialize(&admin, &token_address, &1000, &500, &10, &MAX_CHAIN_DEPTH);
 }
 
 #[test]
@@ -301,12 +303,14 @@ fn test_update_config() {
         &Some(2000), // new referrer reward
         &Some(1000), // new referee reward
         &Some(20),   // new max referrals
+        &Some(5),    // new max_chain_depth
     );
 
     let config = client.get_config();
     assert_eq!(config.referrer_reward, 2000);
     assert_eq!(config.referee_reward, 1000);
     assert_eq!(config.max_referrals_per_user, 20);
+    assert_eq!(config.max_chain_depth, 5);
 }
 
 #[test]
@@ -317,7 +321,7 @@ fn test_update_config_non_admin_should_fail() {
     let non_admin = Address::generate(&e);
 
     let client = ReferralContractClient::new(&e, &referral_contract);
-    client.update_config(&non_admin, &Some(2000), &None, &None);
+    client.update_config(&non_admin, &Some(2000), &None, &None, &None);
 }
 
 #[test]
@@ -397,4 +401,154 @@ fn test_get_referrals_list() {
     assert_eq!(referrals.get(0), Some(referee1));
     assert_eq!(referrals.get(1), Some(referee2));
     assert_eq!(referrals.get(2), Some(referee3));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cycle-detection tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Build a legitimate 5-node linear chain (A→B→C→D→E) then attempt to close
+/// the cycle by having A register under E's code.  The contract must reject
+/// this with "Cyclic referral chain detected".
+///
+/// Chain layout (each arrow means "referred by"):
+///   E  ←  D  ←  C  ←  B  ←  A   (A is the root)
+///
+/// The closing attempt: A tries to register under E's code, which would make
+/// E the parent of A — but A is already an ancestor of E, so this is a cycle.
+#[test]
+#[should_panic(expected = "Cyclic referral chain detected")]
+fn test_cyclic_chain_five_steps_should_fail() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin = Address::generate(&e);
+    let token_admin = Address::generate(&e);
+    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let referral_contract = create_referral_contract(&e);
+
+    let token_admin_client = StellarAssetClient::new(&e, &token_address);
+    let client = ReferralContractClient::new(&e, &referral_contract);
+
+    // Initialize with max_chain_depth = 10 (well above our 5-step chain).
+    client.initialize(
+        &admin,
+        &token_address,
+        &0,             // no rewards needed for this test
+        &0,
+        &100,           // generous referral limit
+        &MAX_CHAIN_DEPTH,
+    );
+
+    token_admin_client.mint(&referral_contract, &1_000_000);
+
+    // Create five users.
+    let user_a = Address::generate(&e); // root
+    let user_b = Address::generate(&e);
+    let user_c = Address::generate(&e);
+    let user_d = Address::generate(&e);
+    let user_e = Address::generate(&e); // tail
+
+    // Generate codes for every user (each will be both a referrer and referee).
+    let code_a = client.generate_referral_code(&user_a);
+    let code_b = client.generate_referral_code(&user_b);
+    let code_c = client.generate_referral_code(&user_c);
+    let code_d = client.generate_referral_code(&user_d);
+    let code_e = client.generate_referral_code(&user_e);
+
+    // Build the chain: A refers B, B refers C, C refers D, D refers E.
+    // After each registration: Referral(B)=A, Referral(C)=B, Referral(D)=C, Referral(E)=D.
+    client.register_with_referral_code(&user_b, &code_a); // B's parent = A
+    client.register_with_referral_code(&user_c, &code_b); // C's parent = B
+    client.register_with_referral_code(&user_d, &code_c); // D's parent = C
+    client.register_with_referral_code(&user_e, &code_d); // E's parent = D
+
+    // Attempting to have A register under E's code would create the cycle:
+    //   A → E → D → C → B → A  (5 hops back to start).
+    // This must be rejected.
+    client.register_with_referral_code(&user_a, &code_e); // should panic
+}
+
+/// Verify that a valid 5-node chain (no cycle) is accepted without error.
+#[test]
+fn test_deep_chain_no_cycle_succeeds() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin = Address::generate(&e);
+    let token_admin = Address::generate(&e);
+    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let referral_contract = create_referral_contract(&e);
+
+    let token_admin_client = StellarAssetClient::new(&e, &token_address);
+    let client = ReferralContractClient::new(&e, &referral_contract);
+
+    client.initialize(
+        &admin,
+        &token_address,
+        &0,
+        &0,
+        &100,
+        &MAX_CHAIN_DEPTH,
+    );
+
+    token_admin_client.mint(&referral_contract, &1_000_000);
+
+    // 6-node linear chain (users[0] is root, users[5] is leaf) — no cycle.
+    let user0 = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let user3 = Address::generate(&e);
+    let user4 = Address::generate(&e);
+    let user5 = Address::generate(&e);
+
+    let code0 = client.generate_referral_code(&user0);
+    let code1 = client.generate_referral_code(&user1);
+    let code2 = client.generate_referral_code(&user2);
+    let code3 = client.generate_referral_code(&user3);
+    let code4 = client.generate_referral_code(&user4);
+
+    // Chain: user0 ← user1 ← user2 ← user3 ← user4 ← user5
+    client.register_with_referral_code(&user1, &code0);
+    client.register_with_referral_code(&user2, &code1);
+    client.register_with_referral_code(&user3, &code2);
+    client.register_with_referral_code(&user4, &code3);
+    client.register_with_referral_code(&user5, &code4);
+
+    // The chain is intact; last node has user4 as parent.
+    assert_eq!(client.get_referrer(&user5), Some(user4.clone()));
+    assert_eq!(client.get_referrer(&user1), Some(user0.clone()));
+}
+
+/// Ensure max_chain_depth is clamped to MAX_CHAIN_DEPTH when an out-of-range
+/// value is supplied to initialize().
+#[test]
+fn test_max_chain_depth_clamped_on_initialize() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let admin = Address::generate(&e);
+    let token_admin = Address::generate(&e);
+    let (token_address, _) = create_token_contract(&e, &token_admin);
+    let referral_contract = create_referral_contract(&e);
+
+    let client = ReferralContractClient::new(&e, &referral_contract);
+    // Pass a depth larger than MAX_CHAIN_DEPTH — it must be clamped.
+    client.initialize(&admin, &token_address, &0, &0, &10, &999);
+
+    let config = client.get_config();
+    assert_eq!(config.max_chain_depth, MAX_CHAIN_DEPTH);
+}
+
+/// Ensure max_chain_depth is clamped when updated via update_config().
+#[test]
+fn test_max_chain_depth_clamped_on_update_config() {
+    let e = Env::default();
+    let (referral_contract, _, admin, _) = setup_contract(&e);
+    let client = ReferralContractClient::new(&e, &referral_contract);
+
+    client.update_config(&admin, &None, &None, &None, &Some(999));
+
+    let config = client.get_config();
+    assert_eq!(config.max_chain_depth, MAX_CHAIN_DEPTH);
 }
