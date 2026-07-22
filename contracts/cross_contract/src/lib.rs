@@ -736,7 +736,5 @@ fn append_audit(
     env.storage().persistent().set(&key, &trail);
 }
 
-fn panic_with_error(env: &Env, err: CrossContractError) -> ! {
-    env.events().publish((symbol_short!("xerr"),), err as u32);
-    panic!("cross contract error");
-}
+// Removed dead `panic_with_error` – all call-sites already use the
+// Result<T, CrossContractError> return pattern instead of panicking.
