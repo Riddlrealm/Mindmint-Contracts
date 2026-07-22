@@ -1,23 +1,30 @@
 use crate::types::{Config, PriceFeed, PriceFeedError, PriceSnapshot};
-use soroban_sdk::{symbol_short, Env, Map, Symbol, Vec};
+use soroban_sdk::{contracttype, Env, Symbol, Vec};
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Global price-feed configuration (instance storage).
+    Config,
+    /// Per-pair price history, keyed by trading pair id (persistent storage).
+    History(Symbol),
+}
 
 pub struct Storage;
 
 impl Storage {
     pub fn has_config(env: &Env) -> bool {
-        env.storage().instance().has(&symbol_short!("config"))
+        env.storage().instance().has(&DataKey::Config)
     }
 
     pub fn set_config(env: &Env, config: &Config) {
-        env.storage()
-            .instance()
-            .set(&symbol_short!("config"), config);
+        env.storage().instance().set(&DataKey::Config, config);
     }
 
     pub fn get_config(env: &Env) -> Result<Config, PriceFeedError> {
         env.storage()
             .instance()
-            .get(&symbol_short!("config"))
+            .get(&DataKey::Config)
             .ok_or(PriceFeedError::NotInitialized)
     }
 
@@ -37,7 +44,7 @@ impl Storage {
     }
 
     pub fn add_price_snapshot(env: &Env, pair_id: &Symbol, snapshot: &PriceSnapshot) {
-        let key = (symbol_short!("history"), pair_id.clone());
+        let key = DataKey::History(pair_id.clone());
         let mut history: Vec<PriceSnapshot> = env
             .storage()
             .persistent()
@@ -55,7 +62,7 @@ impl Storage {
     }
 
     pub fn get_price_history(env: &Env, pair_id: &Symbol, limit: u32) -> Vec<PriceSnapshot> {
-        let key = (symbol_short!("history"), pair_id.clone());
+        let key = DataKey::History(pair_id.clone());
         let history: Vec<PriceSnapshot> = env
             .storage()
             .persistent()

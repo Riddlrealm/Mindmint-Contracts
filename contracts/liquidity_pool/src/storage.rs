@@ -1,21 +1,36 @@
-use soroban_sdk::{Address, Env, symbol_short};
+use soroban_sdk::{contracttype, Address, Env};
 
-#[derive(Debug, Clone, Copy)]
-#[repr(u32)]
+#[contracttype]
+#[derive(Clone)]
 pub enum DataKey {
-    Initialized = 0,
-    Admin = 1,
-    TokenA = 2,
-    TokenB = 3,
-    ReserveA = 4,
-    ReserveB = 5,
-    TotalSupply = 6,
-    FeeBps = 7,
-    FeeRecipient = 8,
-    FeesA = 9,
-    FeesB = 10,
-    PriceOracleTimestamp = 11,
-    CumulativePrice = 12,
+    /// Initialization guard flag (instance storage).
+    Initialized,
+    /// Contract admin address (instance storage).
+    Admin,
+    /// First pooled token address (instance storage).
+    TokenA,
+    /// Second pooled token address (instance storage).
+    TokenB,
+    /// Reserve of token A (instance storage).
+    ReserveA,
+    /// Reserve of token B (instance storage).
+    ReserveB,
+    /// Total LP token supply (instance storage).
+    TotalSupply,
+    /// Swap fee in basis points (instance storage).
+    FeeBps,
+    /// Fee recipient address (instance storage).
+    FeeRecipient,
+    /// Accumulated fees of token A (instance storage).
+    FeesA,
+    /// Accumulated fees of token B (instance storage).
+    FeesB,
+    /// Last price-oracle update timestamp (instance storage).
+    PriceOracleTimestamp,
+    /// Cumulative price accumulator (instance storage).
+    CumulativePrice,
+    /// Per-owner LP balance map key (persistent storage), keyed by owner.
+    Balance,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -117,11 +132,11 @@ pub(crate) fn get_fee_recipient(env: &Env) -> Address {
 }
 
 pub(crate) fn set_balance(env: &Env, owner: &Address, balance: &i128) {
-    env.storage().persistent().set(&symbol_short!("balance"), owner, balance);
+    env.storage().persistent().set(&DataKey::Balance, owner, balance);
 }
 
 pub(crate) fn get_balance(env: &Env, owner: &Address) -> i128 {
-    env.storage().persistent().get(&symbol_short!("balance"), owner).unwrap_or(0)
+    env.storage().persistent().get(&DataKey::Balance, owner).unwrap_or(0)
 }
 
 pub(crate) fn set_price_oracle(env: &Env, oracle: &PriceOracle) {

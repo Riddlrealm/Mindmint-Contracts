@@ -5,6 +5,9 @@ mod events;
 #[cfg(test)]
 mod test;
 
+#[cfg(test)]
+mod datakey_keys_test;
+
 use soroban_sdk::{
     contract, contractimpl, Address, Env, Symbol, String, panic_with_error,
     token::Client as TokenClient,
