@@ -1,4 +1,7 @@
-use crate::types::{DataKey, GovernanceConfig, Member, MembershipTier, Proposal, TreasuryInfo};
+use crate::types::{
+    AdminAction, DataKey, GovernanceConfig, Member, MembershipTier, MultisigConfig, Proposal,
+    TreasuryInfo,
+};
 use soroban_sdk::{Address, Env, Map, Val, Vec};
 
 pub fn set_config(env: &Env, config: &GovernanceConfig) {
@@ -162,4 +165,46 @@ pub fn set_membership_thresholds(env: &Env, thresholds: &Map<MembershipTier, i12
     env.storage()
         .instance()
         .set(&DataKey::MembershipThresholds, thresholds);
+}
+
+// ── Multisig storage (ADR-0013) ──────────────────────────────────────────
+
+pub fn get_multisig_config(env: &Env) -> Option<MultisigConfig> {
+    env.storage()
+        .instance()
+        .get(&DataKey::MultisigConfig)
+}
+
+pub fn set_multisig_config(env: &Env, config: &MultisigConfig) {
+    env.storage()
+        .instance()
+        .set(&DataKey::MultisigConfig, config);
+}
+
+pub fn get_admin_action_count(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::AdminActionCount)
+        .unwrap_or(0)
+}
+
+pub fn increment_admin_action_count(env: &Env) -> u64 {
+    let count = get_admin_action_count(env);
+    let new_count = count + 1;
+    env.storage()
+        .instance()
+        .set(&DataKey::AdminActionCount, &new_count);
+    new_count
+}
+
+pub fn set_admin_action(env: &Env, action: &AdminAction) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::AdminAction(action.id), action);
+}
+
+pub fn get_admin_action(env: &Env, action_id: u64) -> Option<AdminAction> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::AdminAction(action_id))
 }
