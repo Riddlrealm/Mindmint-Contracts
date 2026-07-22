@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{Address, Env, String, Symbol, Vec, contract, contractimpl, contracttype, token};
+pub mod event;
+
+use soroban_sdk::{Address, Env, String, Vec, contract, contractimpl, contracttype, token};
 
 //
 // ──────────────────────────────────────────────────────────
@@ -136,9 +138,12 @@ impl ReferralContract {
             .instance()
             .set(&DataKey::ReferralStats, &stats);
 
-        env.events().publish(
-            (Symbol::new(&env, "init"), Symbol::new(&env, "referral")),
-            (admin, reward_token_clone, referrer_reward, referee_reward),
+        event::emit::init(
+            &env,
+            &admin,
+            &reward_token_clone,
+            referrer_reward,
+            referee_reward,
         );
     }
 
@@ -209,10 +214,7 @@ impl ReferralContract {
             &Vec::<Address>::new(&env),
         );
 
-        env.events().publish(
-            (Symbol::new(&env, "referral_code_generated"), user),
-            code.clone(),
-        );
+        event::emit::referral_code_generated(&env, &user, &code);
 
         code
     }
@@ -376,9 +378,12 @@ impl ReferralContract {
             .set(&DataKey::ReferralStats, &stats);
 
         // Emit event
-        env.events().publish(
-            (Symbol::new(&env, "referral_registered"), referee),
-            (referrer, referral_code, rewards_distributed),
+        event::emit::referral_registered(
+            &env,
+            &referee,
+            &referrer,
+            &referral_code,
+            rewards_distributed,
         );
 
         rewards_distributed
@@ -398,12 +403,12 @@ impl ReferralContract {
 
         if contract_balance < total_needed {
             // Insufficient balance - still record referral but don't reward
-            env.events().publish(
-                (
-                    Symbol::new(env, "reward_failed"),
-                    Symbol::new(env, "insufficient_balance"),
-                ),
-                (referrer, referee, total_needed, contract_balance),
+            event::emit::reward_failed(
+                env,
+                &referrer,
+                &referee,
+                total_needed,
+                contract_balance,
             );
             return false;
         }
@@ -429,9 +434,12 @@ impl ReferralContract {
             );
         }
 
-        env.events().publish(
-            (Symbol::new(env, "rewards_distributed"), referrer),
-            (referee, config.referrer_reward, config.referee_reward),
+        event::emit::rewards_distributed(
+            env,
+            &referrer,
+            &referee,
+            config.referrer_reward,
+            config.referee_reward,
         );
 
         true
@@ -512,8 +520,7 @@ impl ReferralContract {
 
         env.storage().instance().set(&DataKey::Config, &config);
 
-        env.events()
-            .publish((Symbol::new(&env, "config_updated"), admin), config.clone());
+        event::emit::config_updated(&env, &admin);
     }
 
     /// Deposit reward tokens to contract (admin only)
@@ -527,8 +534,7 @@ impl ReferralContract {
 
         token_client.transfer(&admin, &env.current_contract_address(), &amount);
 
-        env.events()
-            .publish((Symbol::new(&env, "tokens_deposited"), admin), amount);
+        event::emit::tokens_deposited(&env, &admin, amount);
     }
 
     // ───────────── HELPERS ─────────────
