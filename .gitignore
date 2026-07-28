@@ -1,6 +1,8 @@
 # Rust
 target/
-Cargo.lock
+# Cargo.lock is committed for reproducible CI: a fresh resolve otherwise pulls
+# ed25519-dalek 3.0.0, which fails to compile soroban-env-host's testutils and
+# breaks `cargo test`/`clippy` for the whole workspace.
 **/*.rs.bk
 
 # Soroban
