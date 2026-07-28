@@ -1,0 +1,12 @@
+[package]
+name = "lint-driver"
+version = "0.1.0"
+edition = "2021"
+description = "AST-based linter driver that aggregates all scripts/check-*.sh rules"
+
+[[bin]]
+name = "lint-driver"
+path = "src/main.rs"
+
+[dependencies]
+regex = "1"
