@@ -1,6 +1,19 @@
 #![no_std]
 
-use soroban_sdk::{Address, Env, String, Symbol, Vec, contract, contractimpl, contracttype, token};
+pub mod event;
+
+use soroban_sdk::{Address, Env, String, Vec, contract, contractimpl, contracttype, token};
+
+//
+// ──────────────────────────────────────────────────────────
+// CONSTANTS
+// ──────────────────────────────────────────────────────────
+//
+
+/// Hard upper-bound on how many hops the cycle-detection walk will follow.
+/// Configurable per deployment via Config::max_chain_depth but never allowed
+/// to exceed this value.
+pub const MAX_CHAIN_DEPTH: u32 = 10;
 
 //
 // ──────────────────────────────────────────────────────────
@@ -28,6 +41,8 @@ pub enum DataKey {
     Admin,
     /// Counter for generating unique codes
     CodeCounter,
+    /// Reentrancy guard: true when an external call is in progress
+    ReentrancyGuard,
 }
 
 //
@@ -53,6 +68,8 @@ pub struct Config {
     pub referee_reward: i128,          // Reward for referee
     pub max_referrals_per_user: u32,   // Maximum referrals allowed per user
     pub min_referral_code_length: u32, // Minimum length for referral codes
+    /// Maximum ancestor hops checked during cycle detection (≤ MAX_CHAIN_DEPTH).
+    pub max_chain_depth: u32,
 }
 
 //
@@ -76,6 +93,7 @@ impl ReferralContract {
     /// * `referrer_reward` - Amount of tokens to reward referrer
     /// * `referee_reward` - Amount of tokens to reward referee
     /// * `max_referrals_per_user` - Maximum number of referrals per user
+    /// * `max_chain_depth` - Depth limit for cycle detection (capped at MAX_CHAIN_DEPTH)
     pub fn initialize(
         env: Env,
         admin: Address,
@@ -83,12 +101,20 @@ impl ReferralContract {
         referrer_reward: i128,
         referee_reward: i128,
         max_referrals_per_user: u32,
+        max_chain_depth: u32,
     ) {
         admin.require_auth();
 
         if env.storage().instance().has(&DataKey::Admin) {
             panic!("Already initialized");
         }
+
+        // Clamp the provided depth to the hard constant.
+        let effective_depth = if max_chain_depth == 0 || max_chain_depth > MAX_CHAIN_DEPTH {
+            MAX_CHAIN_DEPTH
+        } else {
+            max_chain_depth
+        };
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::CodeCounter, &0u32);
@@ -100,6 +126,7 @@ impl ReferralContract {
             referee_reward,
             max_referrals_per_user,
             min_referral_code_length: 6,
+            max_chain_depth: effective_depth,
         };
         env.storage().instance().set(&DataKey::Config, &config);
 
@@ -113,9 +140,12 @@ impl ReferralContract {
             .instance()
             .set(&DataKey::ReferralStats, &stats);
 
-        env.events().publish(
-            (Symbol::new(&env, "init"), Symbol::new(&env, "referral")),
-            (admin, reward_token_clone, referrer_reward, referee_reward),
+        event::emit::init(
+            &env,
+            &admin,
+            &reward_token_clone,
+            referrer_reward,
+            referee_reward,
         );
     }
 
@@ -186,10 +216,7 @@ impl ReferralContract {
             &Vec::<Address>::new(&env),
         );
 
-        env.events().publish(
-            (Symbol::new(&env, "referral_code_generated"), user),
-            code.clone(),
-        );
+        event::emit::referral_code_generated(&env, &user, &code);
 
         code
     }
@@ -224,6 +251,11 @@ impl ReferralContract {
     // ───────────── REFERRAL REGISTRATION ─────────────
 
     /// Register as a referee with a referral code
+    ///
+    /// Performs a depth-limited ancestor walk to detect cycles in the referral
+    /// graph.  If the candidate referrer is already an ancestor of the referee
+    /// (or vice-versa) within `config.max_chain_depth` hops, the call panics
+    /// with "Cyclic referral chain detected".
     ///
     /// # Arguments
     /// * `referee` - Address of the new user (referee)
@@ -260,6 +292,38 @@ impl ReferralContract {
             panic!("Cannot refer yourself");
         }
 
+        let config: Config = env.storage().instance().get(&DataKey::Config).unwrap();
+
+        // ── Cycle detection ──────────────────────────────────────────────────
+        // Walk the existing ancestor chain starting from `referrer`.  If we
+        // encounter `referee` at any point we know that accepting this edge
+        // would close a cycle.  We stop after `config.max_chain_depth` hops to
+        // bound storage reads (each hop is one instance-storage get).
+        {
+            let mut current: Address = referrer.clone();
+            let mut depth: u32 = 0;
+            loop {
+                if depth >= config.max_chain_depth {
+                    break;
+                }
+                match env
+                    .storage()
+                    .instance()
+                    .get::<DataKey, Address>(&DataKey::Referral(current.clone()))
+                {
+                    None => break, // reached the root of this chain
+                    Some(parent) => {
+                        if parent == referee {
+                            panic!("Cyclic referral chain detected");
+                        }
+                        current = parent;
+                        depth += 1;
+                    }
+                }
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // Anti-gaming: Check referral limit
         let referral_count: u32 = env
             .storage()
@@ -267,7 +331,6 @@ impl ReferralContract {
             .get(&DataKey::ReferralCount(referrer.clone()))
             .unwrap_or(0);
 
-        let config: Config = env.storage().instance().get(&DataKey::Config).unwrap();
         if referral_count >= config.max_referrals_per_user {
             panic!("Referrer has reached maximum referral limit");
         }
@@ -317,9 +380,12 @@ impl ReferralContract {
             .set(&DataKey::ReferralStats, &stats);
 
         // Emit event
-        env.events().publish(
-            (Symbol::new(&env, "referral_registered"), referee),
-            (referrer, referral_code, rewards_distributed),
+        event::emit::referral_registered(
+            &env,
+            &referee,
+            &referrer,
+            &referral_code,
+            rewards_distributed,
         );
 
         rewards_distributed
@@ -327,16 +393,14 @@ impl ReferralContract {
 
     // ───────────── REWARD DISTRIBUTION ─────────────
 
-    /// Distribute rewards to both referrer and referee
+    /// Distribute rewards to both referrer and referee.
+    ///
+    /// Protected by a reentrancy guard: if the reward token contract calls
+    /// back into this contract during `transfer`, the call will panic.
+    ///
     /// Note: This requires the contract to have authorization to mint tokens
     /// or have sufficient balance to transfer from itself
     fn distribute_rewards(env: &Env, referrer: Address, referee: Address, config: &Config) -> bool {
-        // For reward_token contract, we need to check balance first
-        // The contract should have been funded with tokens via deposit_reward_tokens
-        // We'll use the token client to check and transfer
-
-        // Try to use token::Client first (for standard token interface)
-        // If that doesn't work, we'll need to interact with reward_token directly
         let total_needed = config.referrer_reward + config.referee_reward;
 
         // Check contract balance
@@ -345,15 +409,18 @@ impl ReferralContract {
 
         if contract_balance < total_needed {
             // Insufficient balance - still record referral but don't reward
-            env.events().publish(
-                (
-                    Symbol::new(env, "reward_failed"),
-                    Symbol::new(env, "insufficient_balance"),
-                ),
-                (referrer, referee, total_needed, contract_balance),
+            event::emit::reward_failed(
+                env,
+                &referrer,
+                &referee,
+                total_needed,
+                contract_balance,
             );
             return false;
         }
+
+        // Acquire reentrancy guard before external calls
+        Self::acquire_guard(env);
 
         // Transfer rewards using token client
         let token_client = token::Client::new(env, &config.reward_token);
@@ -376,9 +443,15 @@ impl ReferralContract {
             );
         }
 
-        env.events().publish(
-            (Symbol::new(env, "rewards_distributed"), referrer),
-            (referee, config.referrer_reward, config.referee_reward),
+        // Release reentrancy guard after external calls complete
+        Self::release_guard(env);
+
+        event::emit::rewards_distributed(
+            env,
+            &referrer,
+            &referee,
+            config.referrer_reward,
+            config.referee_reward,
         );
 
         true
@@ -386,7 +459,6 @@ impl ReferralContract {
 
     /// Helper to get token balance (works with both standard tokens and custom reward_token)
     fn get_token_balance(env: &Env, token_addr: &Address, account: &Address) -> i128 {
-        // Try token::Client first (standard interface)
         let token_client = token::Client::new(env, token_addr);
         token_client.balance(account)
     }
@@ -425,12 +497,16 @@ impl ReferralContract {
     // ───────────── ADMIN FUNCTIONS ─────────────
 
     /// Update configuration (admin only)
+    ///
+    /// Pass `None` to leave a field unchanged.  `max_chain_depth` is capped
+    /// at MAX_CHAIN_DEPTH regardless of the value provided.
     pub fn update_config(
         env: Env,
         admin: Address,
         referrer_reward: Option<i128>,
         referee_reward: Option<i128>,
         max_referrals_per_user: Option<u32>,
+        max_chain_depth: Option<u32>,
     ) {
         admin.require_auth();
         Self::assert_admin(&env, &admin);
@@ -446,11 +522,17 @@ impl ReferralContract {
         if let Some(max) = max_referrals_per_user {
             config.max_referrals_per_user = max;
         }
+        if let Some(depth) = max_chain_depth {
+            config.max_chain_depth = if depth == 0 || depth > MAX_CHAIN_DEPTH {
+                MAX_CHAIN_DEPTH
+            } else {
+                depth
+            };
+        }
 
         env.storage().instance().set(&DataKey::Config, &config);
 
-        env.events()
-            .publish((Symbol::new(&env, "config_updated"), admin), config.clone());
+        event::emit::config_updated(&env, &admin);
     }
 
     /// Deposit reward tokens to contract (admin only)
@@ -464,11 +546,32 @@ impl ReferralContract {
 
         token_client.transfer(&admin, &env.current_contract_address(), &amount);
 
-        env.events()
-            .publish((Symbol::new(&env, "tokens_deposited"), admin), amount);
+        event::emit::tokens_deposited(&env, &admin, amount);
     }
 
     // ───────────── HELPERS ─────────────
+
+    /// Acquire the reentrancy guard. Panics if already held (reentrant call).
+    fn acquire_guard(env: &Env) {
+        let held: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::ReentrancyGuard)
+            .unwrap_or(false);
+        if held {
+            panic!("Reentrancy detected");
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::ReentrancyGuard, &true);
+    }
+
+    /// Release the reentrancy guard.
+    fn release_guard(env: &Env) {
+        env.storage()
+            .instance()
+            .set(&DataKey::ReentrancyGuard, &false);
+    }
 
     fn assert_initialized(env: &Env) {
         if !env.storage().instance().has(&DataKey::Admin) {

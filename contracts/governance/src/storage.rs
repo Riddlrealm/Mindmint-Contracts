@@ -1,4 +1,4 @@
-use crate::types::{DataKey, GovernanceConfig, Proposal};
+use crate::types::{AdminAction, DataKey, GovernanceConfig, MultisigConfig, Proposal};
 use soroban_sdk::{Address, Env, Val, Vec};
 
 pub fn set_config(env: &Env, config: &GovernanceConfig) {
@@ -97,4 +97,39 @@ pub fn set_voted(env: &Env, proposal_id: u64, user: &Address) {
     env.storage()
         .persistent()
         .set(&DataKey::Vote(proposal_id, user.clone()), &true);
+}
+
+// ───────────── MULTISIG STORAGE (ADR-0013) ─────────────
+
+pub fn get_multisig_config(env: &Env) -> Option<MultisigConfig> {
+    env.storage().persistent().get(&DataKey::MultisigConfig)
+}
+
+pub fn set_multisig_config(env: &Env, config: &MultisigConfig) {
+    env.storage().persistent().set(&DataKey::MultisigConfig, config);
+}
+
+pub fn increment_admin_action_count(env: &Env) -> u64 {
+    let count: u64 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::AdminActionCount)
+        .unwrap_or(0);
+    let new_count = count + 1;
+    env.storage()
+        .persistent()
+        .set(&DataKey::AdminActionCount, &new_count);
+    new_count
+}
+
+pub fn set_admin_action(env: &Env, action: &AdminAction) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::AdminAction(action.id), action);
+}
+
+pub fn get_admin_action(env: &Env, action_id: u64) -> Option<AdminAction> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::AdminAction(action_id))
 }

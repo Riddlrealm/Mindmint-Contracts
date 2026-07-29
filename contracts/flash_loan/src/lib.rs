@@ -1,12 +1,20 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol, Vec,
+    contract, contracterror, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol,
+    Vec,
 };
 
 const BASIS_POINTS: i128 = 10_000;
 const MIN_FEE_BPS: u32 = 10;
 const MAX_FEE_BPS: u32 = 30;
+
+#[contracterror]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Error {
+    FlashLoanUnpaid = 1,
+    ReentrantCall = 2,
+}
 
 #[contracttype]
 pub enum DataKey {
@@ -16,7 +24,7 @@ pub enum DataKey {
     Analytics,
     FlashLoanCounter,
     FlashLoanRecord(u64),
-    ReentrancyGuard,
+    IsProcessing,
     Paused,
 }
 
@@ -125,9 +133,7 @@ impl FlashLoanContract {
             .persistent()
             .set(&DataKey::PoolList, &Vec::<Address>::new(&env));
         env.storage().persistent().set(&DataKey::Paused, &false);
-        env.storage()
-            .persistent()
-            .set(&DataKey::ReentrancyGuard, &false);
+        env.storage().persistent().set(&DataKey::IsProcessing, &false);
     }
 
     pub fn add_liquidity(env: Env, lender: Address, token: Address, amount: i128) {
@@ -227,10 +233,10 @@ impl FlashLoanContract {
         amount: i128,
         callback_contract: Address,
         callback_data: soroban_sdk::Bytes,
-    ) -> u64 {
+    ) -> Result<u64, Error> {
         borrower.require_auth();
         Self::assert_not_paused(&env);
-        Self::assert_not_reentrant(&env);
+        Self::assert_not_reentrant(&env)?;
 
         if amount <= 0 {
             panic!("Amount must be greater than zero");
@@ -290,11 +296,17 @@ impl FlashLoanContract {
             .persistent()
             .set(&DataKey::Pool(token.clone()), &pool);
 
-        let token_client = token::Client::new(&env, &token);
-        token_client.transfer(&env.current_contract_address(), &borrower, &amount);
-
+        // Step 1: Enable reentrancy guard before any state changes
         Self::set_reentrancy_guard(&env, true);
 
+        // Step 2: Record pre-state balance before disbursing the loan
+        let token_client = token::Client::new(&env, &token);
+        let starting_balance = token_client.balance(&env.current_contract_address());
+
+        // Step 3: Disburse the loan principal to the borrower
+        token_client.transfer(&env.current_contract_address(), &borrower, &amount);
+
+        // Step 4: Invoke the borrower's callback (must repay within this call)
         let callback_args = (borrower.clone(), token.clone(), amount, fee, callback_data);
         let _callback_result: bool = env.invoke_contract(
             &callback_contract,
@@ -302,25 +314,19 @@ impl FlashLoanContract {
             callback_args.into_val(&env),
         );
 
+        // Step 5: Disable reentrancy guard after callback returns
         Self::set_reentrancy_guard(&env, false);
 
+        // Step 6: Verify repayment — balance must be at least starting_balance + fee
+        // (principal was transferred out, so net expected increase is just the fee)
         let current_balance = token_client.balance(&env.current_contract_address());
-        let expected_balance_after_repayment = pool.available_liquidity + repayment_amount;
+        let expected_balance_after_repayment = starting_balance + fee;
 
         if current_balance < expected_balance_after_repayment {
-            let mut updated_record: FlashLoanRecord = env
-                .storage()
-                .persistent()
-                .get(&DataKey::FlashLoanRecord(loan_id))
-                .unwrap();
-            updated_record.status = FlashLoanStatus::Defaulted;
-            updated_record.end_time = env.ledger().timestamp();
-            env.storage()
-                .persistent()
-                .set(&DataKey::FlashLoanRecord(loan_id), &updated_record);
-            panic!("Flash loan not repaid within transaction");
+            return Err(Error::FlashLoanUnpaid);
         }
 
+        // Step 7: Update pool state with repaid funds
         let mut updated_pool: LiquidityPool = env
             .storage()
             .persistent()
@@ -334,6 +340,7 @@ impl FlashLoanContract {
             .persistent()
             .set(&DataKey::Pool(token), &updated_pool);
 
+        // Step 8: Mark the loan record as repaid
         let mut updated_record: FlashLoanRecord = env
             .storage()
             .persistent()
@@ -347,7 +354,7 @@ impl FlashLoanContract {
 
         Self::update_analytics(&env, amount, fee, true);
 
-        loan_id
+        Ok(loan_id)
     }
 
     pub fn set_fee_bps(env: Env, admin: Address, fee_bps: u32) {
@@ -525,21 +532,22 @@ impl FlashLoanContract {
         }
     }
 
-    fn assert_not_reentrant(env: &Env) {
+    fn assert_not_reentrant(env: &Env) -> Result<(), Error> {
         let guard: bool = env
             .storage()
             .persistent()
-            .get(&DataKey::ReentrancyGuard)
+            .get(&DataKey::IsProcessing)
             .unwrap_or(false);
         if guard {
-            panic!("Reentrancy detected");
+            return Err(Error::ReentrantCall);
         }
+        Ok(())
     }
 
     fn set_reentrancy_guard(env: &Env, value: bool) {
         env.storage()
             .persistent()
-            .set(&DataKey::ReentrancyGuard, &value);
+            .set(&DataKey::IsProcessing, &value);
     }
 }
 

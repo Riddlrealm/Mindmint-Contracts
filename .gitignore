@@ -1,6 +1,8 @@
 # Rust
 target/
-Cargo.lock
+# Cargo.lock is committed intentionally: pinning transitive deps (e.g.
+# ed25519-dalek =2.2.0) is the only reliable way to keep CI reproducible
+# for a workspace that does not use --locked in its CI commands.
 **/*.rs.bk
 
 # Soroban
