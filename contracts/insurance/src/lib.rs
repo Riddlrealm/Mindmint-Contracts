@@ -1,6 +1,9 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String, Vec};
+use soroban_sdk::{
+    contract, contracterror, contractimpl, contracttype, panic_with_error, token, Address, Env,
+    String, Vec,
+};
 
 //
 // ──────────────────────────────────────────────────────────
@@ -133,6 +136,23 @@ pub struct FraudMetrics {
 const SECONDS_PER_DAY: u64 = 86_400;
 const BASIS_POINTS: u64 = 10_000;
 const FRAUD_LOOKBACK_PERIOD: u64 = 30 * SECONDS_PER_DAY; // 30 days
+
+//
+// ──────────────────────────────────────────────────────────
+// ERRORS
+// ──────────────────────────────────────────────────────────
+//
+
+/// Errors surfaced by checked arithmetic paths (issue #22).
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum InsuranceError {
+    /// Premium calculation or pool accumulation overflowed i128.
+    PremiumOverflow = 1,
+    /// Refund proration or pool deduction underflowed.
+    RefundUnderflow = 2,
+}
 
 //
 // ──────────────────────────────────────────────────────────
@@ -272,9 +292,12 @@ impl InsuranceContract {
             .persistent()
             .get(&DataKey::PremiumPool)
             .unwrap_or(0);
+        let new_pool = pool
+            .checked_add(premium)
+            .unwrap_or_else(|| panic_with_error!(&env, InsuranceError::PremiumOverflow));
         env.storage()
             .persistent()
-            .set(&DataKey::PremiumPool, &(pool + premium));
+            .set(&DataKey::PremiumPool, &new_pool);
 
         // Increment total policies
         let total: u64 = env
@@ -335,7 +358,10 @@ impl InsuranceContract {
 
         // Update policy
         policy.end_time = new_end_time;
-        policy.premium_paid += additional_premium;
+        policy.premium_paid = policy
+            .premium_paid
+            .checked_add(additional_premium)
+            .unwrap_or_else(|| panic_with_error!(&env, InsuranceError::PremiumOverflow));
         policy.status = PolicyStatus::Active;
 
         env.storage()
@@ -348,9 +374,12 @@ impl InsuranceContract {
             .persistent()
             .get(&DataKey::PremiumPool)
             .unwrap_or(0);
+        let new_pool = pool
+            .checked_add(additional_premium)
+            .unwrap_or_else(|| panic_with_error!(&env, InsuranceError::PremiumOverflow));
         env.storage()
             .persistent()
-            .set(&DataKey::PremiumPool, &(pool + additional_premium));
+            .set(&DataKey::PremiumPool, &new_pool);
     }
 
     /// Cancel a policy and receive prorated refund
@@ -376,14 +405,15 @@ impl InsuranceContract {
         // Calculate refund (prorated based on unused time)
         let total_period = policy.end_time - policy.start_time;
         let _elapsed_period = current_time - policy.start_time;
-        let remaining_period = if policy.end_time > current_time {
-            policy.end_time - current_time
-        } else {
-            0
-        };
+        let remaining_period = policy.end_time.saturating_sub(current_time);
 
         let refund = if remaining_period > 0 {
-            (policy.premium_paid * remaining_period as i128) / total_period as i128
+            // checked_div also guards total_period == 0 (div-by-zero -> clean error)
+            policy
+                .premium_paid
+                .checked_mul(remaining_period as i128)
+                .and_then(|v| v.checked_div(total_period as i128))
+                .unwrap_or_else(|| panic_with_error!(&env, InsuranceError::RefundUnderflow))
         } else {
             0
         };
@@ -405,9 +435,12 @@ impl InsuranceContract {
                 .persistent()
                 .get(&DataKey::PremiumPool)
                 .unwrap_or(0);
+            let new_pool = pool
+                .checked_sub(refund)
+                .unwrap_or_else(|| panic_with_error!(&env, InsuranceError::RefundUnderflow));
             env.storage()
                 .persistent()
-                .set(&DataKey::PremiumPool, &(pool - refund));
+                .set(&DataKey::PremiumPool, &new_pool);
         }
     }
 
@@ -914,8 +947,17 @@ impl InsuranceContract {
 
     // ───────────── INTERNAL HELPERS ─────────────
 
+    /// Premium = coverage_amount × base_rate × multiplier × coverage_days
+    ///           ─────────────────────────────────────────────────────────
+    ///                        365 × BASIS_POINTS × 100
+    ///
+    /// Single division at the end: avoids the truncation bug where
+    /// `(base_rate * multiplier) / 100` floored the rate whenever
+    /// base_rate × multiplier was not a clean multiple of 100, systematically
+    /// underpricing premiums (collapsing to the minimum of 1 in the worst case)
+    /// regardless of coverage amount.
     fn calculate_premium_internal(
-        _env: &Env,
+        env: &Env,
         config: &InsuranceConfig,
         coverage_type: CoverageType,
         coverage_amount: i128,
@@ -928,15 +970,23 @@ impl InsuranceContract {
             CoverageType::Combined => config.combined_multiplier,
         };
 
-        // Calculate: coverage_amount * base_rate * multiplier * (period_days / 365) / (BASIS_POINTS * 100)
         let coverage_days = coverage_period / SECONDS_PER_DAY;
-        let annual_rate = (config.base_premium_rate as i128 * multiplier as i128) / 100; // Divide by 100 for multiplier percentage
 
-        // Premium = coverage_amount * annual_rate * (coverage_days / 365) / BASIS_POINTS
-        let premium =
-            (coverage_amount * annual_rate * coverage_days as i128) / (365 * BASIS_POINTS as i128);
+        // Numerator: coverage_amount × base_rate × multiplier × days (all checked)
+        let numerator = coverage_amount
+            .checked_mul(config.base_premium_rate as i128)
+            .and_then(|v| v.checked_mul(multiplier as i128))
+            .and_then(|v| v.checked_mul(coverage_days as i128))
+            .unwrap_or_else(|| panic_with_error!(env, InsuranceError::PremiumOverflow));
 
-        // Ensure minimum premium of 1
+        // Denominator: 365 × BASIS_POINTS × 100 — constant, can't overflow i128
+        let denominator: i128 = 365i128 * (BASIS_POINTS as i128) * 100i128;
+
+        let premium = numerator
+            .checked_div(denominator)
+            .unwrap_or_else(|| panic_with_error!(env, InsuranceError::PremiumOverflow));
+
+        // Ensure minimum premium of 1 (unchanged behavior)
         if premium < 1 {
             1
         } else {
@@ -975,11 +1025,7 @@ impl InsuranceContract {
         }
 
         // Check recent claim frequency
-        let lookback_time = if current_time > FRAUD_LOOKBACK_PERIOD {
-            current_time - FRAUD_LOOKBACK_PERIOD
-        } else {
-            0
-        };
+        let lookback_time = current_time.saturating_sub(FRAUD_LOOKBACK_PERIOD);
 
         let mut recent_count = 0u32;
         for claim_id in metrics.recent_claims.iter() {
@@ -1016,11 +1062,7 @@ impl InsuranceContract {
         metrics.last_claim_time = current_time;
 
         // Add to recent claims, removing old ones
-        let lookback_time = if current_time > FRAUD_LOOKBACK_PERIOD {
-            current_time - FRAUD_LOOKBACK_PERIOD
-        } else {
-            0
-        };
+        let lookback_time = current_time.saturating_sub(FRAUD_LOOKBACK_PERIOD);
 
         let mut new_recent: Vec<u64> = Vec::new(env);
         for id in metrics.recent_claims.iter() {
@@ -1083,5 +1125,112 @@ impl InsuranceContract {
         if config.paused {
             panic!("Contract is paused");
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use soroban_sdk::testutils::{Address as _, Ledger};
+    use soroban_sdk::token::StellarAssetClient;
+    use soroban_sdk::{Address, Env};
+
+    const YEAR: u64 = 365 * SECONDS_PER_DAY;
+
+    /// Register a fresh contract with a test SAC as its payment token.
+    /// Returns (env, client, admin, token_address).
+    fn setup(base_rate: u32) -> (Env, InsuranceContractClient<'static>, Address, Address) {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let admin = Address::generate(&env);
+        let token_admin = Address::generate(&env);
+        // Stellar Asset Contract used as the premium/payout token.
+        let token_id = env
+            .register_stellar_asset_contract_v2(token_admin.clone())
+            .address();
+
+        let contract_id = env.register_contract(None, InsuranceContract);
+        let client = InsuranceContractClient::new(&env, &contract_id);
+        client.initialize(&admin, &token_id, &base_rate);
+
+        (env, client, admin, token_id)
+    }
+
+    // ── Acceptance: property sweep near i128::MAX / 1000 ─────────────────
+    #[test]
+    fn premium_overflow_surfaces_clean_error_near_i128_max() {
+        let (_env, client, _admin, _token) = setup(100);
+        // `calculate_premium` returns a plain i128 and raises the error via
+        // `panic_with_error!`, so the generated `try_` surfaces the generic
+        // `soroban_sdk::Error` carrying the contract error code — not the enum.
+        let expected =
+            soroban_sdk::Error::from_contract_error(InsuranceError::PremiumOverflow as u32);
+        let base = i128::MAX / 1000;
+        // Sweep of values around the overflow threshold.
+        for offset in [0i128, 1, 999, 100_000, 1_000_000] {
+            let coverage = base + offset;
+            let res = client.try_calculate_premium(&CoverageType::Token, &coverage, &YEAR);
+            // A numerator of this magnitude overflows i128: the checked path
+            // must surface PremiumOverflow cleanly, not an opaque host trap.
+            assert_eq!(res, Err(Ok(expected)), "coverage = {coverage}");
+        }
+    }
+
+    // ── The truncation bug: low-rate premiums scale with coverage ────────
+    #[test]
+    fn low_rate_premium_no_longer_floors_to_one() {
+        // base_rate = 1 bps, NFT multiplier = 150 (default). The old code did
+        // `(base_rate * multiplier) / 100` first, truncating 1.5 -> 1 and
+        // underpricing every premium. Multiply-first fixes the truncation and
+        // keeps premiums proportional to coverage.
+        let (_env, client, _admin, _token) = setup(1);
+        let premium_small = client.calculate_premium(&CoverageType::NFT, &1_000_000i128, &YEAR);
+        let premium_large = client.calculate_premium(&CoverageType::NFT, &1_000_000_000i128, &YEAR);
+        assert!(
+            premium_large > premium_small,
+            "premium must scale with coverage"
+        );
+        assert!(premium_large > 1, "large coverage must not floor to 1");
+    }
+
+    // ── Refund: proration is sane and does not trap ──────────────────────
+    #[test]
+    fn cancel_refund_prorates_without_trapping() {
+        let (env, client, _admin, token_id) = setup(100);
+
+        let owner = Address::generate(&env);
+        let asset = Address::generate(&env);
+
+        // Mint enough of the payment token to the owner to pay the premium.
+        StellarAssetClient::new(&env, &token_id).mint(&owner, &1_000_000_000i128);
+
+        // Purchase a 1-year Token policy.
+        let coverage = 1_000_000i128;
+        client.purchase_policy(&owner, &CoverageType::Token, &coverage, &YEAR, &asset);
+
+        let policy = client.get_policy(&owner).unwrap();
+        let premium_paid = policy.premium_paid;
+        assert!(premium_paid > 0, "premium should be non-trivial");
+        assert_eq!(client.get_premium_pool(), premium_paid);
+
+        // Advance the ledger to exactly the midpoint of the coverage period.
+        env.ledger().with_mut(|li| {
+            li.timestamp = policy.start_time + YEAR / 2;
+        });
+
+        client.cancel_policy(&owner);
+
+        // Refund ≈ premium_paid / 2, and the pool drops by exactly that.
+        let expected_refund = premium_paid / 2;
+        assert_eq!(
+            client.get_premium_pool(),
+            premium_paid - expected_refund,
+            "pool must drop by the prorated refund"
+        );
+        assert_eq!(
+            client.get_policy(&owner).unwrap().status,
+            PolicyStatus::Cancelled
+        );
     }
 }
