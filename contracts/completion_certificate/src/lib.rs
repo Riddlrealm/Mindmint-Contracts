@@ -3,15 +3,28 @@
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short,
-    Address, Env, Map, String, Symbol, Vec,
+    Address, Env, String, Vec,
     log, panic_with_error,
 };
 
 // ─── Storage Keys ────────────────────────────────────────────────────────────
 
-const ADMIN_KEY: Symbol          = symbol_short!("ADMIN");
-const TOKEN_COUNT_KEY: Symbol    = symbol_short!("TOK_CNT");
-const PAUSED_KEY: Symbol         = symbol_short!("PAUSED");
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Contract admin address (instance storage).
+    Admin,
+    /// Auto-incremented total certificate count (instance storage).
+    TokenCount,
+    /// Global pause flag (instance storage).
+    Paused,
+    /// Per-certificate metadata, keyed by token id (persistent storage).
+    Cert(u64),
+    /// Per-owner certificate id list, keyed by owner (persistent storage).
+    OwnerCerts(Address),
+    /// (puzzle, owner) → minted token id marker (persistent storage).
+    PuzzleMinted(String, Address),
+}
 
 // ─── Error Codes ─────────────────────────────────────────────────────────────
 
@@ -122,16 +135,16 @@ pub struct VerificationProof {
 
 // ─── Storage Helpers ─────────────────────────────────────────────────────────
 
-fn cert_key(token_id: u64) -> (Symbol, u64) {
-    (symbol_short!("CERT"), token_id)
+fn cert_key(token_id: u64) -> DataKey {
+    DataKey::Cert(token_id)
 }
 
-fn owner_certs_key(owner: &Address) -> (Symbol, Address) {
-    (symbol_short!("OWN_CERT"), owner.clone())
+fn owner_certs_key(owner: &Address) -> DataKey {
+    DataKey::OwnerCerts(owner.clone())
 }
 
-fn puzzle_minted_key(puzzle_id: &String, owner: &Address) -> (Symbol, String, Address) {
-    (symbol_short!("P_MINTED"), puzzle_id.clone(), owner.clone())
+fn puzzle_minted_key(puzzle_id: &String, owner: &Address) -> DataKey {
+    DataKey::PuzzleMinted(puzzle_id.clone(), owner.clone())
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -145,13 +158,13 @@ impl CompletionCertificateContract {
     // ── Initialisation ────────────────────────────────────────────────────
 
     pub fn initialize(env: Env, admin: Address) {
-        if env.storage().instance().has(&ADMIN_KEY) {
+        if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, CertError::Unauthorized);
         }
         admin.require_auth();
-        env.storage().instance().set(&ADMIN_KEY, &admin);
-        env.storage().instance().set(&TOKEN_COUNT_KEY, &0u64);
-        env.storage().instance().set(&PAUSED_KEY, &false);
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::TokenCount, &0u64);
+        env.storage().instance().set(&DataKey::Paused, &false);
         log!(&env, "CompletionCertificate: initialized with admin {}", admin);
     }
 
@@ -159,12 +172,12 @@ impl CompletionCertificateContract {
 
     pub fn set_admin(env: Env, new_admin: Address) {
         Self::require_admin(&env);
-        env.storage().instance().set(&ADMIN_KEY, &new_admin);
+        env.storage().instance().set(&DataKey::Admin, &new_admin);
     }
 
     pub fn set_paused(env: Env, paused: bool) {
         Self::require_admin(&env);
-        env.storage().instance().set(&PAUSED_KEY, &paused);
+        env.storage().instance().set(&DataKey::Paused, &paused);
     }
 
     // ── Minting ───────────────────────────────────────────────────────────
@@ -193,10 +206,10 @@ impl CompletionCertificateContract {
         let token_id: u64 = env
             .storage()
             .instance()
-            .get::<Symbol, u64>(&TOKEN_COUNT_KEY)
+            .get::<DataKey, u64>(&DataKey::TokenCount)
             .unwrap_or(0)
             + 1;
-        env.storage().instance().set(&TOKEN_COUNT_KEY, &token_id);
+        env.storage().instance().set(&DataKey::TokenCount, &token_id);
 
         let completed_at = env.ledger().timestamp();
 
@@ -225,7 +238,7 @@ impl CompletionCertificateContract {
         let mut owner_list: Vec<u64> = env
             .storage()
             .persistent()
-            .get::<(Symbol, Address), Vec<u64>>(&own_key)
+            .get::<DataKey, Vec<u64>>(&own_key)
             .unwrap_or(Vec::new(&env));
         owner_list.push_back(token_id);
         env.storage().persistent().set(&own_key, &owner_list);
@@ -257,7 +270,7 @@ impl CompletionCertificateContract {
         let mut cert: CertificateMetadata = env
             .storage()
             .persistent()
-            .get::<(Symbol, u64), CertificateMetadata>(&key)
+            .get::<DataKey, CertificateMetadata>(&key)
             .unwrap_or_else(|| panic_with_error!(&env, CertError::CertNotFound));
 
         if cert.burned {
@@ -275,7 +288,7 @@ impl CompletionCertificateContract {
         let mut old_list: Vec<u64> = env
             .storage()
             .persistent()
-            .get::<(Symbol, Address), Vec<u64>>(&old_key)
+            .get::<DataKey, Vec<u64>>(&old_key)
             .unwrap_or(Vec::new(&env));
         if let Some(idx) = old_list.iter().position(|id| id == token_id) {
             old_list.remove(idx as u32);
@@ -287,7 +300,7 @@ impl CompletionCertificateContract {
         let mut new_list: Vec<u64> = env
             .storage()
             .persistent()
-            .get::<(Symbol, Address), Vec<u64>>(&new_key)
+            .get::<DataKey, Vec<u64>>(&new_key)
             .unwrap_or(Vec::new(&env));
         new_list.push_back(token_id);
         env.storage().persistent().set(&new_key, &new_list);
@@ -310,7 +323,7 @@ impl CompletionCertificateContract {
         let mut cert: CertificateMetadata = env
             .storage()
             .persistent()
-            .get::<(Symbol, u64), CertificateMetadata>(&key)
+            .get::<DataKey, CertificateMetadata>(&key)
             .unwrap_or_else(|| panic_with_error!(&env, CertError::CertNotFound));
 
         if cert.owner != owner {
@@ -328,7 +341,7 @@ impl CompletionCertificateContract {
         let mut list: Vec<u64> = env
             .storage()
             .persistent()
-            .get::<(Symbol, Address), Vec<u64>>(&own_key)
+            .get::<DataKey, Vec<u64>>(&own_key)
             .unwrap_or(Vec::new(&env));
         if let Some(idx) = list.iter().position(|id| id == token_id) {
             list.remove(idx as u32);
@@ -348,7 +361,7 @@ impl CompletionCertificateContract {
         match env
             .storage()
             .persistent()
-            .get::<(Symbol, u64), CertificateMetadata>(&key)
+            .get::<DataKey, CertificateMetadata>(&key)
         {
             Some(cert) if !cert.burned => VerificationProof {
                 token_id:      cert.token_id,
@@ -383,7 +396,7 @@ impl CompletionCertificateContract {
     pub fn get_certificate(env: Env, token_id: u64) -> CertificateMetadata {
         env.storage()
             .persistent()
-            .get::<(Symbol, u64), CertificateMetadata>(&cert_key(token_id))
+            .get::<DataKey, CertificateMetadata>(&cert_key(token_id))
             .unwrap_or_else(|| panic_with_error!(&env, CertError::CertNotFound))
     }
 
@@ -391,7 +404,7 @@ impl CompletionCertificateContract {
     pub fn get_owner_certificates(env: Env, owner: Address) -> Vec<u64> {
         env.storage()
             .persistent()
-            .get::<(Symbol, Address), Vec<u64>>(&owner_certs_key(&owner))
+            .get::<DataKey, Vec<u64>>(&owner_certs_key(&owner))
             .unwrap_or(Vec::new(&env))
     }
 
@@ -399,7 +412,7 @@ impl CompletionCertificateContract {
     pub fn total_supply(env: Env) -> u64 {
         env.storage()
             .instance()
-            .get::<Symbol, u64>(&TOKEN_COUNT_KEY)
+            .get::<DataKey, u64>(&DataKey::TokenCount)
             .unwrap_or(0)
     }
 
@@ -414,7 +427,7 @@ impl CompletionCertificateContract {
     pub fn get_admin(env: Env) -> Address {
         env.storage()
             .instance()
-            .get::<Symbol, Address>(&ADMIN_KEY)
+            .get::<DataKey, Address>(&DataKey::Admin)
             .unwrap_or_else(|| panic_with_error!(&env, CertError::Unauthorized))
     }
 
@@ -422,7 +435,7 @@ impl CompletionCertificateContract {
     pub fn is_paused(env: Env) -> bool {
         env.storage()
             .instance()
-            .get::<Symbol, bool>(&PAUSED_KEY)
+            .get::<DataKey, bool>(&DataKey::Paused)
             .unwrap_or(false)
     }
 
@@ -436,7 +449,7 @@ impl CompletionCertificateContract {
             if let Some(cert) = env
                 .storage()
                 .persistent()
-                .get::<(Symbol, u64), CertificateMetadata>(&cert_key(id))
+                .get::<DataKey, CertificateMetadata>(&cert_key(id))
             {
                 if !cert.burned {
                     certs.push_back(cert);
@@ -473,7 +486,7 @@ impl CompletionCertificateContract {
         let admin: Address = env
             .storage()
             .instance()
-            .get::<Symbol, Address>(&ADMIN_KEY)
+            .get::<DataKey, Address>(&DataKey::Admin)
             .unwrap_or_else(|| panic_with_error!(env, CertError::NotAdmin));
         admin.require_auth();
     }
@@ -482,7 +495,7 @@ impl CompletionCertificateContract {
         let paused: bool = env
             .storage()
             .instance()
-            .get::<Symbol, bool>(&PAUSED_KEY)
+            .get::<DataKey, bool>(&DataKey::Paused)
             .unwrap_or(false);
         if paused {
             panic_with_error!(env, CertError::ContractPaused);
@@ -946,3 +959,5 @@ mod tests {
         assert_eq!(client.get_owner_certificates(&owner).len(), 3);
     }
 }
+#[cfg(test)]
+mod datakey_keys_test;

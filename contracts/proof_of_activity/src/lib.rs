@@ -3,7 +3,8 @@
 mod types;
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, symbol_short, vec, Address, Env, Symbol, Vec,
+    contract, contracterror, contractimpl, contracttype, symbol_short, vec, Address, Env, Symbol,
+    Vec,
 };
 use types::ActivityType;
 
@@ -19,25 +20,42 @@ pub enum ContractError {
     InvalidPagination = 6,
 }
 
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Contract admin / oracle configuration (instance storage).
+    Config,
+    /// Authorized oracle set (instance storage).
+    Oracles,
+    /// Count of recorded proofs (instance storage).
+    ProofCounter,
+    /// Next proof id to assign (instance storage).
+    NextProofId,
+    /// Per-proof data, keyed by proof id (persistent storage).
+    Proof(u64),
+    /// Per-player activity count, keyed by (player, activity type) (persistent storage).
+    ActivityCount(Address, u32),
+    /// Per-player total activity score, keyed by player (persistent storage).
+    ActivityScore(Address),
+}
+
 #[contract]
 pub struct ProofOfActivityContract;
 
 #[contractimpl]
 impl ProofOfActivityContract {
     pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
-        if env.storage().instance().has(&symbol_short!("OR_CFG")) {
+        if env.storage().instance().has(&DataKey::Config) {
             return Err(ContractError::AlreadyInitialized);
         }
 
+        env.storage().instance().set(&DataKey::Config, &admin);
         env.storage()
             .instance()
-            .set(&symbol_short!("OR_CFG"), &admin);
+            .set(&DataKey::Oracles, &vec![&env, admin.clone()]);
         env.storage()
             .instance()
-            .set(&symbol_short!("ORACLES"), &vec![&env, admin.clone()]);
-        env.storage()
-            .instance()
-            .set(&symbol_short!("PROOF_CNT"), &0u64);
+            .set(&DataKey::ProofCounter, &0u64);
 
         Ok(())
     }
@@ -66,17 +84,17 @@ impl ProofOfActivityContract {
         );
         env.storage()
             .persistent()
-            .set(&(symbol_short!("PROOF"), proof_id), &proof_data);
+            .set(&DataKey::Proof(proof_id), &proof_data);
 
         // Update player's proof count for this activity type
-        let count_key = (symbol_short!("CNT"), player.clone(), activity_type as u32);
+        let count_key = DataKey::ActivityCount(player.clone(), activity_type as u32);
         let current_count: u32 = env.storage().persistent().get(&count_key).unwrap_or(0);
         env.storage()
             .persistent()
             .set(&count_key, &(current_count + 1));
 
         // Update player's total score
-        let score_key = (symbol_short!("SCORE"), player.clone());
+        let score_key = DataKey::ActivityScore(player.clone());
         let current_score: u64 = env.storage().persistent().get(&score_key).unwrap_or(0);
         env.storage()
             .persistent()
@@ -97,7 +115,7 @@ impl ProofOfActivityContract {
     ) -> Result<(Address, u32, Symbol, u64, u64), ContractError> {
         env.storage()
             .persistent()
-            .get(&(symbol_short!("PROOF"), proof_id))
+            .get(&DataKey::Proof(proof_id))
             .ok_or(ContractError::ProofNotFound)
     }
 
@@ -116,7 +134,7 @@ impl ProofOfActivityContract {
         let proof_counter: u64 = env
             .storage()
             .instance()
-            .get(&symbol_short!("PROOF_CNT"))
+            .get(&DataKey::ProofCounter)
             .unwrap_or(0);
 
         let mut found_count = 0;
@@ -126,10 +144,7 @@ impl ProofOfActivityContract {
             if let Some(proof) = env
                 .storage()
                 .persistent()
-                .get::<(Symbol, u64), (Address, u32, Symbol, u64, u64)>(&(
-                    symbol_short!("PROOF"),
-                    proof_id,
-                ))
+                .get::<DataKey, (Address, u32, Symbol, u64, u64)>(&DataKey::Proof(proof_id))
             {
                 if proof.0 == player && proof.1 == activity_type as u32 {
                     if found_count >= offset && collected < limit {
@@ -145,7 +160,7 @@ impl ProofOfActivityContract {
     }
 
     pub fn get_activity_score(env: Env, player: Address) -> u64 {
-        let score_key = (symbol_short!("SCORE"), player);
+        let score_key = DataKey::ActivityScore(player);
         env.storage().persistent().get(&score_key).unwrap_or(0)
     }
 
@@ -153,7 +168,7 @@ impl ProofOfActivityContract {
         if activity_type > 2 {
             panic!("Invalid activity type");
         }
-        let count_key = (symbol_short!("CNT"), player, activity_type);
+        let count_key = DataKey::ActivityCount(player, activity_type);
         env.storage().persistent().get(&count_key).unwrap_or(0)
     }
 
@@ -165,13 +180,13 @@ impl ProofOfActivityContract {
         let mut oracles: Vec<Address> = env
             .storage()
             .instance()
-            .get(&symbol_short!("ORACLES"))
+            .get(&DataKey::Oracles)
             .unwrap_or_else(|| vec![&env]);
 
         oracles.push_back(oracle.clone());
         env.storage()
             .instance()
-            .set(&symbol_short!("ORACLES"), &oracles);
+            .set(&DataKey::Oracles, &oracles);
 
         Ok(())
     }
@@ -184,7 +199,7 @@ impl ProofOfActivityContract {
         let oracles: Vec<Address> = env
             .storage()
             .instance()
-            .get(&symbol_short!("ORACLES"))
+            .get(&DataKey::Oracles)
             .unwrap_or_else(|| vec![&env]);
 
         let mut new_oracles = vec![&env];
@@ -196,7 +211,7 @@ impl ProofOfActivityContract {
 
         env.storage()
             .instance()
-            .set(&symbol_short!("ORACLES"), &new_oracles);
+            .set(&DataKey::Oracles, &new_oracles);
 
         Ok(())
     }
@@ -209,13 +224,13 @@ impl ProofOfActivityContract {
         let counter: u64 = env
             .storage()
             .instance()
-            .get(&symbol_short!("PROOF_CNT"))
+            .get(&DataKey::ProofCounter)
             .unwrap_or(0);
 
         let next_id = counter + 1;
         env.storage()
             .instance()
-            .set(&symbol_short!("OR_CNT"), &next_id);
+            .set(&DataKey::NextProofId, &next_id);
 
         next_id
     }
@@ -224,7 +239,7 @@ impl ProofOfActivityContract {
         let admin: Address = env
             .storage()
             .instance()
-            .get(&symbol_short!("OR_CFG"))
+            .get(&DataKey::Config)
             .ok_or(ContractError::NotInitialized)?;
 
         if admin == *address {
@@ -238,7 +253,7 @@ impl ProofOfActivityContract {
         let oracles: Vec<Address> = env
             .storage()
             .instance()
-            .get(&symbol_short!("ORACLES"))
+            .get(&DataKey::Oracles)
             .unwrap_or_else(|| vec![env]);
 
         for authorized_oracle in oracles.iter() {
@@ -250,3 +265,6 @@ impl ProofOfActivityContract {
         Err(ContractError::Unauthorized)
     }
 }
+
+#[cfg(test)]
+mod datakey_keys_test;

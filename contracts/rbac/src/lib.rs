@@ -374,3 +374,6 @@ fn would_create_cycle(env: &Env, child_role: &Symbol, parent_role: &Symbol) -> b
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod datakey_keys_test;

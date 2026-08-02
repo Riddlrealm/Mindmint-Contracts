@@ -194,3 +194,6 @@ impl EventTicketContract {
 }
 
 mod test;
+
+#[cfg(test)]
+mod datakey_keys_test;

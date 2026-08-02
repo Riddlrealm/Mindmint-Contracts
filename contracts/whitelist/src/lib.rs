@@ -1,11 +1,14 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contractmeta, contracttype, symbol_short, Address,
-    Bytes, BytesN, Env, Symbol, Vec,
+    contract, contracterror, contractimpl, contractmeta, contracttype, Address, Bytes, BytesN, Env,
+    Symbol, Vec,
 };
 
 mod test;
+
+#[cfg(test)]
+mod datakey_keys_test;
 
 // Contract metadata
 contractmeta!(
@@ -52,11 +55,20 @@ pub enum WhitelistError {
 }
 
 // Storage keys
-const ADMIN: Symbol = symbol_short!("ADMIN");
-const WHITELIST: Symbol = symbol_short!("WLIST");
-const MERKLE_ROOT: Symbol = symbol_short!("MROOT");
-const SNAPSHOT: Symbol = symbol_short!("SNAP");
-const TIER_PERMS: Symbol = symbol_short!("TPERMS");
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Contract admin address (instance storage).
+    Admin,
+    /// Per-address whitelist entry, keyed by address (persistent storage).
+    Entry(Address),
+    /// Current merkle root for gas-optimized verification (instance storage).
+    MerkleRoot,
+    /// Most recent whitelist snapshot (instance storage).
+    Snapshot,
+    /// Per-tier permission set, keyed by tier (persistent storage).
+    TierPermissions(u32),
+}
 
 #[contract]
 pub struct WhitelistContract;
@@ -66,7 +78,7 @@ impl WhitelistContract {
     /// Initialize the contract with an admin
     pub fn initialize(env: Env, admin: Address) {
         admin.require_auth();
-        env.storage().instance().set(&ADMIN, &admin);
+        env.storage().instance().set(&DataKey::Admin, &admin);
     }
 
     /// Add a single address to whitelist
@@ -91,7 +103,7 @@ impl WhitelistContract {
             permissions,
         };
 
-        let key = (WHITELIST, address);
+        let key = DataKey::Entry(address.clone());
         env.storage().persistent().set(&key, &entry);
 
         Ok(())
@@ -105,7 +117,7 @@ impl WhitelistContract {
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
 
-        let key = (WHITELIST, address);
+        let key = DataKey::Entry(address.clone());
         env.storage().persistent().remove(&key);
 
         Ok(())
@@ -124,7 +136,7 @@ impl WhitelistContract {
                 return Err(WhitelistError::InvalidTier);
             }
 
-            let key = (WHITELIST, entry.address.clone());
+            let key = DataKey::Entry(entry.address.clone());
             env.storage().persistent().set(&key, &entry);
         }
 
@@ -140,7 +152,7 @@ impl WhitelistContract {
         Self::require_admin(&env, &admin)?;
 
         for address in addresses.iter() {
-            let key = (WHITELIST, address);
+            let key = DataKey::Entry(address.clone());
             env.storage().persistent().remove(&key);
         }
 
@@ -149,7 +161,7 @@ impl WhitelistContract {
 
     /// Check if address is whitelisted and has required tier
     pub fn is_whitelisted(env: Env, address: Address, required_tier: Option<u32>) -> bool {
-        let key = (WHITELIST, address);
+        let key = DataKey::Entry(address.clone());
 
         if let Some(entry) = env.storage().persistent().get::<_, WhitelistEntry>(&key) {
             // Check expiration
@@ -172,7 +184,7 @@ impl WhitelistContract {
 
     /// Check if address has specific permission
     pub fn has_permission(env: Env, address: Address, permission: Symbol) -> bool {
-        let key = (WHITELIST, address);
+        let key = DataKey::Entry(address.clone());
 
         if let Some(entry) = env.storage().persistent().get::<_, WhitelistEntry>(&key) {
             // Check expiration
@@ -190,7 +202,7 @@ impl WhitelistContract {
 
     /// Get whitelist entry for address
     pub fn get_whitelist_entry(env: Env, address: Address) -> Option<WhitelistEntry> {
-        let key = (WHITELIST, address);
+        let key = DataKey::Entry(address.clone());
         env.storage().persistent().get(&key)
     }
 
@@ -207,7 +219,7 @@ impl WhitelistContract {
             return Err(WhitelistError::InvalidTier);
         }
 
-        let key = (TIER_PERMS, tier);
+        let key = DataKey::TierPermissions(tier);
         env.storage().persistent().set(&key, &permissions);
 
         Ok(())
@@ -215,7 +227,7 @@ impl WhitelistContract {
 
     /// Get tier permissions
     pub fn get_tier_permissions(env: Env, tier: u32) -> Vec<Symbol> {
-        let key = (TIER_PERMS, tier);
+        let key = DataKey::TierPermissions(tier);
         env.storage()
             .persistent()
             .get(&key)
@@ -230,7 +242,7 @@ impl WhitelistContract {
     ) -> Result<(), WhitelistError> {
         Self::require_admin(&env, &admin)?;
 
-        env.storage().instance().set(&MERKLE_ROOT, &merkle_root);
+        env.storage().instance().set(&DataKey::MerkleRoot, &merkle_root);
 
         Ok(())
     }
@@ -242,7 +254,7 @@ impl WhitelistContract {
         tier: u32,
         proof: Vec<BytesN<32>>,
     ) -> Result<bool, WhitelistError> {
-        let merkle_root: Option<BytesN<32>> = env.storage().instance().get(&MERKLE_ROOT);
+        let merkle_root: Option<BytesN<32>> = env.storage().instance().get(&DataKey::MerkleRoot);
 
         if merkle_root.is_none() {
             return Err(WhitelistError::InvalidMerkleProof);
@@ -269,14 +281,14 @@ impl WhitelistContract {
             total_entries,
         };
 
-        env.storage().instance().set(&SNAPSHOT, &snapshot);
+        env.storage().instance().set(&DataKey::Snapshot, &snapshot);
 
         Ok(())
     }
 
     /// Get current snapshot
     pub fn get_snapshot(env: Env) -> Option<WhitelistSnapshot> {
-        env.storage().instance().get(&SNAPSHOT)
+        env.storage().instance().get(&DataKey::Snapshot)
     }
 
     /// Transfer admin role
@@ -288,21 +300,21 @@ impl WhitelistContract {
         Self::require_admin(&env, &current_admin)?;
         new_admin.require_auth();
 
-        env.storage().instance().set(&ADMIN, &new_admin);
+        env.storage().instance().set(&DataKey::Admin, &new_admin);
 
         Ok(())
     }
 
     /// Get current admin
     pub fn get_admin(env: Env) -> Option<Address> {
-        env.storage().instance().get(&ADMIN)
+        env.storage().instance().get(&DataKey::Admin)
     }
 
     // Helper functions
     fn require_admin(env: &Env, admin: &Address) -> Result<(), WhitelistError> {
         admin.require_auth();
 
-        let stored_admin: Option<Address> = env.storage().instance().get(&ADMIN);
+        let stored_admin: Option<Address> = env.storage().instance().get(&DataKey::Admin);
 
         match stored_admin {
             Some(stored) if stored == *admin => Ok(()),
