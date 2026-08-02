@@ -1,12 +1,13 @@
 # Default reviewers for the project.
 
-/contracts/   @Riddlrealm # 
-/docs/        @Riddlrealm # 
-/scripts/     @Riddlrealm # 
-/.github/     @Riddlrealm # 
-/Cargo.toml   @Riddlrealm # 
-/Makefile     @Riddlrealm # 
-/README.md    @Riddlrealm # 
+/contracts/   @Phantomcall # 
+/docs/        @Phantomcall # 
+/scripts/     @Phantomcall # 
+/.github/     @Phantomcall # 
+/Cargo.toml   @Phantomcall # 
+/Makefile     @Phantomcall # 
+/README.md    @Phantomcall # 
 
-# NOTE: Replace the @Riddlrealm placeholder above with the real maintainer
-# handle once CODEOWNERS ownership is configured in repo settings.
+# Security policy and ownership are mandated to the maintainer team.
+/SECURITY.md  @Phantomcall # 
+/CODEOWNERS   @Phantomcall # 
