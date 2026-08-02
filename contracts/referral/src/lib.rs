@@ -2,7 +2,9 @@
 
 pub mod event;
 
-use soroban_sdk::{Address, Env, String, Vec, contract, contractimpl, contracttype, token};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, token, xdr::ToXdr, Address, Env, String, Vec,
+};
 
 //
 // ──────────────────────────────────────────────────────────
@@ -117,7 +119,7 @@ impl ReferralContract {
         };
 
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::CodeCounter, &0u32);
+        env.storage().instance().set(&DataKey::CodeCounter, &0u64);
 
         let reward_token_clone = reward_token.clone();
         let config = Config {
