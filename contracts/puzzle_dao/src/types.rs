@@ -104,6 +104,47 @@ pub struct TreasuryInfo {
     pub last_distribution: u64,
 }
 
+// ── Multisig types (ADR-0013) ────────────────────────────────────────────
+
+/// Configuration for the multisig gate (ADR-0013).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultisigConfig {
+    /// Minimum number of Council-tier signatures required.
+    pub threshold: u32,
+    /// Maximum time (in seconds) a pending admin action may collect signatures.
+    pub action_ttl: u64,
+}
+
+/// Status of a multisig-gated admin action.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AdminActionStatus {
+    /// Awaiting additional signatures.
+    Pending,
+    /// Threshold reached; ready to execute.
+    Approved,
+    /// Already executed.
+    Executed,
+    /// Rejected or expired.
+    Rejected,
+}
+
+/// A multisig-gated admin action (treasury allocation, threshold update, etc.).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminAction {
+    pub id: u64,
+    pub proposer: Address,
+    pub description: String,
+    pub status: AdminActionStatus,
+    pub created_at: u64,
+    pub expires_at: u64,
+    pub executed_at: Option<u64>,
+    /// Council members who have signed (includes proposer).
+    pub signers: Vec<Address>,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
@@ -119,4 +160,7 @@ pub enum DataKey {
     MemberCount,
     TreasuryInfo,
     MembershipThresholds,
+    MultisigConfig,
+    AdminAction(u64),
+    AdminActionCount,
 }

@@ -1,0 +1,13 @@
+[package]
+name = "check-permissions"
+version = "0.1.0"
+edition = "2021"
+
+# Standalone workspace: keeps this host-only tool out of the contracts workspace
+# so it is never pulled into `cargo build --target wasm32`.
+[workspace]
+
+[dependencies]
+syn = { version = "2", features = ["full", "visit"] }
+quote = "1"
+proc-macro2 = "1"
