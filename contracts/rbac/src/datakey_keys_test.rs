@@ -1,5 +1,6 @@
 #![cfg(test)]
-use soroban_sdk::{symbol_short, Address, Env, IntoVal, Symbol, vec};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{symbol_short, vec, xdr::ToXdr, Address, Env, Symbol};
 
 use crate::storage::DataKey;
 
@@ -14,26 +15,33 @@ fn test_datakey_variant_keys_are_unique() {
     let sym = Symbol::new(&env, "role");
 
     let variants = vec![
-        DataKey::Admin.into_val(&env),
-        DataKey::EmergencyAdmin.into_val(&env),
-        DataKey::Paused.into_val(&env),
-        DataKey::UserRoles(addr.clone()).into_val(&env),
-        DataKey::RolePermissions(sym.clone()).into_val(&env),
-        DataKey::RoleParent(sym.clone()).into_val(&env),
-        DataKey::AuditLogs.into_val(&env),
+        &env,
+        DataKey::Admin.to_xdr(&env),
+        DataKey::EmergencyAdmin.to_xdr(&env),
+        DataKey::Paused.to_xdr(&env),
+        DataKey::UserRoles(addr.clone()).to_xdr(&env),
+        DataKey::RolePermissions(sym.clone()).to_xdr(&env),
+        DataKey::RoleParent(sym.clone()).to_xdr(&env),
+        DataKey::AuditLogs.to_xdr(&env),
     ];
 
     for i in 0..variants.len() {
         for j in (i + 1)..variants.len() {
             assert_ne!(
-                variants[i], variants[j],
+                variants.get(i).unwrap(),
+                variants.get(j).unwrap(),
                 "storage-key collision between DataKey variants {} and {}",
-                i, j
+                i,
+                j
             );
         }
     }
 
     // Sanity: an unrelated symbol-short key must never equal a data-key.
-    let raw = symbol_short!("admin").into_val(&env);
-    assert_ne!(variants[0], raw, "DataKey::Admin collides with raw 'admin'");
+    let raw = symbol_short!("admin").to_xdr(&env);
+    assert_ne!(
+        variants.get(0).unwrap(),
+        raw,
+        "DataKey::Admin collides with raw 'admin'"
+    );
 }

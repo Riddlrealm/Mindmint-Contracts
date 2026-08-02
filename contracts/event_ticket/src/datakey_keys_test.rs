@@ -1,5 +1,6 @@
 #![cfg(test)]
-use soroban_sdk::{symbol_short, Address, Env, IntoVal, vec};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{symbol_short, vec, xdr::ToXdr, Address, Env};
 
 use crate::storage::DataKey;
 
@@ -11,23 +12,30 @@ fn test_datakey_variant_keys_are_unique() {
     let addr = Address::generate(&env);
 
     let variants = vec![
-        DataKey::Config.into_val(&env),
-        DataKey::Event(1u64).into_val(&env),
-        DataKey::Ticket(1u64).into_val(&env),
-        DataKey::HolderTickets(addr.clone()).into_val(&env),
-        DataKey::Attendance(1u64).into_val(&env),
+        &env,
+        DataKey::Config.to_xdr(&env),
+        DataKey::Event(1u64).to_xdr(&env),
+        DataKey::Ticket(1u64).to_xdr(&env),
+        DataKey::HolderTickets(addr.clone()).to_xdr(&env),
+        DataKey::Attendance(1u64).to_xdr(&env),
     ];
 
     for i in 0..variants.len() {
         for j in (i + 1)..variants.len() {
             assert_ne!(
-                variants[i], variants[j],
+                variants.get(i).unwrap(),
+                variants.get(j).unwrap(),
                 "storage-key collision between DataKey variants {} and {}",
-                i, j
+                i,
+                j
             );
         }
     }
 
-    let raw = symbol_short!("config").into_val(&env);
-    assert_ne!(variants[0], raw, "DataKey::Config collides with raw 'config'");
+    let raw = symbol_short!("config").to_xdr(&env);
+    assert_ne!(
+        variants.get(0).unwrap(),
+        raw,
+        "DataKey::Config collides with raw 'config'"
+    );
 }

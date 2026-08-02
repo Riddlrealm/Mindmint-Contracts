@@ -1,5 +1,5 @@
 #![cfg(test)]
-use soroban_sdk::{symbol_short, Env, IntoVal, vec};
+use soroban_sdk::{symbol_short, vec, xdr::ToXdr, Env};
 
 use crate::storage::DataKey;
 
@@ -12,32 +12,39 @@ fn test_datakey_variant_keys_are_unique() {
     let env = Env::default();
 
     let variants = vec![
-        DataKey::Initialized.into_val(&env),
-        DataKey::Admin.into_val(&env),
-        DataKey::TokenA.into_val(&env),
-        DataKey::TokenB.into_val(&env),
-        DataKey::ReserveA.into_val(&env),
-        DataKey::ReserveB.into_val(&env),
-        DataKey::TotalSupply.into_val(&env),
-        DataKey::FeeBps.into_val(&env),
-        DataKey::FeeRecipient.into_val(&env),
-        DataKey::FeesA.into_val(&env),
-        DataKey::FeesB.into_val(&env),
-        DataKey::PriceOracleTimestamp.into_val(&env),
-        DataKey::CumulativePrice.into_val(&env),
-        DataKey::Balance.into_val(&env),
+        &env,
+        DataKey::Initialized.to_xdr(&env),
+        DataKey::Admin.to_xdr(&env),
+        DataKey::TokenA.to_xdr(&env),
+        DataKey::TokenB.to_xdr(&env),
+        DataKey::ReserveA.to_xdr(&env),
+        DataKey::ReserveB.to_xdr(&env),
+        DataKey::TotalSupply.to_xdr(&env),
+        DataKey::FeeBps.to_xdr(&env),
+        DataKey::FeeRecipient.to_xdr(&env),
+        DataKey::FeesA.to_xdr(&env),
+        DataKey::FeesB.to_xdr(&env),
+        DataKey::PriceOracleTimestamp.to_xdr(&env),
+        DataKey::CumulativePrice.to_xdr(&env),
+        DataKey::Balance.to_xdr(&env),
     ];
 
     for i in 0..variants.len() {
         for j in (i + 1)..variants.len() {
             assert_ne!(
-                variants[i], variants[j],
+                variants.get(i).unwrap(),
+                variants.get(j).unwrap(),
                 "storage-key collision between DataKey variants {} and {}",
-                i, j
+                i,
+                j
             );
         }
     }
 
-    let raw = symbol_short!("admin").into_val(&env);
-    assert_ne!(variants[1], raw, "DataKey::Admin collides with raw 'admin'");
+    let raw = symbol_short!("admin").to_xdr(&env);
+    assert_ne!(
+        variants.get(1).unwrap(),
+        raw,
+        "DataKey::Admin collides with raw 'admin'"
+    );
 }

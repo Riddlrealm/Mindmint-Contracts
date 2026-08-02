@@ -1,5 +1,6 @@
 #![cfg(test)]
-use soroban_sdk::{symbol_short, Address, Env, IntoVal, Symbol, vec};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{symbol_short, vec, xdr::ToXdr, Address, Env};
 
 use crate::DataKey;
 
@@ -9,28 +10,34 @@ use crate::DataKey;
 fn test_datakey_variant_keys_are_unique() {
     let env = Env::default();
     let addr = Address::generate(&env);
-    let sym = Symbol::new(&env, "solve");
 
     let variants = vec![
-        DataKey::Config.into_val(&env),
-        DataKey::Oracles.into_val(&env),
-        DataKey::ProofCounter.into_val(&env),
-        DataKey::NextProofId.into_val(&env),
-        DataKey::Proof(1u64).into_val(&env),
-        DataKey::ActivityCount(addr.clone(), 1u32).into_val(&env),
-        DataKey::ActivityScore(addr.clone()).into_val(&env),
+        &env,
+        DataKey::Config.to_xdr(&env),
+        DataKey::Oracles.to_xdr(&env),
+        DataKey::ProofCounter.to_xdr(&env),
+        DataKey::NextProofId.to_xdr(&env),
+        DataKey::Proof(1u64).to_xdr(&env),
+        DataKey::ActivityCount(addr.clone(), 1u32).to_xdr(&env),
+        DataKey::ActivityScore(addr.clone()).to_xdr(&env),
     ];
 
     for i in 0..variants.len() {
         for j in (i + 1)..variants.len() {
             assert_ne!(
-                variants[i], variants[j],
+                variants.get(i).unwrap(),
+                variants.get(j).unwrap(),
                 "storage-key collision between DataKey variants {} and {}",
-                i, j
+                i,
+                j
             );
         }
     }
 
-    let raw = symbol_short!("OR_CFG").into_val(&env);
-    assert_ne!(variants[0], raw, "DataKey::Config collides with raw 'OR_CFG'");
+    let raw = symbol_short!("OR_CFG").to_xdr(&env);
+    assert_ne!(
+        variants.get(0).unwrap(),
+        raw,
+        "DataKey::Config collides with raw 'OR_CFG'"
+    );
 }

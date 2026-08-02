@@ -1,6 +1,6 @@
 #![cfg(test)]
-use soroban_sdk::vec;
-use soroban_sdk::{symbol_short, Address, Env, IntoVal, String};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::{symbol_short, vec, xdr::ToXdr, Address, Env, String};
 
 use crate::DataKey;
 
@@ -13,24 +13,31 @@ fn test_datakey_variant_keys_are_unique() {
     let pid = String::from_str(&env, "PUZZLE-1");
 
     let variants = vec![
-        DataKey::Admin.into_val(&env),
-        DataKey::TokenCount.into_val(&env),
-        DataKey::Paused.into_val(&env),
-        DataKey::Cert(1u64).into_val(&env),
-        DataKey::OwnerCerts(addr.clone()).into_val(&env),
-        DataKey::PuzzleMinted(pid.clone(), addr.clone()).into_val(&env),
+        &env,
+        DataKey::Admin.to_xdr(&env),
+        DataKey::TokenCount.to_xdr(&env),
+        DataKey::Paused.to_xdr(&env),
+        DataKey::Cert(1u64).to_xdr(&env),
+        DataKey::OwnerCerts(addr.clone()).to_xdr(&env),
+        DataKey::PuzzleMinted(pid.clone(), addr.clone()).to_xdr(&env),
     ];
 
     for i in 0..variants.len() {
         for j in (i + 1)..variants.len() {
             assert_ne!(
-                variants[i], variants[j],
+                variants.get(i).unwrap(),
+                variants.get(j).unwrap(),
                 "storage-key collision between DataKey variants {} and {}",
-                i, j
+                i,
+                j
             );
         }
     }
 
-    let raw = symbol_short!("ADMIN").into_val(&env);
-    assert_ne!(variants[0], raw, "DataKey::Admin collides with raw 'ADMIN'");
+    let raw = symbol_short!("ADMIN").to_xdr(&env);
+    assert_ne!(
+        variants.get(0).unwrap(),
+        raw,
+        "DataKey::Admin collides with raw 'ADMIN'"
+    );
 }

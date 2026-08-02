@@ -1,6 +1,6 @@
 #![cfg(test)]
 use soroban_sdk::vec;
-use soroban_sdk::{symbol_short, Env, IntoVal, Symbol};
+use soroban_sdk::{symbol_short, xdr::ToXdr, Env, Symbol};
 
 use crate::storage::DataKey;
 
@@ -12,21 +12,28 @@ fn test_datakey_variant_keys_are_unique() {
     let sym = Symbol::new(&env, "XLM");
 
     let variants = vec![
-        DataKey::Config.into_val(&env),
-        DataKey::Signers.into_val(&env),
-        DataKey::Dispute(sym.clone()).into_val(&env),
+        &env,
+        DataKey::Config.to_xdr(&env),
+        DataKey::Signers.to_xdr(&env),
+        DataKey::Dispute(sym.clone()).to_xdr(&env),
     ];
 
     for i in 0..variants.len() {
         for j in (i + 1)..variants.len() {
             assert_ne!(
-                variants[i], variants[j],
+                variants.get(i).unwrap(),
+                variants.get(j).unwrap(),
                 "storage-key collision between DataKey variants {} and {}",
-                i, j
+                i,
+                j
             );
         }
     }
 
-    let raw = symbol_short!("config").into_val(&env);
-    assert_ne!(variants[0], raw, "DataKey::Config collides with raw 'config'");
+    let raw = symbol_short!("config").to_xdr(&env);
+    assert_ne!(
+        variants.get(0).unwrap(),
+        raw,
+        "DataKey::Config collides with raw 'config'"
+    );
 }
