@@ -1,17 +1,15 @@
-
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short,
-    Address, Env, Map, String, Symbol, Vec,
-    log, panic_with_error,
+    contract, contractimpl, contracttype, log, panic_with_error, symbol_short, Address, Env, Map,
+    String, Symbol, Vec,
 };
 
 // ─── Storage Keys ────────────────────────────────────────────────────────────
 
-const ADMIN_KEY: Symbol          = symbol_short!("ADMIN");
-const TOKEN_COUNT_KEY: Symbol    = symbol_short!("TOK_CNT");
-const PAUSED_KEY: Symbol         = symbol_short!("PAUSED");
+const ADMIN_KEY: Symbol = symbol_short!("ADMIN");
+const TOKEN_COUNT_KEY: Symbol = symbol_short!("TOK_CNT");
+const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
 
 // ─── Error Codes ─────────────────────────────────────────────────────────────
 
@@ -19,14 +17,14 @@ const PAUSED_KEY: Symbol         = symbol_short!("PAUSED");
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 pub enum CertError {
-    NotAdmin          = 1,
-    NotOwner          = 2,
-    CertNotFound      = 3,
-    AlreadyMinted     = 4,
+    NotAdmin = 1,
+    NotOwner = 2,
+    CertNotFound = 3,
+    AlreadyMinted = 4,
     TransferRestricted = 5,
-    ContractPaused    = 6,
-    InvalidInput      = 7,
-    Unauthorized      = 8,
+    ContractPaused = 6,
+    InvalidInput = 7,
+    Unauthorized = 8,
 }
 
 impl From<CertError> for soroban_sdk::Error {
@@ -55,21 +53,21 @@ pub enum RarityTier {
 impl RarityTier {
     pub fn from_seconds(secs: u64) -> Self {
         match secs {
-            0..=60      => RarityTier::Legendary,
-            61..=300    => RarityTier::Epic,
-            301..=900   => RarityTier::Rare,
-            901..=3600  => RarityTier::Uncommon,
-            _           => RarityTier::Common,
+            0..=60 => RarityTier::Legendary,
+            61..=300 => RarityTier::Epic,
+            301..=900 => RarityTier::Rare,
+            901..=3600 => RarityTier::Uncommon,
+            _ => RarityTier::Common,
         }
     }
 
     pub fn weight(&self) -> u32 {
         match self {
             RarityTier::Legendary => 5,
-            RarityTier::Epic      => 4,
-            RarityTier::Rare      => 3,
-            RarityTier::Uncommon  => 2,
-            RarityTier::Common    => 1,
+            RarityTier::Epic => 4,
+            RarityTier::Rare => 3,
+            RarityTier::Uncommon => 2,
+            RarityTier::Common => 1,
         }
     }
 }
@@ -141,7 +139,6 @@ pub struct CompletionCertificateContract;
 
 #[contractimpl]
 impl CompletionCertificateContract {
-
     // ── Initialisation ────────────────────────────────────────────────────
 
     pub fn initialize(env: Env, admin: Address) {
@@ -152,7 +149,11 @@ impl CompletionCertificateContract {
         env.storage().instance().set(&ADMIN_KEY, &admin);
         env.storage().instance().set(&TOKEN_COUNT_KEY, &0u64);
         env.storage().instance().set(&PAUSED_KEY, &false);
-        log!(&env, "CompletionCertificate: initialized with admin {}", admin);
+        log!(
+            &env,
+            "CompletionCertificate: initialized with admin {}",
+            admin
+        );
     }
 
     // ── Admin Utilities ───────────────────────────────────────────────────
@@ -351,27 +352,26 @@ impl CompletionCertificateContract {
             .get::<(Symbol, u64), CertificateMetadata>(&key)
         {
             Some(cert) if !cert.burned => VerificationProof {
-                token_id:      cert.token_id,
-                owner:         cert.owner,
-                puzzle_id:     cert.puzzle_id,
+                token_id: cert.token_id,
+                owner: cert.owner,
+                puzzle_id: cert.puzzle_id,
                 solution_hash: cert.solution_hash,
-                rarity:        cert.rarity,
-                completed_at:  cert.completed_at,
-                rank:          cert.rank,
-                authentic:     true,
+                rarity: cert.rarity,
+                completed_at: cert.completed_at,
+                rank: cert.rank,
+                authentic: true,
             },
             _ => {
-
                 let contract_addr = env.current_contract_address();
                 VerificationProof {
                     token_id,
-                    owner:         contract_addr,
-                    puzzle_id:     String::from_str(&env, ""),
+                    owner: contract_addr,
+                    puzzle_id: String::from_str(&env, ""),
                     solution_hash: String::from_str(&env, ""),
-                    rarity:        RarityTier::Common,
-                    completed_at:  0,
-                    rank:          0,
-                    authentic:     false,
+                    rarity: RarityTier::Common,
+                    completed_at: 0,
+                    rank: 0,
+                    authentic: false,
                 }
             }
         }
@@ -516,14 +516,14 @@ mod tests {
 
     #[test]
     fn test_rarity_legendary() {
-        assert_eq!(RarityTier::from_seconds(0),  RarityTier::Legendary);
+        assert_eq!(RarityTier::from_seconds(0), RarityTier::Legendary);
         assert_eq!(RarityTier::from_seconds(30), RarityTier::Legendary);
         assert_eq!(RarityTier::from_seconds(60), RarityTier::Legendary);
     }
 
     #[test]
     fn test_rarity_epic() {
-        assert_eq!(RarityTier::from_seconds(61),  RarityTier::Epic);
+        assert_eq!(RarityTier::from_seconds(61), RarityTier::Epic);
         assert_eq!(RarityTier::from_seconds(300), RarityTier::Epic);
     }
 
@@ -535,22 +535,22 @@ mod tests {
 
     #[test]
     fn test_rarity_uncommon() {
-        assert_eq!(RarityTier::from_seconds(901),  RarityTier::Uncommon);
+        assert_eq!(RarityTier::from_seconds(901), RarityTier::Uncommon);
         assert_eq!(RarityTier::from_seconds(3600), RarityTier::Uncommon);
     }
 
     #[test]
     fn test_rarity_common() {
-        assert_eq!(RarityTier::from_seconds(3601),  RarityTier::Common);
+        assert_eq!(RarityTier::from_seconds(3601), RarityTier::Common);
         assert_eq!(RarityTier::from_seconds(99999), RarityTier::Common);
     }
 
     #[test]
     fn test_rarity_weights_ordered() {
         assert!(RarityTier::Legendary.weight() > RarityTier::Epic.weight());
-        assert!(RarityTier::Epic.weight()       > RarityTier::Rare.weight());
-        assert!(RarityTier::Rare.weight()       > RarityTier::Uncommon.weight());
-        assert!(RarityTier::Uncommon.weight()   > RarityTier::Common.weight());
+        assert!(RarityTier::Epic.weight() > RarityTier::Rare.weight());
+        assert!(RarityTier::Rare.weight() > RarityTier::Uncommon.weight());
+        assert!(RarityTier::Uncommon.weight() > RarityTier::Common.weight());
     }
 
     // ── Initialisation Tests ──────────────────────────────────────────────
@@ -580,16 +580,15 @@ mod tests {
         let (env, contract_id, _admin) = setup();
         let client = CompletionCertificateContractClient::new(&env, &contract_id);
 
-        let owner   = Address::generate(&env);
-        let p_id    = String::from_str(&env, "PUZZLE-001");
+        let owner = Address::generate(&env);
+        let p_id = String::from_str(&env, "PUZZLE-001");
         let p_title = String::from_str(&env, "The Lost Labyrinth");
         let sol_hash = String::from_str(&env, "abc123def456");
-        let uri      = String::from_str(&env, "ipfs://QmTest");
+        let uri = String::from_str(&env, "ipfs://QmTest");
 
         let token_id = client.mint_certificate(
-            &owner, &p_id, &p_title,
-            &45u64,   // 45 s → Legendary
-            &1u64,    // rank 1
+            &owner, &p_id, &p_title, &45u64, // 45 s → Legendary
+            &1u64,  // rank 1
             &sol_hash, &uri, &true,
         );
 
@@ -664,14 +663,16 @@ mod tests {
         let client = CompletionCertificateContractClient::new(&env, &contract_id);
 
         let owner = Address::generate(&env);
-        let p_id  = String::from_str(&env, "P-01");
+        let p_id = String::from_str(&env, "P-01");
 
         assert!(!client.is_minted(&p_id, &owner));
 
         client.mint_certificate(
-            &owner, &p_id,
+            &owner,
+            &p_id,
             &String::from_str(&env, "Puzzle"),
-            &120u64, &2u64,
+            &120u64,
+            &2u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &false,
@@ -692,9 +693,11 @@ mod tests {
         let p_id = String::from_str(&env, "P-T");
 
         let token_id = client.mint_certificate(
-            &owner, &p_id,
+            &owner,
+            &p_id,
             &String::from_str(&env, "Transferable"),
-            &50u64, &1u64,
+            &50u64,
+            &1u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &true, // transferable
@@ -722,12 +725,14 @@ mod tests {
 
         let owner = Address::generate(&env);
         let other = Address::generate(&env);
-        let p_id  = String::from_str(&env, "P-NT");
+        let p_id = String::from_str(&env, "P-NT");
 
         let token_id = client.mint_certificate(
-            &owner, &p_id,
+            &owner,
+            &p_id,
             &String::from_str(&env, "Soulbound"),
-            &50u64, &1u64,
+            &50u64,
+            &1u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &false, // NOT transferable
@@ -744,12 +749,14 @@ mod tests {
         let client = CompletionCertificateContractClient::new(&env, &contract_id);
 
         let owner = Address::generate(&env);
-        let p_id  = String::from_str(&env, "P-BURN");
+        let p_id = String::from_str(&env, "P-BURN");
 
         let token_id = client.mint_certificate(
-            &owner, &p_id,
+            &owner,
+            &p_id,
             &String::from_str(&env, "Burnable"),
-            &100u64, &3u64,
+            &100u64,
+            &3u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &true,
@@ -776,12 +783,14 @@ mod tests {
 
         let owner = Address::generate(&env);
         let other = Address::generate(&env);
-        let p_id  = String::from_str(&env, "P-BURN2");
+        let p_id = String::from_str(&env, "P-BURN2");
 
         let token_id = client.mint_certificate(
-            &owner, &p_id,
+            &owner,
+            &p_id,
             &String::from_str(&env, "T"),
-            &100u64, &1u64,
+            &100u64,
+            &1u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &true,
@@ -797,14 +806,16 @@ mod tests {
         let (env, contract_id, _) = setup();
         let client = CompletionCertificateContractClient::new(&env, &contract_id);
 
-        let owner    = Address::generate(&env);
-        let p_id     = String::from_str(&env, "P-VER");
+        let owner = Address::generate(&env);
+        let p_id = String::from_str(&env, "P-VER");
         let sol_hash = String::from_str(&env, "deadbeef");
 
         let token_id = client.mint_certificate(
-            &owner, &p_id,
+            &owner,
+            &p_id,
             &String::from_str(&env, "Verify Me"),
-            &250u64, &5u64,
+            &250u64,
+            &5u64,
             &sol_hash,
             &String::from_str(&env, "uri"),
             &true,
@@ -812,11 +823,11 @@ mod tests {
 
         let proof = client.verify_certificate(&token_id);
         assert!(proof.authentic);
-        assert_eq!(proof.owner,         owner);
-        assert_eq!(proof.puzzle_id,     p_id);
+        assert_eq!(proof.owner, owner);
+        assert_eq!(proof.puzzle_id, p_id);
         assert_eq!(proof.solution_hash, sol_hash);
-        assert_eq!(proof.rarity,        RarityTier::Epic); // 250 s → Epic
-        assert_eq!(proof.rank,          5);
+        assert_eq!(proof.rarity, RarityTier::Epic); // 250 s → Epic
+        assert_eq!(proof.rank, 5);
     }
 
     #[test]
@@ -842,7 +853,8 @@ mod tests {
                 &owner,
                 &String::from_str(&env, p),
                 &String::from_str(&env, "Title"),
-                &secs, &1u64,
+                &secs,
+                &1u64,
                 &String::from_str(&env, "h"),
                 &String::from_str(&env, "u"),
                 &true,
@@ -874,7 +886,8 @@ mod tests {
             &owner,
             &String::from_str(&env, "P-PAUSE"),
             &String::from_str(&env, "T"),
-            &100u64, &1u64,
+            &100u64,
+            &1u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &true,
@@ -895,7 +908,8 @@ mod tests {
             &owner,
             &String::from_str(&env, "P-UNPAUSE"),
             &String::from_str(&env, "T"),
-            &100u64, &1u64,
+            &100u64,
+            &1u64,
             &String::from_str(&env, "h"),
             &String::from_str(&env, "u"),
             &true,
@@ -908,7 +922,7 @@ mod tests {
     #[test]
     fn test_set_admin() {
         let (env, contract_id, _old_admin) = setup();
-        let client  = CompletionCertificateContractClient::new(&env, &contract_id);
+        let client = CompletionCertificateContractClient::new(&env, &contract_id);
         let new_admin = Address::generate(&env);
 
         client.set_admin(&new_admin);
@@ -929,14 +943,15 @@ mod tests {
     fn test_get_owner_certificates_multiple() {
         let (env, contract_id, _) = setup();
         let client = CompletionCertificateContractClient::new(&env, &contract_id);
-        let owner  = Address::generate(&env);
+        let owner = Address::generate(&env);
 
         for p in ["PA", "PB", "PC"] {
             client.mint_certificate(
                 &owner,
                 &String::from_str(&env, p),
                 &String::from_str(&env, "Title"),
-                &100u64, &1u64,
+                &100u64,
+                &1u64,
                 &String::from_str(&env, "h"),
                 &String::from_str(&env, "u"),
                 &true,

@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, Env, Map,
-};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Map};
 
 const BPS_DENOMINATOR: u32 = 10_000;
 
@@ -34,12 +32,7 @@ pub struct RoyaltySplitter;
 impl RoyaltySplitter {
     /* ================= INIT ================= */
 
-    pub fn init(
-        env: Env,
-        admin: Address,
-        splits: Map<Address, u32>,
-        min_threshold: i128,
-    ) {
+    pub fn init(env: Env, admin: Address, splits: Map<Address, u32>, min_threshold: i128) {
         if env.storage().instance().has(&DataKey::Initialized) {
             panic!("Already initialized");
         }
@@ -55,9 +48,15 @@ impl RoyaltySplitter {
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Splits, &splits);
-        env.storage().instance().set(&DataKey::Balances, &Map::<Address, i128>::new(&env));
-        env.storage().instance().set(&DataKey::TotalReceived, &0i128);
-        env.storage().instance().set(&DataKey::MinThreshold, &min_threshold);
+        env.storage()
+            .instance()
+            .set(&DataKey::Balances, &Map::<Address, i128>::new(&env));
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalReceived, &0i128);
+        env.storage()
+            .instance()
+            .set(&DataKey::MinThreshold, &min_threshold);
         env.storage().instance().set(&DataKey::Initialized, &true);
     }
 
@@ -66,14 +65,25 @@ impl RoyaltySplitter {
     pub fn distribute(env: Env, amount: i128) {
         Self::require_init(&env);
 
-        let min = env.storage().instance().get::<_, i128>(&DataKey::MinThreshold).unwrap();
+        let min = env
+            .storage()
+            .instance()
+            .get::<_, i128>(&DataKey::MinThreshold)
+            .unwrap();
         if amount < min {
             panic!("Below minimum threshold");
         }
 
-        let splits = env.storage().instance().get::<_, Map<Address, u32>>(&DataKey::Splits).unwrap();
-        let mut balances =
-            env.storage().instance().get::<_, Map<Address, i128>>(&DataKey::Balances).unwrap();
+        let splits = env
+            .storage()
+            .instance()
+            .get::<_, Map<Address, u32>>(&DataKey::Splits)
+            .unwrap();
+        let mut balances = env
+            .storage()
+            .instance()
+            .get::<_, Map<Address, i128>>(&DataKey::Balances)
+            .unwrap();
 
         for (recipient, pct) in splits.iter() {
             let share = amount * pct as i128 / BPS_DENOMINATOR as i128;
@@ -86,7 +96,9 @@ impl RoyaltySplitter {
             .instance()
             .get::<_, i128>(&DataKey::TotalReceived)
             .unwrap();
-        env.storage().instance().set(&DataKey::TotalReceived, &(total + amount));
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalReceived, &(total + amount));
         env.storage().instance().set(&DataKey::Balances, &balances);
     }
 
@@ -95,8 +107,11 @@ impl RoyaltySplitter {
     pub fn withdraw(env: Env, recipient: Address) {
         Self::require_init(&env);
 
-        let mut balances =
-            env.storage().instance().get::<_, Map<Address, i128>>(&DataKey::Balances).unwrap();
+        let mut balances = env
+            .storage()
+            .instance()
+            .get::<_, Map<Address, i128>>(&DataKey::Balances)
+            .unwrap();
         let amount = balances.get(recipient.clone()).unwrap_or(0);
 
         if amount <= 0 {
@@ -132,8 +147,11 @@ impl RoyaltySplitter {
     pub fn emergency_withdraw(env: Env, recipient: Address, amount: i128) {
         Self::require_admin(&env);
 
-        let mut balances =
-            env.storage().instance().get::<_, Map<Address, i128>>(&DataKey::Balances).unwrap();
+        let mut balances = env
+            .storage()
+            .instance()
+            .get::<_, Map<Address, i128>>(&DataKey::Balances)
+            .unwrap();
         let current = balances.get(recipient.clone()).unwrap_or(0);
 
         if amount > current {
@@ -147,11 +165,7 @@ impl RoyaltySplitter {
     /* ================= HELPERS ================= */
 
     fn require_init(env: &Env) {
-        if !env
-            .storage()
-            .instance()
-            .has(&DataKey::Initialized)
-        {
+        if !env.storage().instance().has(&DataKey::Initialized) {
             panic!("Not initialized");
         }
     }

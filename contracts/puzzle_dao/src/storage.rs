@@ -170,9 +170,7 @@ pub fn set_membership_thresholds(env: &Env, thresholds: &Map<MembershipTier, i12
 // ── Multisig storage (ADR-0013) ──────────────────────────────────────────
 
 pub fn get_multisig_config(env: &Env) -> Option<MultisigConfig> {
-    env.storage()
-        .instance()
-        .get(&DataKey::MultisigConfig)
+    env.storage().instance().get(&DataKey::MultisigConfig)
 }
 
 pub fn set_multisig_config(env: &Env, config: &MultisigConfig) {

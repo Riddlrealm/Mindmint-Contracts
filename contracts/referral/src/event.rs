@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Env, String, Symbol};
+use soroban_sdk::{Address, Env, String, Symbol, contracttype};
 
 /// The payload varies per event kind.
 #[contracttype]
@@ -27,12 +27,7 @@ pub enum ReferralEventData {
 /// filtering by off-chain indexers.
 pub fn emit_referral_event(env: &Env, kind: Symbol, data: &ReferralEventData) {
     match data {
-        ReferralEventData::Init(
-            admin,
-            reward_token,
-            referrer_reward,
-            referee_reward,
-        ) => {
+        ReferralEventData::Init(admin, reward_token, referrer_reward, referee_reward) => {
             env.events().publish(
                 (kind, Symbol::new(env, "init")),
                 (
@@ -49,12 +44,7 @@ pub fn emit_referral_event(env: &Env, kind: Symbol, data: &ReferralEventData) {
                 (user.clone(), code.clone()),
             );
         }
-        ReferralEventData::ReferralRegistered(
-            referee,
-            referrer,
-            code,
-            rewards_distributed,
-        ) => {
+        ReferralEventData::ReferralRegistered(referee, referrer, code, rewards_distributed) => {
             env.events().publish(
                 (kind, Symbol::new(env, "referral_registered")),
                 (
@@ -65,24 +55,14 @@ pub fn emit_referral_event(env: &Env, kind: Symbol, data: &ReferralEventData) {
                 ),
             );
         }
-        ReferralEventData::RewardFailed(
-            referrer,
-            referee,
-            total_needed,
-            available,
-        ) => {
+        ReferralEventData::RewardFailed(referrer, referee, total_needed, available) => {
             env.events().publish(
                 (
                     kind,
                     Symbol::new(env, "reward_failed"),
                     Symbol::new(env, "insufficient_balance"),
                 ),
-                (
-                    referrer.clone(),
-                    referee.clone(),
-                    *total_needed,
-                    *available,
-                ),
+                (referrer.clone(), referee.clone(), *total_needed, *available),
             );
         }
         ReferralEventData::RewardsDistributed(

@@ -7,3 +7,6 @@
 # Words that are correct despite looking like typos.
 soroban = "soroban"
 noqa = "noqa"
+nd = "nd"           # suffix of `reward_2nd` / `reward_3rd`
+groth = "groth"     # Groth16 zk-SNARK construction
+issu = "issu"       # `symbol_short!("tkt_issu")`; capped at 9 chars

@@ -1,9 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype,
-    Address, Bytes, BytesN, Env, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, Vec};
 
 #[contract]
 pub struct GiftContract;
@@ -38,7 +35,6 @@ const DAY: u64 = 86400;
 
 #[contractimpl]
 impl GiftContract {
-
     pub fn create_gift(
         env: Env,
         sender: Address,
@@ -46,10 +42,12 @@ impl GiftContract {
         product_id: u32,
         duration_days: u64,
     ) -> Bytes {
-
         sender.require_auth();
 
-        let raw_code = Bytes::from_array(&env, &[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+        let raw_code = Bytes::from_array(
+            &env,
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        );
         let code_hash: BytesN<32> = env.crypto().sha256(&raw_code).into();
 
         let expires_at = env.ledger().timestamp() + duration_days * DAY;
@@ -63,31 +61,36 @@ impl GiftContract {
             status: GiftStatus::Pending,
         };
 
-        env.storage().persistent().set(&DataKey::Gift(code_hash.clone()), &gift);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Gift(code_hash.clone()), &gift);
 
-        let mut list: Vec<BytesN<32>> =
-            env.storage()
-                .persistent()
-                .get(&DataKey::SentList(sender.clone()))
-                .unwrap_or(Vec::new(&env));
+        let mut list: Vec<BytesN<32>> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::SentList(sender.clone()))
+            .unwrap_or(Vec::new(&env));
 
         list.push_back(code_hash.clone());
-        env.storage().persistent().set(&DataKey::SentList(sender.clone()), &list);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SentList(sender.clone()), &list);
 
         raw_code
     }
 
     pub fn claim_gift(env: Env, caller: Address, raw_code: Bytes) {
-
         caller.require_auth();
 
         let code_hash: BytesN<32> = env.crypto().sha256(&raw_code).into();
 
-        let mut gift: GiftCode = match env.storage()
+        let mut gift: GiftCode = match env
+            .storage()
             .persistent()
-            .get(&DataKey::Gift(code_hash.clone())) {
-                Some(g) => g,
-                None => return,
+            .get(&DataKey::Gift(code_hash.clone()))
+        {
+            Some(g) => g,
+            None => return,
         };
 
         if gift.status != GiftStatus::Pending {
@@ -104,18 +107,21 @@ impl GiftContract {
 
         gift.status = GiftStatus::Claimed;
 
-        env.storage().persistent().set(&DataKey::Gift(code_hash.clone()), &gift);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Gift(code_hash.clone()), &gift);
     }
 
     pub fn refund_gift(env: Env, caller: Address, code_hash: BytesN<32>) {
-
         caller.require_auth();
 
-        let mut gift: GiftCode = match env.storage()
+        let mut gift: GiftCode = match env
+            .storage()
             .persistent()
-            .get(&DataKey::Gift(code_hash.clone())) {
-                Some(g) => g,
-                None => return,
+            .get(&DataKey::Gift(code_hash.clone()))
+        {
+            Some(g) => g,
+            None => return,
         };
 
         if caller != gift.sender {
@@ -132,7 +138,9 @@ impl GiftContract {
 
         gift.status = GiftStatus::Refunded;
 
-        env.storage().persistent().set(&DataKey::Gift(code_hash.clone()), &gift);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Gift(code_hash.clone()), &gift);
     }
 
     pub fn get_gift(env: Env, code_hash: BytesN<32>) -> GiftCode {
@@ -153,7 +161,7 @@ impl GiftContract {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{Env, testutils::Address as _};
+    use soroban_sdk::{testutils::Address as _, Env};
 
     #[test]
     fn test_create_and_claim() {

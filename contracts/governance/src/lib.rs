@@ -296,11 +296,7 @@ impl GovernanceContract {
     }
 
     /// Propose a multisig-gated admin action.
-    pub fn propose_admin_action(
-        env: Env,
-        proposer: Address,
-        description: String,
-    ) -> u64 {
+    pub fn propose_admin_action(env: Env, proposer: Address, description: String) -> u64 {
         proposer.require_auth();
 
         let msig = get_multisig_config(&env).expect("Multisig not initialized");
@@ -358,8 +354,10 @@ impl GovernanceContract {
 
         set_admin_action(&env, &action);
 
-        env.events()
-            .publish((Symbol::new(&env, "admin_action_signed"),), (action_id, signer));
+        env.events().publish(
+            (Symbol::new(&env, "admin_action_signed"),),
+            (action_id, signer),
+        );
     }
 
     /// Execute an approved admin action.

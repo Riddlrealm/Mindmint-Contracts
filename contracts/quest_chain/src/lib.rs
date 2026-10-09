@@ -633,9 +633,7 @@ impl QuestChainContract {
             .get(&DataKey::CompletionLeaderboard(chain_id))
             .unwrap_or(Vec::new(&env));
 
-        let actual_limit = limit
-            .min(MAX_LEADERBOARD_ENTRIES)
-            .min(leaderboard.len());
+        let actual_limit = limit.min(MAX_LEADERBOARD_ENTRIES).min(leaderboard.len());
         let mut result = Vec::new(&env);
 
         for i in 0..actual_limit {

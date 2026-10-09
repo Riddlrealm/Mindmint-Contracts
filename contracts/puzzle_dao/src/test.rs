@@ -502,7 +502,12 @@ fn test_propose_admin_action() {
     // otherwise `mint` rejects the minter as unauthorized.
     let token_client = RewardTokenClient::new(&env, &token_id);
     let token_admin = Address::generate(&env);
-    token_client.initialize(&token_admin, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
+    token_client.initialize(
+        &token_admin,
+        &String::from_str(&env, "T"),
+        &String::from_str(&env, "T"),
+        &6,
+    );
     token_client.mint(&token_admin, &council1, &100000);
     token_client.mint(&token_admin, &council2, &100000);
     client.join_dao(&council1, &100000);
@@ -512,10 +517,8 @@ fn test_propose_admin_action() {
     client.initialize_multisig(&council1, &2, &3600);
 
     // Propose action
-    let action_id = client.propose_admin_action(
-        &council1,
-        &String::from_str(&env, "Allocate 500 tokens"),
-    );
+    let action_id =
+        client.propose_admin_action(&council1, &String::from_str(&env, "Allocate 500 tokens"));
     assert_eq!(action_id, 1);
 
     let action = client.get_admin_action_info(&action_id);
@@ -550,7 +553,12 @@ fn test_sign_admin_action_and_approve() {
 
     let token_client = RewardTokenClient::new(&env, &token_id);
     let admin_addr = Address::generate(&env);
-    token_client.initialize(&admin_addr, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
+    token_client.initialize(
+        &admin_addr,
+        &String::from_str(&env, "T"),
+        &String::from_str(&env, "T"),
+        &6,
+    );
     token_client.mint(&admin_addr, &council1, &100000);
     token_client.mint(&admin_addr, &council2, &100000);
     client.join_dao(&council1, &100000);
@@ -558,10 +566,7 @@ fn test_sign_admin_action_and_approve() {
 
     client.initialize_multisig(&council1, &2, &3600);
 
-    let action_id = client.propose_admin_action(
-        &council1,
-        &String::from_str(&env, "Spend 500"),
-    );
+    let action_id = client.propose_admin_action(&council1, &String::from_str(&env, "Spend 500"));
 
     // Before second signature: still Pending
     let action = client.get_admin_action_info(&action_id);
@@ -602,7 +607,12 @@ fn test_non_council_cannot_propose() {
 
     let token_client = RewardTokenClient::new(&env, &token_id);
     let admin_addr = Address::generate(&env);
-    token_client.initialize(&admin_addr, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
+    token_client.initialize(
+        &admin_addr,
+        &String::from_str(&env, "T"),
+        &String::from_str(&env, "T"),
+        &6,
+    );
     token_client.mint(&admin_addr, &council, &100000);
     token_client.mint(&admin_addr, &basic_member, &5000);
     client.join_dao(&council, &100000);
@@ -611,10 +621,8 @@ fn test_non_council_cannot_propose() {
     client.initialize_multisig(&council, &2, &3600);
 
     // Basic member tries to propose
-    let result = client.try_propose_admin_action(
-        &basic_member,
-        &String::from_str(&env, "Unauthorized"),
-    );
+    let result =
+        client.try_propose_admin_action(&basic_member, &String::from_str(&env, "Unauthorized"));
     assert!(result.is_err());
 }
 
@@ -644,7 +652,12 @@ fn test_execute_approved_action() {
 
     let token_client = RewardTokenClient::new(&env, &token_id);
     let admin_addr = Address::generate(&env);
-    token_client.initialize(&admin_addr, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
+    token_client.initialize(
+        &admin_addr,
+        &String::from_str(&env, "T"),
+        &String::from_str(&env, "T"),
+        &6,
+    );
     token_client.mint(&admin_addr, &council1, &100000);
     token_client.mint(&admin_addr, &council2, &100000);
     client.join_dao(&council1, &100000);
@@ -652,10 +665,7 @@ fn test_execute_approved_action() {
 
     client.initialize_multisig(&council1, &2, &3600);
 
-    let action_id = client.propose_admin_action(
-        &council1,
-        &String::from_str(&env, "Execute me"),
-    );
+    let action_id = client.propose_admin_action(&council1, &String::from_str(&env, "Execute me"));
     client.sign_admin_action(&council2, &action_id);
 
     // Execute
@@ -692,7 +702,12 @@ fn test_cannot_execute_non_approved_action() {
 
     let token_client = RewardTokenClient::new(&env, &token_id);
     let admin_addr = Address::generate(&env);
-    token_client.initialize(&admin_addr, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
+    token_client.initialize(
+        &admin_addr,
+        &String::from_str(&env, "T"),
+        &String::from_str(&env, "T"),
+        &6,
+    );
     token_client.mint(&admin_addr, &council, &100000);
     // council2 must hold tokens to join; they never sign, so the action
     // stays Pending and execution must fail below.
@@ -702,10 +717,8 @@ fn test_cannot_execute_non_approved_action() {
 
     client.initialize_multisig(&council, &2, &3600);
 
-    let action_id = client.propose_admin_action(
-        &council,
-        &String::from_str(&env, "Not approved yet"),
-    );
+    let action_id =
+        client.propose_admin_action(&council, &String::from_str(&env, "Not approved yet"));
 
     // Should fail because action is still Pending (only 1 of 2 signatures)
     let result = client.try_execute_admin_action(&council, &action_id);

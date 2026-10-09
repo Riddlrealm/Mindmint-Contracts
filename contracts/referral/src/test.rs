@@ -31,9 +31,9 @@ fn setup_contract(e: &Env) -> (Address, Address, Address, TokenClient) {
     client.initialize(
         &admin,
         &token_address,
-        &1000,           // referrer reward
-        &500,            // referee reward
-        &10,             // max referrals per user
+        &1000,            // referrer reward
+        &500,             // referee reward
+        &10,              // max referrals per user
         &MAX_CHAIN_DEPTH, // max_chain_depth
     );
 
@@ -434,9 +434,9 @@ fn test_cyclic_chain_five_steps_should_fail() {
     client.initialize(
         &admin,
         &token_address,
-        &0,             // no rewards needed for this test
+        &0, // no rewards needed for this test
         &0,
-        &100,           // generous referral limit
+        &100, // generous referral limit
         &MAX_CHAIN_DEPTH,
     );
 
@@ -483,14 +483,7 @@ fn test_deep_chain_no_cycle_succeeds() {
     let token_admin_client = StellarAssetClient::new(&e, &token_address);
     let client = ReferralContractClient::new(&e, &referral_contract);
 
-    client.initialize(
-        &admin,
-        &token_address,
-        &0,
-        &0,
-        &100,
-        &MAX_CHAIN_DEPTH,
-    );
+    client.initialize(&admin, &token_address, &0, &0, &100, &MAX_CHAIN_DEPTH);
 
     token_admin_client.mint(&referral_contract, &1_000_000);
 

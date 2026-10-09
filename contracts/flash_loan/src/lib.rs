@@ -1,8 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol,
-    Vec,
+    contract, contracterror, contractimpl, contracttype, token, Address, Env, IntoVal, Symbol, Vec,
 };
 
 const BASIS_POINTS: i128 = 10_000;
@@ -133,7 +132,9 @@ impl FlashLoanContract {
             .persistent()
             .set(&DataKey::PoolList, &Vec::<Address>::new(&env));
         env.storage().persistent().set(&DataKey::Paused, &false);
-        env.storage().persistent().set(&DataKey::IsProcessing, &false);
+        env.storage()
+            .persistent()
+            .set(&DataKey::IsProcessing, &false);
     }
 
     pub fn add_liquidity(env: Env, lender: Address, token: Address, amount: i128) {
