@@ -1,0 +1,10 @@
+[package]
+name = "referral_reward"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Pure-Rust referral reward logic (no chain dependency). Kept in the
+# workspace so it is compile-checked and tested alongside the contracts.
+[lib]
+path = "src/lib.rs"

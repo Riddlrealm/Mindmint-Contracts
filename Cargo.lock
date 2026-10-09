@@ -131,6 +131,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
+name = "batch_processing"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "battle_pass"
 version = "0.1.0"
 dependencies = [
@@ -236,6 +243,13 @@ dependencies = [
 
 [[package]]
 name = "community-grant"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "completion_certificate"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
@@ -1502,6 +1516,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "referral_reward"
+version = "0.1.0"
+
+[[package]]
 name = "reputation"
 version = "0.1.0"
 dependencies = [
@@ -1542,6 +1560,13 @@ dependencies = [
 [[package]]
 name = "royalty_distribution"
 version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "royalty_splitter"
+version = "0.0.0"
 dependencies = [
  "soroban-sdk",
 ]
@@ -2045,6 +2070,13 @@ dependencies = [
 
 [[package]]
 name = "subscription-dao"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "subscription_gift"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
