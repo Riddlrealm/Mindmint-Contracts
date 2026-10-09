@@ -624,7 +624,8 @@ fn test_cycle_beyond_max_depth_not_detected() {
     // (D→C→B), never reaching A, so the cycle is NOT detected.
     // This is expected behavior: the depth bound limits cycle detection.
     // NOTE: This test documents the limitation, not a bug.
-    let code_d = client.get_referral_code(&user_d).unwrap();
+    // D only registered as a referee so far; generate D's own code first.
+    let code_d = client.generate_referral_code(&user_d);
     // This will NOT panic because the walk stops at depth 2
     client.register_with_referral_code(&user_a, &code_d);
 

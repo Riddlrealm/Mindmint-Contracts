@@ -498,11 +498,13 @@ fn test_propose_admin_action() {
         &50,
     );
 
-    // Setup members
+    // Setup members — reuse the same admin address for initialize and mint,
+    // otherwise `mint` rejects the minter as unauthorized.
     let token_client = RewardTokenClient::new(&env, &token_id);
-    token_client.initialize(&Address::generate(&env), &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
-    token_client.mint(&Address::generate(&env), &council1, &100000);
-    token_client.mint(&Address::generate(&env), &council2, &100000);
+    let token_admin = Address::generate(&env);
+    token_client.initialize(&token_admin, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
+    token_client.mint(&token_admin, &council1, &100000);
+    token_client.mint(&token_admin, &council2, &100000);
     client.join_dao(&council1, &100000);
     client.join_dao(&council2, &100000);
 
@@ -692,6 +694,9 @@ fn test_cannot_execute_non_approved_action() {
     let admin_addr = Address::generate(&env);
     token_client.initialize(&admin_addr, &String::from_str(&env, "T"), &String::from_str(&env, "T"), &6);
     token_client.mint(&admin_addr, &council, &100000);
+    // council2 must hold tokens to join; they never sign, so the action
+    // stays Pending and execution must fail below.
+    token_client.mint(&admin_addr, &council2, &100000);
     client.join_dao(&council, &100000);
     client.join_dao(&council2, &100000);
 
