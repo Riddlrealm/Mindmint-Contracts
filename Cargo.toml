@@ -95,6 +95,11 @@ members = ["contracts/subscription",
   "contracts/revenue_share",
   "contracts/cross_contract",
   "contracts/royalty_distribution",
+  "contracts/batch_processing",
+  "contracts/completion_certificate",
+  "contracts/referral_reward",
+  "contracts/royalty_splitter",
+  "contracts/subscription_gift",
 ]
 
 
