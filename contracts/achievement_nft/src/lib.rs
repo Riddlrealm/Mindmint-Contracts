@@ -1,8 +1,6 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec};
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -75,8 +73,8 @@ const NOT_ADMIN: &str = "NotAdmin";
 const TTL_LOW: u32 = 100_000;
 const TTL_HIGH: u32 = 500_000;
 /// Audit log TTL — shorter, sampled retention.
-const AUDIT_TTL_LOW: u32 = 17_280;    // ~1 day
-const AUDIT_TTL_HIGH: u32 = 120_960;  // ~7 days
+const AUDIT_TTL_LOW: u32 = 17_280; // ~1 day
+const AUDIT_TTL_HIGH: u32 = 120_960; // ~7 days
 
 // ---------------------------------------------------------------------------
 // Contract
@@ -126,10 +124,8 @@ impl AchievementNFT {
         // Audit log
         Self::write_audit(&env, &admin, &minter, true);
 
-        env.events().publish(
-            (symbol_short!("mtr_grant"), admin),
-            minter,
-        );
+        env.events()
+            .publish((symbol_short!("mtr_grant"), admin), minter);
     }
 
     /// Revoke the minter role from `minter`.  Only the admin may call this.
@@ -144,10 +140,8 @@ impl AchievementNFT {
         // Audit log
         Self::write_audit(&env, &admin, &minter, false);
 
-        env.events().publish(
-            (symbol_short!("mtr_rev"), admin),
-            minter,
-        );
+        env.events()
+            .publish((symbol_short!("mtr_rev"), admin), minter);
     }
 
     /// Query whether `addr` currently holds the minter role.
@@ -266,9 +260,11 @@ impl AchievementNFT {
         env.storage()
             .persistent()
             .set(&DataKey::OwnerCollection(from.clone()), &from_col);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::OwnerCollection(from.clone()), TTL_LOW, TTL_HIGH);
+        env.storage().persistent().extend_ttl(
+            &DataKey::OwnerCollection(from.clone()),
+            TTL_LOW,
+            TTL_HIGH,
+        );
 
         // Add to receiver's collection
         let mut to_col = Self::get_collection_internal(&env, to.clone());
@@ -280,9 +276,11 @@ impl AchievementNFT {
         env.storage()
             .persistent()
             .set(&DataKey::OwnerCollection(to.clone()), &to_col);
-        env.storage()
-            .persistent()
-            .extend_ttl(&DataKey::OwnerCollection(to.clone()), TTL_LOW, TTL_HIGH);
+        env.storage().persistent().extend_ttl(
+            &DataKey::OwnerCollection(to.clone()),
+            TTL_LOW,
+            TTL_HIGH,
+        );
 
         // Update ownership
         achievement.owner = to.clone();
@@ -655,9 +653,8 @@ mod tests {
 
         // Retrieve the audit entry directly from storage.
         let key = DataKey::MinterAudit(minter.clone(), ts_before);
-        let entry: Option<MinterAuditEntry> = env.as_contract(&client.address, || {
-            env.storage().persistent().get(&key)
-        });
+        let entry: Option<MinterAuditEntry> =
+            env.as_contract(&client.address, || env.storage().persistent().get(&key));
 
         let entry = entry.expect("audit entry must exist after grant_minter");
         assert_eq!(entry.subject, minter);
@@ -676,9 +673,8 @@ mod tests {
         client.revoke_minter(&minter);
 
         let key = DataKey::MinterAudit(minter.clone(), ts_before);
-        let entry: Option<MinterAuditEntry> = env.as_contract(&client.address, || {
-            env.storage().persistent().get(&key)
-        });
+        let entry: Option<MinterAuditEntry> =
+            env.as_contract(&client.address, || env.storage().persistent().get(&key));
 
         let entry = entry.expect("audit entry must exist after revoke_minter");
         assert_eq!(entry.subject, minter);

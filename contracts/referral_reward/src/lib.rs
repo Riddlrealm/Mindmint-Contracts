@@ -47,7 +47,10 @@ impl ReferralContract {
     }
 
     pub fn claim_referral_reward(&mut self, referee: String, now: u64) -> Result<(), String> {
-        let record = self.referrals.get_mut(&referee).ok_or("Referral not found")?;
+        let record = self
+            .referrals
+            .get_mut(&referee)
+            .ok_or("Referral not found")?;
 
         if record.rewarded_at.is_some() {
             return Err("Reward already claimed".into());
@@ -79,11 +82,7 @@ impl ReferralContract {
             record.rewarded_at = Some(now);
         }
 
-        self.emit_referral_rewarded(
-            &referrer,
-            &referee,
-            referrer_amount + referee_amount,
-        );
+        self.emit_referral_rewarded(&referrer, &referee, referrer_amount + referee_amount);
 
         Ok(())
     }
@@ -94,7 +93,10 @@ impl ReferralContract {
     }
 
     fn emit_referral_rewarded(&self, referrer: &String, referee: &String, amount: u64) {
-        println!("ReferralRewarded: referrer={}, referee={}, amount={}", referrer, referee, amount);
+        println!(
+            "ReferralRewarded: referrer={}, referee={}, amount={}",
+            referrer, referee, amount
+        );
     }
 
     pub fn update_reward_amounts(&mut self, referrer_amount: u64, referee_amount: u64) {
@@ -129,23 +131,35 @@ mod tests {
     #[test]
     fn test_valid_claim() {
         let mut contract = ReferralContract::new(50, 25);
-        contract.register_referral("alice".into(), "bob".into()).unwrap();
+        contract
+            .register_referral("alice".into(), "bob".into())
+            .unwrap();
         assert!(contract.claim_referral_reward("bob".into(), 123456).is_ok());
     }
 
     #[test]
     fn test_duplicate_claim_rejected() {
         let mut contract = ReferralContract::new(50, 25);
-        contract.register_referral("alice".into(), "bob".into()).unwrap();
-        contract.claim_referral_reward("bob".into(), 123456).unwrap();
-        assert!(contract.claim_referral_reward("bob".into(), 123457).is_err());
+        contract
+            .register_referral("alice".into(), "bob".into())
+            .unwrap();
+        contract
+            .claim_referral_reward("bob".into(), 123456)
+            .unwrap();
+        assert!(contract
+            .claim_referral_reward("bob".into(), 123457)
+            .is_err());
     }
 
     #[test]
     fn test_stats_accuracy() {
         let mut contract = ReferralContract::new(50, 25);
-        contract.register_referral("alice".into(), "bob".into()).unwrap();
-        contract.claim_referral_reward("bob".into(), 123456).unwrap();
+        contract
+            .register_referral("alice".into(), "bob".into())
+            .unwrap();
+        contract
+            .claim_referral_reward("bob".into(), 123456)
+            .unwrap();
         let stats = contract.get_referral_stats("alice".into());
         assert_eq!(stats.0, 1);
         assert_eq!(stats.1, 50);
@@ -157,8 +171,12 @@ mod tests {
         contract.update_reward_cap(Some(80));
 
         let referrer = "alice".to_string();
-        contract.referrals.insert("user1".to_string(), record(&referrer, "user1", 50, 10));
-        contract.referrals.insert("user2".to_string(), record(&referrer, "user2", 50, 10));
+        contract
+            .referrals
+            .insert("user1".to_string(), record(&referrer, "user1", 50, 10));
+        contract
+            .referrals
+            .insert("user2".to_string(), record(&referrer, "user2", 50, 10));
 
         // First claim should succeed (50 <= 80)
         assert!(contract.claim_referral_reward("user1".into(), 100).is_ok());
@@ -173,14 +191,20 @@ mod tests {
     fn test_cap_update_scenario() {
         let mut contract = ReferralContract::new(50, 10);
         let referrer = "alice".to_string();
-        contract.referrals.insert("user1".to_string(), record(&referrer, "user1", 50, 10));
-        contract.referrals.insert("user2".to_string(), record(&referrer, "user2", 50, 10));
+        contract
+            .referrals
+            .insert("user1".to_string(), record(&referrer, "user1", 50, 10));
+        contract
+            .referrals
+            .insert("user2".to_string(), record(&referrer, "user2", 50, 10));
 
         contract.update_reward_cap(Some(50));
         assert!(contract.claim_referral_reward("user1".into(), 100).is_ok());
 
         // Fails due to cap
-        assert!(contract.claim_referral_reward("user2".to_string(), 101).is_err());
+        assert!(contract
+            .claim_referral_reward("user2".to_string(), 101)
+            .is_err());
 
         // Increase cap
         contract.update_reward_cap(Some(100));

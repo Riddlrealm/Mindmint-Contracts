@@ -409,13 +409,7 @@ impl ReferralContract {
 
         if contract_balance < total_needed {
             // Insufficient balance - still record referral but don't reward
-            event::emit::reward_failed(
-                env,
-                &referrer,
-                &referee,
-                total_needed,
-                contract_balance,
-            );
+            event::emit::reward_failed(env, &referrer, &referee, total_needed, contract_balance);
             return false;
         }
 

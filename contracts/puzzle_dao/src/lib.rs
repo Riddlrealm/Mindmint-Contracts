@@ -1,4 +1,5 @@
-#![no_std]#![allow(clippy::empty_line_after_outer_attr)] 
+#![no_std]
+#![allow(clippy::empty_line_after_outer_attr)]
 
 mod storage;
 pub mod types;
@@ -427,11 +428,7 @@ impl PuzzleDaoContract {
 
     /// Propose a multisig-gated admin action.  Only Council members may propose.
     /// Returns the action ID.
-    pub fn propose_admin_action(
-        env: Env,
-        proposer: Address,
-        description: String,
-    ) -> u64 {
+    pub fn propose_admin_action(env: Env, proposer: Address, description: String) -> u64 {
         proposer.require_auth();
         let member = get_member(&env, &proposer).expect("Not a member");
         if member.tier != MembershipTier::Council {
@@ -498,8 +495,10 @@ impl PuzzleDaoContract {
 
         set_admin_action(&env, &action);
 
-        env.events()
-            .publish((Symbol::new(&env, "admin_action_signed"),), (action_id, signer));
+        env.events().publish(
+            (Symbol::new(&env, "admin_action_signed"),),
+            (action_id, signer),
+        );
     }
 
     /// Execute an approved admin action.

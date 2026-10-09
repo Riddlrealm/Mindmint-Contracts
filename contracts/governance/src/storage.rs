@@ -106,7 +106,9 @@ pub fn get_multisig_config(env: &Env) -> Option<MultisigConfig> {
 }
 
 pub fn set_multisig_config(env: &Env, config: &MultisigConfig) {
-    env.storage().persistent().set(&DataKey::MultisigConfig, config);
+    env.storage()
+        .persistent()
+        .set(&DataKey::MultisigConfig, config);
 }
 
 pub fn increment_admin_action_count(env: &Env) -> u64 {

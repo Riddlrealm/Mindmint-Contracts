@@ -1,0 +1,24 @@
+name: typos
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: typos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check spelling
+        # Configuration lives in typos.toml (identifiers/words this domain
+        # legitimately uses, e.g. `soroban`, `Groth16`, `reward_2nd`).
+        uses: crate-ci/typos@v1
