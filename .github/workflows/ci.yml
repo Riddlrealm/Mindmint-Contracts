@@ -35,6 +35,7 @@ jobs:
           fi
       - name: Cargo check
         run: cargo check --workspace --all-targets
-      - name: Cargo test (compile only)
-        # Compiles the test binaries without running them; ensures tests still build.
-        run: cargo test --workspace --no-run
+      - name: Cargo test
+        # Executes the full workspace test suite. --no-fail-fast reports every
+        # crate failure instead of stopping at the first one.
+        run: cargo test --workspace --no-fail-fast
